@@ -217,7 +217,9 @@ def train():
         config["model_name_or_path"],
         torch_dtype=torch.float16,
         trust_remote_code=True,
-        use_cache=False  # Disable KV cache for training
+        use_cache=False,  # Disable KV cache for training
+        device_map=None,  # Ensure all parameters are on CPU initially
+        low_cpu_mem_usage=True  # Optimize memory usage during loading
     )
     
     # Don't move model to GPU - let DeepSpeed handle device placement
@@ -327,7 +329,10 @@ def train():
         eval_dataset=eval_dataset,
         data_collator=data_collator,
         tokenizer=tokenizer,
-        callbacks=[wandb_metrics_callback]
+        callbacks=[wandb_metrics_callback],
+        # Don't let the trainer move the model to device - DeepSpeed will handle this
+        # This prevents device conflicts between DeepSpeed and DataParallel
+        model_init=lambda: model
     )
     
     print("Trainer initialized successfully")
