@@ -80,11 +80,17 @@ def get_best_params_from_wandb(project_name, entity_name=None):
 
 def create_training_config(best_params, output_path, model_path, dataset_path, deepspeed_config=None):
     """Create a training configuration file with the best hyperparameters."""
+    # Generate a timestamp for the output directory
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    # Create checkpoint directory
+    checkpoint_dir = f"qwen_model/finetuning/checkpoints_{timestamp}"
+    
     # Default training parameters
     training_config = {
         "model_name_or_path": model_path,
         "dataset_path": dataset_path,
-        "output_dir": f"qwen_model/finetuning/training_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+        "output_dir": f"qwen_model/finetuning/training_{timestamp}",
         "num_epochs": 3,
         "gradient_accumulation_steps": 8,
         "fp16": True,
@@ -96,7 +102,12 @@ def create_training_config(best_params, output_path, model_path, dataset_path, d
         "evaluation_strategy": "steps",
         "eval_steps": 500,
         "dataloader_num_workers": 1,
-        "optim": "adamw_torch_fused"
+        "optim": "adamw_torch_fused",
+        "resume_from_checkpoint": checkpoint_dir,
+        "save_strategy": "steps",
+        "load_best_model_at_end": True,
+        "metric_for_best_model": "loss",
+        "greater_is_better": False
     }
     
     # Add DeepSpeed configuration if provided
@@ -176,8 +187,13 @@ def main():
         best_params = get_best_params_from_wandb(args.wandb_project, args.wandb_entity)
     
     if not best_params:
-        print("Could not find best hyperparameters. Make sure hyperparameter tuning has completed.")
-        return
+        print("Could not find best hyperparameters. Using default parameters instead.")
+        best_params = {
+            "learning_rate": 1e-5,
+            "weight_decay": 0.01,
+            "warmup_ratio": 0.03
+        }
+        print(f"Default parameters: {json.dumps(best_params, indent=2)}")
     
     # Create the training configuration
     training_config = create_training_config(

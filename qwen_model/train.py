@@ -291,25 +291,51 @@ def train():
     print("Setting up training arguments...")
     
     # Use only parameters that are supported by all transformers versions
-    training_args = TrainingArguments(
-        output_dir=config["output_dir"],
-        fp16=True,  # Use mixed precision
-        gradient_accumulation_steps=1,  # Can use smaller value with 8x H100s
-        per_device_train_batch_size=2,  # Can use larger batch size with H100s
-        learning_rate=config["learning_rate"],
-        weight_decay=config["weight_decay"],
-        num_train_epochs=config["num_train_epochs"],
-        save_steps=config["save_steps"],
-        save_total_limit=config["save_total_limit"],
-        logging_steps=config["logging_steps"],
-        max_grad_norm=config["max_grad_norm"],
-        warmup_ratio=config["warmup_ratio"],
-        deepspeed=args.deepspeed,  # Use the DeepSpeed config from command line
-        report_to=["tensorboard", "wandb"],
-        remove_unused_columns=False,
-        dataloader_num_workers=4,  # Can use more workers with H100s
-        gradient_checkpointing=True  # Still use gradient checkpointing for efficiency
-    )
+    training_args_dict = {
+        "output_dir": config["output_dir"],
+        "fp16": True,  # Use mixed precision
+        "gradient_accumulation_steps": 1,  # Can use smaller value with 8x H100s
+        "per_device_train_batch_size": 2,  # Can use larger batch size with H100s
+        "learning_rate": config["learning_rate"],
+        "weight_decay": config["weight_decay"],
+        "num_train_epochs": config["num_train_epochs"],
+        "save_steps": config["save_steps"],
+        "save_total_limit": config["save_total_limit"],
+        "logging_steps": config["logging_steps"],
+        "max_grad_norm": 1.0 if "max_grad_norm" not in config else config["max_grad_norm"],
+        "warmup_ratio": config["warmup_ratio"],
+        "deepspeed": args.deepspeed,  # Use the DeepSpeed config from command line
+        "report_to": ["tensorboard", "wandb"],
+        "remove_unused_columns": False,
+        "dataloader_num_workers": 4,  # Can use more workers with H100s
+        "gradient_checkpointing": True  # Still use gradient checkpointing for efficiency
+    }
+    
+    # Add checkpoint-related parameters if they exist in the config
+    if "resume_from_checkpoint" in config:
+        print(f"Setting up checkpoint directory: {config['resume_from_checkpoint']}")
+        os.makedirs(config["resume_from_checkpoint"], exist_ok=True)
+        training_args_dict["resume_from_checkpoint"] = config["resume_from_checkpoint"]
+    
+    if "save_strategy" in config:
+        training_args_dict["save_strategy"] = config["save_strategy"]
+    
+    if "load_best_model_at_end" in config:
+        training_args_dict["load_best_model_at_end"] = config["load_best_model_at_end"]
+        
+        # If we're loading the best model at the end, we need an evaluation strategy
+        if config["load_best_model_at_end"]:
+            training_args_dict["evaluation_strategy"] = "steps"
+            training_args_dict["eval_steps"] = config.get("eval_steps", 500)
+    
+    if "metric_for_best_model" in config:
+        training_args_dict["metric_for_best_model"] = config["metric_for_best_model"]
+        
+    if "greater_is_better" in config:
+        training_args_dict["greater_is_better"] = config["greater_is_better"]
+    
+    # Create the training arguments
+    training_args = TrainingArguments(**training_args_dict)
     
     print(f"Training arguments set up successfully: {training_args}")
     
@@ -322,6 +348,13 @@ def train():
     
     # Initialize Trainer with simple configuration
     print("Initializing Trainer...")
+    
+    # Ensure model parameters are properly initialized for DeepSpeed
+    # Move model to first GPU to ensure all parameters are on the same device
+    if torch.cuda.is_available():
+        model = model.to("cuda:0")
+        print("Model moved to CUDA device")
+    
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -329,17 +362,33 @@ def train():
         eval_dataset=eval_dataset,
         data_collator=data_collator,
         tokenizer=tokenizer,
-        callbacks=[wandb_metrics_callback],
-        # Don't let the trainer move the model to device - DeepSpeed will handle this
-        # This prevents device conflicts between DeepSpeed and DataParallel
-        model_init=lambda: model
+        callbacks=[wandb_metrics_callback]
+        # Remove model_init lambda to avoid device placement conflicts
     )
     
     print("Trainer initialized successfully")
     
+    # Create checkpoint directory if specified
+    if "resume_from_checkpoint" in config:
+        checkpoint_dir = config["resume_from_checkpoint"]
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        print(f"Created checkpoint directory: {checkpoint_dir}")
+    
     # Start training
     print("Starting training...")
-    trainer.train()
+    try:
+        trainer.train()
+    except Exception as e:
+        print(f"Training error: {e}")
+        # Save checkpoint even if training fails
+        if "resume_from_checkpoint" in config:
+            print(f"Attempting to save checkpoint after error...")
+            try:
+                trainer.save_model(config["resume_from_checkpoint"] + "/error_checkpoint")
+                print(f"Saved checkpoint after error to {config['resume_from_checkpoint']}/error_checkpoint")
+            except Exception as save_error:
+                print(f"Failed to save checkpoint after error: {save_error}")
+        raise e
     
     # Save the final model
     print(f"Saving model to {config['output_dir']}")
