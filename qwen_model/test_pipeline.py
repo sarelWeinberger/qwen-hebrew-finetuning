@@ -105,20 +105,66 @@ def load_and_sample_dataset(dataset_path, max_samples, seed):
     """Load dataset and sample a small subset for testing."""
     print(f"Loading dataset from {dataset_path}...")
     
+    # Set a streaming flag to avoid loading the entire dataset
+    streaming = True if max_samples <= 100 else False
+    print(f"Using streaming mode: {streaming} (max_samples={max_samples})")
+    
     try:
         # First try loading as a local disk dataset
         try:
-            dataset = load_from_disk(dataset_path)
-            print("Successfully loaded dataset from disk")
+            if streaming:
+                # For disk datasets, we'll still load it normally but sample immediately
+                dataset = load_from_disk(dataset_path)
+                print("Successfully loaded dataset from disk")
+            else:
+                dataset = load_from_disk(dataset_path)
+                print("Successfully loaded dataset from disk")
         except Exception as e:
             print(f"Failed to load dataset from disk: {e}")
-            # Try loading as a Hugging Face dataset
-            dataset = load_dataset(dataset_path)
+            # Try loading as a Hugging Face dataset with streaming
+            if streaming:
+                dataset = load_dataset(dataset_path, streaming=True)
+                # Convert streaming dataset to regular dataset with limited samples
+                train_samples = []
+                for i, sample in enumerate(dataset["train"]):
+                    if i >= max_samples:
+                        break
+                    train_samples.append(sample)
+                
+                val_samples = []
+                if "validation" in dataset:
+                    for i, sample in enumerate(dataset["validation"]):
+                        if i >= max_samples // 2:
+                            break
+                        val_samples.append(sample)
+                
+                # Create new dataset from collected samples
+                train_dataset = Dataset.from_dict({k: [sample[k] for sample in train_samples] for k in train_samples[0].keys()})
+                if val_samples:
+                    val_dataset = Dataset.from_dict({k: [sample[k] for sample in val_samples] for k in val_samples[0].keys()})
+                    dataset = DatasetDict({"train": train_dataset, "validation": val_dataset})
+                else:
+                    dataset = DatasetDict({"train": train_dataset})
+            else:
+                dataset = load_dataset(dataset_path)
     except Exception as e:
         print(f"Failed to load dataset as HF dataset: {e}")
-        # Try loading as a local JSON dataset
+        # Try loading as a local JSON dataset with streaming
         try:
-            dataset = load_dataset("json", data_files=dataset_path)
+            if streaming:
+                dataset = load_dataset("json", data_files=dataset_path, streaming=True)
+                # Convert streaming dataset to regular dataset with limited samples
+                train_samples = []
+                for i, sample in enumerate(dataset["train"]):
+                    if i >= max_samples:
+                        break
+                    train_samples.append(sample)
+                
+                # Create new dataset from collected samples
+                train_dataset = Dataset.from_dict({k: [sample[k] for sample in train_samples] for k in train_samples[0].keys()})
+                dataset = DatasetDict({"train": train_dataset})
+            else:
+                dataset = load_dataset("json", data_files=dataset_path)
         except Exception as e:
             print(f"Failed to load dataset as JSON: {e}")
             raise ValueError(f"Could not load dataset from {dataset_path}")

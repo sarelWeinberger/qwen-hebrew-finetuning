@@ -47,8 +47,8 @@ qwen_model/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/sarelWE/qwen-hebrew-finetuning.git
-cd qwen-hebrew-finetuning
+git clone <repository-url>
+cd <repository-directory>
 ```
 
 ### 2. Install Dependencies
@@ -57,56 +57,60 @@ cd qwen-hebrew-finetuning
 pip install -r requirements.txt
 ```
 
-### 3. Data and Model Preparation
+### 3. Installation Process and Environment Setup
 
-The repository includes a comprehensive workflow script that handles downloading the model from Hugging Face and preparing Hebrew data from S3. This can be run with:
+#### Environment Requirements
+- Python 3.8+ is required
+- CUDA 11.8+ is recommended for GPU acceleration
+- At least 500GB of disk space for model and data storage
+
+#### Dependencies Installation
+The requirements.txt file includes:
+- Core ML libraries: PyTorch, Transformers, DeepSpeed
+- Data processing: Pandas, NumPy, TQDM
+- Monitoring: Tensorboard, Weights & Biases
+- Optimization: Optuna for hyperparameter tuning
+
+#### Weights & Biases Setup
+For logging and monitoring, you need to set up Weights & Biases:
+
+```bash
+# Install wandb
+pip install wandb
+
+# Login with your API key
+wandb login YOUR_API_KEY
+```
+
+### 4. Data and Model Preparation
+
+The repository includes a comprehensive workflow script that handles downloading the model from Hugging Face and preparing Hebrew data from S3:
 
 ```bash
 python qwen_model/run_full_workflow.py --aws_access_key_id YOUR_AWS_ACCESS_KEY --aws_secret_access_key YOUR_AWS_SECRET_KEY
 ```
 
-#### Installation Process Details
+#### Model Download Process
+The workflow downloads the Qwen3-30B-A3B-Base model from Hugging Face using:
 
-1. **Environment Setup**:
-   - Python 3.8+ is required
-   - CUDA 11.8+ is recommended for GPU acceleration
-   - At least 500GB of disk space for model and data storage
+```python
+# First downloads config files
+snapshot_download(
+    repo_id="Qwen/Qwen3-30B-A3B-Base",
+    local_dir=model_path,
+    ignore_patterns=["*.bin", "*.safetensors"]
+)
 
-2. **Dependencies Installation**:
-   - Core ML libraries: PyTorch, Transformers, DeepSpeed
-   - Data processing: Pandas, NumPy, TQDM
-   - Monitoring: Tensorboard, Weights & Biases
-   - Optimization: Optuna for hyperparameter tuning
+# Then downloads model weights
+snapshot_download(
+    repo_id="Qwen/Qwen3-30B-A3B-Base",
+    local_dir=model_path,
+    ignore_patterns=["*.md", "*.txt"],
+    resume_download=True
+)
+```
 
-#### Model Preparation
-
-The workflow downloads the Qwen3-30B-A3B-Base model from Hugging Face using the following process:
-
-1. **Model Download**: Uses `huggingface_hub.snapshot_download` to fetch the model
-   ```python
-   # First downloads config files
-   snapshot_download(
-       repo_id="Qwen/Qwen3-30B-A3B-Base",
-       local_dir=model_path,
-       ignore_patterns=["*.bin", "*.safetensors"]
-   )
-   
-   # Then downloads model weights
-   snapshot_download(
-       repo_id="Qwen/Qwen3-30B-A3B-Base",
-       local_dir=model_path,
-       ignore_patterns=["*.md", "*.txt"],
-       resume_download=True
-   )
-   ```
-
-2. **Model Preparation**: Prepares the model for fine-tuning by:
-   - Verifying model files integrity
-   - Setting up configuration for distributed training
-   - Preparing tokenizer and model architecture
-
-#### Data Preparation
-
+#### S3 Data Processing
 The workflow processes Hebrew data from S3 using the following steps:
 
 1. **S3 Data Download**:
@@ -120,31 +124,31 @@ The workflow processes Hebrew data from S3 using the following steps:
    - Converts to JSONL format suitable for fine-tuning
    - Creates training dataset with appropriate formatting
 
-3. **Dataset Creation**:
-   - Prepares the processed data for training
-   - Creates dataset files in the format expected by the training script
-
-### 4. Test the Pipeline
+### 5. Test the Pipeline
 
 Before running a full training job, test the pipeline with a small subset of data:
 
 ```bash
-./qwen_model/start_test_pipeline.sh --dataset_path qwen_model/data/dataset/dataset
+# For single GPU testing
+python qwen_model/test_pipeline.py --dataset_path qwen_model/data/dataset/dataset --max_samples 100
+
+# For multi-GPU testing with DeepSpeed
+deepspeed --num_gpus=8 qwen_model/test_pipeline.py --dataset_path qwen_model/data/dataset/dataset --max_samples 100 --single_device --deepspeed qwen_model/deepspeed_config.json
 ```
 
-### 4. Run Hyperparameter Tuning
+### 6. Run Hyperparameter Tuning
 
 ```bash
 ./qwen_model/start_hp_tuning.sh --dataset_path qwen_model/data/dataset/dataset --num_trials 10
 ```
 
-### 5. Train the Model
+### 7. Train the Model
 
 ```bash
 ./qwen_model/start_training.sh
 ```
 
-### 6. Evaluate the Model
+### 8. Evaluate the Model
 
 ```bash
 ./qwen_model/start_evaluation.sh --model_path qwen_model/finetuned
