@@ -47,8 +47,8 @@ qwen_model/
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd <repository-directory>
+git clone https://github.com/sarelWE/qwen-hebrew-finetuning.git
+cd qwen-hebrew-finetuning
 ```
 
 ### 2. Install Dependencies
