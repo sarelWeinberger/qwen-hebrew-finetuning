@@ -47,8 +47,8 @@ qwen_model/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/sarelWE/qwen-hebrew-finetuning.git
-cd qwen-hebrew-finetuning
+git clone <repository-url>
+cd <repository-directory>
 ```
 
 ### 2. Install Dependencies
@@ -57,7 +57,74 @@ cd qwen-hebrew-finetuning
 pip install -r requirements.txt
 ```
 
-### 3. Test the Pipeline
+### 3. Data and Model Preparation
+
+The repository includes a comprehensive workflow script that handles downloading the model from Hugging Face and preparing Hebrew data from S3. This can be run with:
+
+```bash
+python qwen_model/run_full_workflow.py --aws_access_key_id YOUR_AWS_ACCESS_KEY --aws_secret_access_key YOUR_AWS_SECRET_KEY
+```
+
+#### Installation Process Details
+
+1. **Environment Setup**:
+   - Python 3.8+ is required
+   - CUDA 11.8+ is recommended for GPU acceleration
+   - At least 500GB of disk space for model and data storage
+
+2. **Dependencies Installation**:
+   - Core ML libraries: PyTorch, Transformers, DeepSpeed
+   - Data processing: Pandas, NumPy, TQDM
+   - Monitoring: Tensorboard, Weights & Biases
+   - Optimization: Optuna for hyperparameter tuning
+
+#### Model Preparation
+
+The workflow downloads the Qwen3-30B-A3B-Base model from Hugging Face using the following process:
+
+1. **Model Download**: Uses `huggingface_hub.snapshot_download` to fetch the model
+   ```python
+   # First downloads config files
+   snapshot_download(
+       repo_id="Qwen/Qwen3-30B-A3B-Base",
+       local_dir=model_path,
+       ignore_patterns=["*.bin", "*.safetensors"]
+   )
+   
+   # Then downloads model weights
+   snapshot_download(
+       repo_id="Qwen/Qwen3-30B-A3B-Base",
+       local_dir=model_path,
+       ignore_patterns=["*.md", "*.txt"],
+       resume_download=True
+   )
+   ```
+
+2. **Model Preparation**: Prepares the model for fine-tuning by:
+   - Verifying model files integrity
+   - Setting up configuration for distributed training
+   - Preparing tokenizer and model architecture
+
+#### Data Preparation
+
+The workflow processes Hebrew data from S3 using the following steps:
+
+1. **S3 Data Download**:
+   - Connects to AWS S3 using provided credentials
+   - Downloads Hebrew text datasets from the "israllm-datasets" bucket
+   - Includes robust error handling with fallback to sample data
+
+2. **Data Processing**:
+   - Extracts text from CSV files using pandas
+   - Cleans and normalizes Hebrew text
+   - Converts to JSONL format suitable for fine-tuning
+   - Creates training dataset with appropriate formatting
+
+3. **Dataset Creation**:
+   - Prepares the processed data for training
+   - Creates dataset files in the format expected by the training script
+
+### 4. Test the Pipeline
 
 Before running a full training job, test the pipeline with a small subset of data:
 
