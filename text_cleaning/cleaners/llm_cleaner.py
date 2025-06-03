@@ -18,5 +18,5 @@ class LLMCleaner:
 
         return self.extract_response(response)
 
-    def extract_response(self, text):
+    def extract_response(self, text) -> str:
         return text.split("assistant")[1].strip() if "assistant" in text else text
