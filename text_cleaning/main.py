@@ -1,5 +1,7 @@
 from text_cleaning.cleaning_pipeline import CleaningPipeline
 
+
+s3_fetcher = S3SourceFetcher()
 # An example registry structure
 # registry = {
 #     "source1": {
@@ -23,3 +25,4 @@ def run_all():
             output_path=f"cleaned_{source_name}.csv"
         )
         pipeline.run()
+
