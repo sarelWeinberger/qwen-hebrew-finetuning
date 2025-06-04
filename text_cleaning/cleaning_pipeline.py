@@ -2,7 +2,7 @@
 import pandas as pd
 
 class CleaningPipeline:
-    def __init__(self, fetcher, cleaner, output_path):
+    def __init__(self, fetcher, cleaner):
         self.fetcher = fetcher
         self.cleaner = cleaner
 

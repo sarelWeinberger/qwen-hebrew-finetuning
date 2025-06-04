@@ -2,14 +2,26 @@ from .base_cleaner import BaseCleaner
 import pandas as pd
 
 class DuplicateRemoverCleaner(BaseCleaner):
-    def __init__(self, text_column: str = "original_text"):
-        self.text_column = text_column
+    def __init__(self):
+        ...
 
     def clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        if self.text_column not in df.columns:
-            raise ValueError(f"Column '{self.text_column}' not found in dataframe")
-        
-        return df.drop_duplicates(subset=[self.text_column]).reset_index(drop=True)
+        """
+        Remove duplicate lines from the 'text' column of the DataFrame.
+        """
+        res_df = pd.DataFrame(columns=['text', 'n_count'])
+        new_texts = []
+        new_n_count = []
+        for text in df['text']:
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            lines = set(lines)
+            new_text = ('\n').join(lines)
+            new_n_count.append(len(new_text.split()))
+            new_texts.append(new_text)
+        res_df['text'] = new_texts
+        res_df['n_count'] = new_n_count
+        return res_df
 
-    def clean(self, raw_text: str) -> str:
-        return raw_text
+
+    def clean(self, df: pd.DataFrame) -> str:
+        return self.clean_dataframe(df)

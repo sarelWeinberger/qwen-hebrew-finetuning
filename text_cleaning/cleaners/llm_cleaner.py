@@ -1,12 +1,14 @@
 # cleaners/llm_cleaner.py
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
+from text_cleaning.cleaners.base_cleaner import BaseCleaner
 
-class LLMCleaner:
-    def __init__(self, model_id, processor, few_shot_prompt: list, torch_dtype=torch.float16):
+class LLMCleaner(BaseCleaner):
+    def __init__(self, model_id, processor, few_shot_prompt: list,raw_text: str, torch_dtype=torch.float16):
         self.model = AutoModelForCausalLM.from_pretrained(model_id, device_map="auto", torch_dtype=torch_dtype)
         self.tokenizer = processor
         self.few_shot_prompt = few_shot_prompt
+        self.raw_text = raw_text
 
     def clean(self, raw_text: str) -> str:
         full_chat = self.few_shot_prompt + [{"role": "user", "content": f"טקסט: {raw_text}"}]
