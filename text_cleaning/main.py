@@ -1,6 +1,7 @@
 from cleaners.duplicate_remove_cleaner import DuplicateRemoverCleaner
 from cleaning_pipeline import CleaningPipeline
 from fetchers.local_source_fetcher import LocalSourceFetcher
+from fetchers.s3_source_fetcher import S3SourceFetcher
 
 
 
@@ -19,9 +20,13 @@ from fetchers.local_source_fetcher import LocalSourceFetcher
 local_fetcher = LocalSourceFetcher(file_path='/Users/orlevi/PWC/tmp/AllHebNLIFiles-Deduped-D2.forgpt_part-100_sample.csv',
                                    output_path='cleaned_data')
 
-registry = {'source_test': {
-                "fetcher": local_fetcher,
-                "cleaner": DuplicateRemoverCleaner()
+registry = {
+            'YisraelHayomData-Combined-Deduped.forgpt':{
+                'fetcher': S3SourceFetcher(bucket_name='israllm-datasets',
+                                           prefix='raw-datasets/rar/csv_output/',
+                                           source_name='YisraelHayomData-Combined-Deduped.forgpt',
+                                           output_prefix='cleaned_data_test'),
+                'cleaner': DuplicateRemoverCleaner()
             }
 }
 
