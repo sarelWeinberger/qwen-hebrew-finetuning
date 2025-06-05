@@ -1,6 +1,6 @@
 from cleaning_pipeline import CleaningPipeline
 from fetchers.s3_source_fetcher import S3SourceFetcher
-from cleaner_config import composite_cleaner_registry, SOURCES
+from utils.cleaner_config import composite_cleaner_registry, SOURCES
 
 # Create registry with all sources
 registry = {

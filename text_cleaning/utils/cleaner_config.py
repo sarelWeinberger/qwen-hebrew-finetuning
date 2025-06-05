@@ -1,7 +1,7 @@
 from typing import Dict, List
-from .cleaners.duplicate_remove_cleaner import DuplicateCleaner
-from .cleaners.regex_cleaner import RegExCleaner
-from .cleaners.composite_cleaner import CompositeCleaner
+from ..cleaners.duplicate_remove_cleaner import DuplicateCleaner
+from ..cleaners.regex_cleaner import RegExCleaner
+from ..cleaners.composite_cleaner import CompositeCleaner
 from .cleaner_constants import CLEANUP_RULES, SOURCES
 
 # Create registry dictionaries
