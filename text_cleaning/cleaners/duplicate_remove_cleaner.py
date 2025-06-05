@@ -44,6 +44,7 @@ class DuplicateRemoverCleaner(BaseCleaner):
 
         res_df['text'] = new_texts
         res_df['n_count'] = new_n_count
+        res_df = res_df.drop_duplicates()
         
         # Update statistics
         self.stats['execution_time'] = time.time() - start_time
