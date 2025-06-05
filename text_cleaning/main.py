@@ -10,7 +10,7 @@ registry = {
             bucket_name='israllm-datasets',
             prefix='raw-datasets/rar/csv_output/',
             source_name=source_name,
-            output_prefix='cleaned_data_duplicates_and_regex/'
+            output_prefix='raw-datasets/cleaned_data_duplicates_and_regex/'
         ),
         'cleaner': composite_cleaner_registry[source_name]
     }
