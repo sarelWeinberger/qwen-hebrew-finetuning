@@ -1,8 +1,5 @@
 # Define the regex patterns for cleaning
 CLEANUP_RULES = [
-    # ——— HTML / placeholders ———
-    (r'<[^>]+>', ''),                     # HTML tags or placeholders like <email>, <phone>, <url> ...
-    
     # ——— Links and references ———
     (r'http[s]?://\S+', ''),              # URLs
     (r'www\.\S+',     ''),                # URLs without http
@@ -23,6 +20,7 @@ CLEANUP_RULES = [
     (r'[_\-–—]{2,}',  ''),                # Long separator lines ___ --- ——
     (r'[■▪◆]',        ''),                # Additional bullet points
     (r'\.{3,}',       '…'),               # Multiple dots → single ellipsis
+    (r'₪', ' ש״ח'),                       # ₪ → ש״ח (Israeli Shekel)
     
     # ——— Space and quote cleanup ———
     (r'""',           '"'),               # "" → "
