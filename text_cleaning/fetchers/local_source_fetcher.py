@@ -5,7 +5,7 @@ import glob
 import time
 import os
 from .base_fetcher import BaseFetcher
-from utils.logger import logger
+from .utils.logger import logger
 
 class LocalSourceFetcher(BaseFetcher):
     def __init__(self, file_path: str, output_path: str):

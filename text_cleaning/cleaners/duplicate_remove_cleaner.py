@@ -14,7 +14,7 @@ class DuplicateRemoverCleaner(BaseCleaner):
         Remove duplicate lines from the 'text' column of the DataFrame.
         """
         start_time = time.time()
-        res_df = pd.DataFrame(columns=['text', 'n_words'])
+        res_df = pd.DataFrame(columns=['text', 'n_count'])
         new_texts = []
         new_n_count = []
         

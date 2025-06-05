@@ -62,7 +62,7 @@ class S3SourceFetcher(BaseFetcher):
             
             # Get object data
             response = self.s3.get_object(Bucket=self.bucket_name, Key=file_path)
-            df = pd.read_csv(io.BytesIO(response["Body"].read()))
+            df = pd.read_csv(io.BytesIO(response["Body"].read()), header=None, names=["text", "n_words"])
             file_stats['rows'] = len(df)
             
             # Update statistics
@@ -71,6 +71,7 @@ class S3SourceFetcher(BaseFetcher):
             self.stats['total_bytes_read'] += file_stats['size_bytes']
             
             logger.info(f"Successfully fetched {len(df)} rows from s3://{self.bucket_name}/{file_path}")
+
             return df
             
         except Exception as e:
