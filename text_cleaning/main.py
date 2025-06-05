@@ -1,42 +1,37 @@
-from cleaners.duplicate_remove_cleaner import DuplicateRemoverCleaner
 from cleaning_pipeline import CleaningPipeline
-from fetchers.local_source_fetcher import LocalSourceFetcher
 from fetchers.s3_source_fetcher import S3SourceFetcher
+from cleaner_config import composite_cleaner_registry, SOURCES
 
-
-
-# An example registry structure
-# registry = {
-#     "source1": {
-#         "fetcher": '',
-#         "cleaner": '',
-#     },
-#     "source2": {
-#         "fetcher": '',
-#         "cleaner": ''
-#     },
-# }
-
-local_fetcher = LocalSourceFetcher(file_path='/Users/orlevi/PWC/tmp/AllHebNLIFiles-Deduped-D2.forgpt_part-100_sample.csv',
-                                   output_path='cleaned_data')
-
+# Create registry with all sources
 registry = {
-            'YisraelHayomData-Combined-Deduped.forgpt':{
-                'fetcher': S3SourceFetcher(bucket_name='israllm-datasets',
-                                           prefix='raw-datasets/rar/csv_output/',
-                                           source_name='YisraelHayomData-Combined-Deduped.forgpt',
-                                           output_prefix='cleaned_data_test'),
-                'cleaner': DuplicateRemoverCleaner()
-            }
+    source_name: {
+        'fetcher': S3SourceFetcher(
+            bucket_name='israllm-datasets',
+            prefix='raw-datasets/rar/csv_output/',
+            source_name=source_name,
+            output_prefix='cleaned_data'
+        ),
+        'cleaner': composite_cleaner_registry[source_name]
+    }
+    for source_name in SOURCES
 }
 
 def run_all():
+    """
+    Run the cleaning pipeline for all sources in the registry.
+    """
     for source_name, components in registry.items():
-        pipeline = CleaningPipeline(
-            fetcher=components["fetcher"],
-            cleaner=components["cleaner"],
-            source_name=source_name
-        )
-        pipeline.run()
+        print(f"\nProcessing source: {source_name}")
+        try:
+            pipeline = CleaningPipeline(
+                fetcher=components["fetcher"],
+                cleaner=components["cleaner"],
+                source_name=source_name
+            )
+            pipeline.run()
+            print(f"Successfully processed {source_name}")
+        except Exception as e:
+            print(f"Error processing {source_name}: {str(e)}")
 
-run_all()
+if __name__ == "__main__":
+    run_all()
