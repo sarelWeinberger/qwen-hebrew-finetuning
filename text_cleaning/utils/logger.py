@@ -20,7 +20,7 @@ class SingletonLogger:
         self.logger.setLevel(logging.INFO)
         
         # Create logs directory if it doesn't exist
-        log_dir = Path('logs')
+        log_dir = Path('text_cleaning/logs')
         log_dir.mkdir(exist_ok=True)
         
         # Add timestamp to log filename
