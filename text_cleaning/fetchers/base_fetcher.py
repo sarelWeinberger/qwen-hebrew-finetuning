@@ -1,7 +1,7 @@
 import pandas as pd
 from typing import List, Dict, Any
 import time
-from logger import logger
+from utils.logger import logger
 
 class BaseFetcher:
     def __init__(self, source_name: str):

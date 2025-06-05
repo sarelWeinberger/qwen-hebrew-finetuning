@@ -1,7 +1,7 @@
 from .base_cleaner import BaseCleaner
 import pandas as pd
 import time
-from logger import logger
+from utils.logger import logger
 
 
 class DuplicateRemoverCleaner(BaseCleaner):
