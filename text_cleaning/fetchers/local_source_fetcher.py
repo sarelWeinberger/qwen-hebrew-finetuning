@@ -4,7 +4,7 @@ from pathlib import Path
 import glob
 import time
 import os
-from ..logger import logger
+from logger import logger
 
 class LocalSourceFetcher(BaseFetcher):
     def __init__(self, file_path: str, output_path: str):

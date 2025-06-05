@@ -1,6 +1,6 @@
 import pandas as pd
 from typing import Dict, Any
-from ..logger import logger
+from logger import logger
 
 class BaseCleaner:
     def __init__(self):

@@ -6,7 +6,7 @@ import wandb
 import psutil
 import GPUtil
 from datetime import datetime
-from ..logger import logger
+from logger import logger
 
 class LLMCleaner(BaseCleaner):
     def __init__(self, model_id, processor, few_shot_prompt: list, raw_text: str, torch_dtype=torch.float16, wandb_project="text-cleaning"):

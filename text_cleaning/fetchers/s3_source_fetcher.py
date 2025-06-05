@@ -5,7 +5,7 @@ from .base_fetcher import BaseFetcher
 from typing import List
 from pathlib import Path
 import time
-from ..logger import logger
+from logger import logger
 
 class S3SourceFetcher(BaseFetcher):
     def __init__(self, bucket_name: str, prefix: str, source_name: str, output_prefix: str):
