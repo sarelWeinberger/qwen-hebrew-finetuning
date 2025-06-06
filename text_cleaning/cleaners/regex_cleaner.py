@@ -34,9 +34,10 @@ class RegExCleaner(BaseCleaner):
         cleaned_texts = [t.strip() for t in joined_text.split(_DELIM)]
         n_words = [len(t.split()) for t in cleaned_texts]
 
-        # 4. Push the results back into the dataframe (or return them, as you prefer)
-        df["text"] = cleaned_texts
-        df["n_count"] = n_words
+        res_df = pd.DataFrame({
+            "text": cleaned_texts,
+            "n_count": n_words
+        })
 
         self.stats['execution_time'] = time.time() - start_time
         logger.info(f"Processed {len(df)} rows in {self.stats['execution_time']:.2f}s")
@@ -45,7 +46,7 @@ class RegExCleaner(BaseCleaner):
         for pattern, count in self.stats['patterns_matched'].items():
             logger.info(f"Pattern '{pattern}' matched {count} times")
 
-        return pd.DataFrame({'text': cleaned_texts, 'n_count': n_words})
+        return res_df
     
     
     def clean(self, df: pd.DataFrame) -> pd.DataFrame:
