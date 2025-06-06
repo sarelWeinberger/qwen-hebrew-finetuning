@@ -1,6 +1,8 @@
 import pandas as pd
 from typing import List, Dict, Any
 import time
+import os
+os.sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.logger import logger
 
 class BaseFetcher:

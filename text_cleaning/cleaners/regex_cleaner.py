@@ -1,13 +1,13 @@
 from .base_cleaner import BaseCleaner
 import pandas as pd
-import re
+import regex
 import time
 from utils.logger import logger
 
 class RegExCleaner(BaseCleaner):
     def __init__(self, patterns: list[tuple[str, str]] = None):
         super().__init__()
-        self.patterns = [(re.compile(p), r) for p, r in patterns or []]
+        self.patterns = [(regex.compile(p), r) for p, r in patterns or []]
         logger.info(f"Initialized RegExCleaner with {len(self.patterns)} patterns")
 
     def clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -17,27 +17,26 @@ class RegExCleaner(BaseCleaner):
 
         self.stats['total_rows_processed'] = len(df)
 
-        for text in df['text']:
-            original_len = len(text)
-            modified = False
+        _DELIM = "UNIQUE_DELIMITER_XYZ123_456_789_899_234_123"
 
-            for pattern, repl in self.patterns:
-                text, n_subs = pattern.subn(repl, text)
-                if n_subs > 0:
-                    self.stats['patterns_matched'][pattern.pattern] = (
-                        self.stats['patterns_matched'].get(pattern.pattern, 0) + n_subs
-                    )
-                    modified = True
+        # 1. Join all rows into one long string
+        joined_text = _DELIM.join(df["text"].astype(str).tolist())
 
-            text = text.strip()
-            cleaned_texts.append(text)
-            n_words.append(len(text.split()))
+        # 2. Apply every (pattern → replacement) once over the *entire* string
+        for pattern, repl in self.patterns:
+            joined_text, n_subs = pattern.subn(repl, joined_text)
+            if n_subs:  # update stats only when we actually replaced something
+                self.stats["patterns_matched"][pattern.pattern] = (
+                    self.stats["patterns_matched"].get(pattern.pattern, 0) + n_subs
+                )
 
-            if modified:
-                new_len = len(text)
-                self.stats['rows_modified'] += 1
-                self.stats['characters_removed'] += max(0, original_len - new_len)
-                self.stats['characters_added'] += max(0, new_len - original_len)
+        # 3. Split back to the original rows and final post-processing
+        cleaned_texts = [t.strip() for t in joined_text.split(_DELIM)]
+        n_words = [len(t.split()) for t in cleaned_texts]
+
+        # 4. Push the results back into the dataframe (or return them, as you prefer)
+        df["text"] = cleaned_texts
+        df["n_count"] = n_words
 
         self.stats['execution_time'] = time.time() - start_time
         logger.info(f"Processed {len(df)} rows in {self.stats['execution_time']:.2f}s")
