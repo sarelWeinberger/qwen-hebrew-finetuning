@@ -14,7 +14,10 @@ import os
 from typing import Dict, Any, List
 
 class LLMCleaner(BaseCleaner):
-    def __init__(self, model_id, processor, few_shot_prompt: list, raw_text: str, torch_dtype=torch.float16, wandb_project="text-cleaning"):
+    def __init__(self, model_id, processor, few_shot_prompt: list,
+                raw_text: str,
+                torch_dtype=torch.float16,
+                wandb_project="text-cleaning"):
         super().__init__()
         self.model = AutoModelForCausalLM.from_pretrained(model_id, device_map="auto", torch_dtype=torch_dtype)
         self.tokenizer = processor
