@@ -1,98 +1,118 @@
 import pandas as pd
 import numpy as np
 from Levenshtein import distance
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 import json
 from pathlib import Path
 
 
 class BenchmarkEvaluator:
-    def __init__(self, benchmark_file: str):
+    def __init__(self, 
+                 benchmark_file: str,
+                 manual_clean_col: str = 'manual_clean',
+                 cleaned_text_col: str = 'cleaned_text'):
         """
         Initialize the benchmark evaluator with a benchmark file.
         
         Args:
-            benchmark_file (str): Path to the benchmark file (CSV) containing raw and cleaned text pairs
+            benchmark_file (str): Path to the benchmark file (Excel) containing raw and cleaned text pairs
+            manual_clean_col (str): Name of the column containing manually cleaned text
+            cleaned_text_col (str): Name of the column containing LLM cleaned text
         """
-        self.benchmark_data = pd.read_csv(benchmark_file)
-        self.required_columns = ['raw_text', 'cleaned_text']
+        self.manual_clean_col = manual_clean_col
+        self.cleaned_text_col = cleaned_text_col
+        self.benchmark_data = {}
+        self.results = {}
         
-        # Validate benchmark file
-        if not all(col in self.benchmark_data.columns for col in self.required_columns):
-            raise ValueError(f"Benchmark file must contain columns: {self.required_columns}")
+        # Read Excel file with multiple sheets
+        excel_data = pd.read_excel(benchmark_file, sheet_name=None)
+        for sheet_name, df in excel_data.items():
+            if manual_clean_col not in df.columns:
+                raise ValueError(f"Sheet '{sheet_name}' must contain column: {manual_clean_col}")
+            self.benchmark_data[sheet_name] = df
     
-    def evaluate_texts(self, texts: List[str], cleaned_texts: List[str]) -> Dict[str, List[float]]:
+    def evaluate_source(self, source_name: str, cleaned_df: pd.DataFrame) -> Dict[str, float]:
         """
-        Evaluate a list of texts against their cleaned versions using Levenshtein distance.
+        Evaluate cleaned texts for a specific source against its benchmark data.
         
         Args:
-            texts (List[str]): List of raw texts
-            cleaned_texts (List[str]): List of corresponding cleaned texts
+            source_name (str): Name of the source/sheet
+            cleaned_df (pd.DataFrame): DataFrame containing cleaned texts
             
         Returns:
-            Dict[str, List[float]]: Dictionary containing:
-                - 'distances': List of Levenshtein distances
-                - 'normalized_distances': List of normalized Levenshtein distances (0-1)
+            Dict[str, float]: Dictionary containing evaluation metrics
         """
-        if len(texts) != len(cleaned_texts):
-            raise ValueError("Number of texts and cleaned texts must be equal")
+        if source_name not in self.benchmark_data:
+            raise ValueError(f"Source '{source_name}' not found in benchmark data")
+            
+        if self.cleaned_text_col not in cleaned_df.columns:
+            raise ValueError(f"Cleaned dataframe must contain column: {self.cleaned_text_col}")
+            
+        benchmark_df = self.benchmark_data[source_name]
         
+        # Calculate Levenshtein distances
         distances = []
         normalized_distances = []
         
-        for raw, cleaned in zip(texts, cleaned_texts):
+        for idx, row in benchmark_df.iterrows():
+            if idx >= len(cleaned_df):
+                break
+                
+            manual_clean = str(row[self.manual_clean_col])
+            llm_clean = str(cleaned_df.iloc[idx][self.cleaned_text_col])
+            
             # Calculate Levenshtein distance
-            lev_distance = distance(raw, cleaned)
+            lev_distance = distance(manual_clean, llm_clean)
             distances.append(lev_distance)
             
             # Normalize distance (0-1 scale)
-            max_len = max(len(raw), len(cleaned))
+            max_len = max(len(manual_clean), len(llm_clean))
             if max_len == 0:
                 normalized_distances.append(0.0)
             else:
                 normalized_distances.append(lev_distance / max_len)
         
-        return {
-            'distances': distances,
-            'normalized_distances': normalized_distances
+        # Add normalized distances to the cleaned dataframe
+        cleaned_df['normalized_levenshtein'] = normalized_distances
+        
+        # Calculate and store metrics
+        metrics = {
+            'mean_distance': np.mean(distances),
+            'mean_normalized_distance': np.mean(normalized_distances),
+            'std_distance': np.std(distances),
+            'std_normalized_distance': np.std(normalized_distances)
         }
+        
+        self.results[source_name] = metrics
+        return metrics
     
-    def evaluate_benchmark(self, cleaned_texts: List[str]) -> Dict[str, float]:
+    def evaluate_all_sources(self, source_dfs: Dict[str, pd.DataFrame]) -> Dict[str, Dict[str, float]]:
         """
-        Evaluate cleaned texts against the benchmark data.
+        Evaluate all sources against their corresponding cleaned dataframes.
         
         Args:
-            cleaned_texts (List[str]): List of cleaned texts to evaluate
+            source_dfs (Dict[str, pd.DataFrame]): Dictionary mapping source names to their cleaned dataframes
             
         Returns:
-            Dict[str, float]: Dictionary containing evaluation metrics:
-                - 'mean_distance': Average Levenshtein distance
-                - 'mean_normalized_distance': Average normalized distance
-                - 'std_distance': Standard deviation of distances
-                - 'std_normalized_distance': Standard deviation of normalized distances
+            Dict[str, Dict[str, float]]: Dictionary containing evaluation metrics for each source
         """
-        if len(cleaned_texts) != len(self.benchmark_data):
-            raise ValueError("Number of cleaned texts must match benchmark data length")
+        for source_name, df in source_dfs.items():
+            self.evaluate_source(source_name, df)
         
-        results = self.evaluate_texts(
-            self.benchmark_data['raw_text'].tolist(),
-            cleaned_texts
-        )
-        
-        return {
-            'mean_distance': np.mean(results['distances']),
-            'mean_normalized_distance': np.mean(results['normalized_distances']),
-            'std_distance': np.std(results['distances']),
-            'std_normalized_distance': np.std(results['normalized_distances'])
-        }
+        return self.results
     
-    def save_results(self, results: Dict[str, float], output_file: str):
+    def save_results(self, output_file: str):
         """
         Save evaluation results to a JSON file.
         
         Args:
-            results (Dict[str, float]): Evaluation results
             output_file (str): Path to save the results
         """
+        # Create a simplified version with just the mean normalized distances
+        simplified_results = {
+            source: metrics['mean_normalized_distance']
+            for source, metrics in self.results.items()
+        }
+        
         with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=4) 
+            json.dump(simplified_results, f, indent=4) 
