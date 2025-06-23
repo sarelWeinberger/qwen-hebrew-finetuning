@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  gepeta-worker:
+    build: .
+    environment:
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - ~/.aws:/root/.aws:ro
+    command: python worker.py --prefix Geektime --part 0 --dataset geektime
+
+  # דוגמה להרצת מספר workers
+  gepeta-worker-2:
+    build: .
+    environment:
+      - AWS_DEFAULT_REGION=us-east-1
+    volumes:
+      - ~/.aws:/root/.aws:ro
+    command: python worker.py --prefix Geektime --part 1 --dataset geektime
