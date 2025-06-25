@@ -67,8 +67,30 @@ class GepetaOrchestrator:
         self.tasks = tasks
         return tasks
 
-    def create_user_data_script(self, task):
-        """יצירת סקריפט התקנה למכונה"""
+    def upload_worker_to_s3(self):
+        """העלאת worker script ל-S3"""
+        try:
+            with open('worker.py', 'r', encoding='utf-8') as f:
+                worker_content = f.read()
+
+            # העלאה ל-S3
+            worker_key = "scripts/worker.py"
+            self.s3_client.put_object(
+                Bucket=STATUS_BUCKET,
+                Key=worker_key,
+                Body=worker_content,
+                ContentType='text/plain'
+            )
+
+            print(f"✅ Worker script הועלה ל-S3: s3://{STATUS_BUCKET}/{worker_key}")
+            return f"s3://{STATUS_BUCKET}/{worker_key}"
+
+        except Exception as e:
+            print(f"❌ שגיאה בהעלאת worker ל-S3: {e}")
+            return None
+
+    def create_user_data_script(self, task, worker_s3_url):
+        """יצירת סקריפט התקנה למכונה - גרסה קומפקטית"""
 
         # קריאת .env מהפרויקט הראשי
         env_paths = ["../.env", "../../.env", ".env"]
@@ -103,11 +125,7 @@ class GepetaOrchestrator:
         except:
             pass
 
-        # קריאת worker.py
-        with open('worker.py', 'r', encoding='utf-8') as f:
-            worker_content = f.read()
-
-        # יצירת user data script מעודכן לUbuntu 24.04
+        # יצירת user data script קומפקטי
         user_data = """#!/bin/bash
 
 # לוג הכל
@@ -165,11 +183,9 @@ export AWS_DEFAULT_REGION=""" + REGION + """
 echo "=== Installing Python packages ==="
 pip install google-generativeai boto3 pandas python-dotenv
 
-# העתקת worker script
-echo "=== Creating worker script ==="
-cat > worker.py << 'EOF'
-""" + worker_content + """
-EOF
+# הורדת worker script מ-S3
+echo "=== Downloading worker script from S3 ==="
+/usr/local/bin/aws s3 cp """ + worker_s3_url + """ worker.py
 
 # הרצת Worker עם virtual environment
 echo "=== Running Worker ==="
@@ -214,10 +230,10 @@ shutdown -h now
 
             return sg_id
 
-    def launch_single_instance(self, task, security_group_id):
+    def launch_single_instance(self, task, security_group_id, worker_s3_url):
         """הפעלת מכונה יחידה"""
         try:
-            user_data = self.create_user_data_script(task)
+            user_data = self.create_user_data_script(task, worker_s3_url)
 
             response = self.ec2_client.run_instances(
                 ImageId='ami-04a81a99f5ec58529',  # Ubuntu 22.04 LTS
@@ -251,6 +267,12 @@ shutdown -h now
         """הפעלת כל המכונות"""
         print(f"🚀 מפעיל {len(self.tasks)} מכונות...")
 
+        # העלאת worker ל-S3
+        worker_s3_url = self.upload_worker_to_s3()
+        if not worker_s3_url:
+            print("❌ כשל בהעלאת worker ל-S3")
+            return False
+
         security_group_id = self.create_security_group()
         successful_launches = []
 
@@ -265,7 +287,7 @@ shutdown -h now
 
             with ThreadPoolExecutor(max_workers=10) as executor:
                 future_to_task = {
-                    executor.submit(self.launch_single_instance, task, security_group_id): task
+                    executor.submit(self.launch_single_instance, task, security_group_id, worker_s3_url): task
                     for task in batch
                 }
 
@@ -330,7 +352,7 @@ shutdown -h now
                     elif worker_status == 'error':
                         symbol = "❌"
                         errors += 1
-                    elif worker_status in ['processing', 'loading_file', 'saving']:
+                    elif worker_status in ['processing', 'loading_file', 'saving', 'calculating_words']:
                         symbol = "🔄"
                         processing += 1
                     else:
@@ -341,7 +363,23 @@ shutdown -h now
                     filled = int(bar_length * progress / 100)
                     bar = "█" * filled + "░" * (bar_length - filled)
 
-                    print(f"{symbol} {prefix:12} part-{part:2} │{bar}│ {progress:5.1f}%")
+                    # הוספת מידע מפורט לפי סטטוס
+                    extra_info = ""
+                    if worker_status in ['processing', 'completed']:
+                        # מידע על עיבוד
+                        total_rows = status.get('total_rows', 0)
+                        rows_already_clean = status.get('rows_already_clean', 0)
+                        rows_processed_so_far = status.get('rows_processed_so_far', 0)
+                        rows_skipped_so_far = status.get('rows_skipped_so_far', 0)
+                        rate_limit_errors_found = status.get('rate_limit_errors_found', 0)
+                        rows_processed_now = status.get('rows_processed_now', 0)
+                        new_rate_limit_errors = status.get('new_rate_limit_errors', 0)
+                        rows_missing = total_rows - rows_already_clean if total_rows > 0 else 0
+
+                        if total_rows > 0:
+                            extra_info = f" | Total: {rows_processed_so_far+rows_skipped_so_far}/{total_rows}, Skipped: {rows_skipped_so_far}/{rows_already_clean}, Processed: {rows_processed_so_far}/{rate_limit_errors_found}, RateLimit: {new_rate_limit_errors}"
+
+                    print(f"{symbol} {prefix:12} part-{part:2} │{bar}│ {progress:5.1f}%{extra_info}")
 
                 print("=" * 80)
                 print(f"📊 ✅ {completed} | 🔄 {processing} | ⏳ {starting} | ❌ {errors}")
@@ -423,6 +461,31 @@ shutdown -h now
                         summary_by_dataset['Original_Words'] * 100
                 ).round(1)
 
+                # יצירת דוח מילים פשוט
+                words_summary = summary_by_dataset[
+                    ['Dataset', 'Original_Words', 'Cleaned_Words', 'Files_Completed']].copy()
+                words_summary['Reduction_Percent'] = words_summary.apply(
+                    lambda row: round((row['Original_Words'] - row['Cleaned_Words']) / row['Original_Words'] * 100, 1)
+                    if row['Original_Words'] > 0 else 0, axis=1
+                )
+
+                # הוספת שורת סיכום
+                total_row = {
+                    'Dataset': 'TOTAL',
+                    'Original_Words': words_summary['Original_Words'].sum(),
+                    'Cleaned_Words': words_summary['Cleaned_Words'].sum(),
+                    'Files_Completed': words_summary['Files_Completed'].sum(),
+                    'Reduction_Percent': 0
+                }
+
+                if total_row['Original_Words'] > 0:
+                    total_row['Reduction_Percent'] = round(
+                        (total_row['Original_Words'] - total_row['Cleaned_Words']) / total_row['Original_Words'] * 100,
+                        1
+                    )
+
+                words_summary = pd.concat([words_summary, pd.DataFrame([total_row])], ignore_index=True)
+
                 # שמירת הדוחות עם timestamp
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -434,31 +497,30 @@ shutdown -h now
                 summary_filename = f"gepeta_summary_report_{timestamp}.csv"
                 summary_by_dataset.to_csv(summary_filename, index=False, encoding='utf-8-sig')
 
+                # דוח מילים פשוט
+                words_filename = f"gepeta_words_summary_{timestamp}.csv"
+                words_summary.to_csv(words_filename, index=False, encoding='utf-8-sig')
+
                 # שמירה ל-S3
                 try:
-                    # העלאת דוח מפורט ל-S3
-                    detailed_key = f"reports/detailed_report_{timestamp}.csv"
-                    with open(detailed_filename, 'rb') as f:
-                        self.s3_client.put_object(
-                            Bucket=STATUS_BUCKET,
-                            Key=detailed_key,
-                            Body=f.read(),
-                            ContentType='text/csv'
-                        )
+                    files_to_upload = [
+                        (detailed_filename, f"reports/detailed_report_{timestamp}.csv"),
+                        (summary_filename, f"reports/summary_report_{timestamp}.csv"),
+                        (words_filename, f"reports/words_summary_{timestamp}.csv")
+                    ]
 
-                    # העלאת דוח מסכם ל-S3
-                    summary_key = f"reports/summary_report_{timestamp}.csv"
-                    with open(summary_filename, 'rb') as f:
-                        self.s3_client.put_object(
-                            Bucket=STATUS_BUCKET,
-                            Key=summary_key,
-                            Body=f.read(),
-                            ContentType='text/csv'
-                        )
+                    for local_file, s3_key in files_to_upload:
+                        with open(local_file, 'rb') as f:
+                            self.s3_client.put_object(
+                                Bucket=STATUS_BUCKET,
+                                Key=s3_key,
+                                Body=f.read(),
+                                ContentType='text/csv'
+                            )
 
                     print(f"☁️ דוחות נשמרו ב-S3:")
-                    print(f"   • s3://{STATUS_BUCKET}/{detailed_key}")
-                    print(f"   • s3://{STATUS_BUCKET}/{summary_key}")
+                    for _, s3_key in files_to_upload:
+                        print(f"   • s3://{STATUS_BUCKET}/{s3_key}")
 
                 except Exception as e:
                     print(f"⚠️ שגיאה בהעלאה ל-S3: {e}")
@@ -466,6 +528,7 @@ shutdown -h now
                 print(f"📁 דוחות מקומיים:")
                 print(f"   • {detailed_filename}")
                 print(f"   • {summary_filename}")
+                print(f"   • {words_filename} ⭐ (דוח מילים עיקרי)")
 
                 # הצגת סיכום מהיר
                 print(f"\n📈 סיכום מהיר:")
@@ -483,35 +546,30 @@ shutdown -h now
 
                 if len(summary_by_dataset) > 0:
                     print(f"\n📝 סיכום מילים לפי dataset:")
-                    for _, row in summary_by_dataset.iterrows():
-                        original = int(row['Original_Words'])
-                        cleaned = int(row['Cleaned_Words'])
-                        reduction = row['Reduction_Percent']
-                        files = int(row['Files_Completed'])
+                    for _, row in words_summary.iterrows():
+                        if row['Dataset'] == 'TOTAL':
+                            print("=" * 60)
+                            print(
+                                f"🎯 {row['Dataset']:12}: {int(row['Files_Completed']):3} קבצים | {int(row['Original_Words']):,} → {int(row['Cleaned_Words']):,} מילים ({row['Reduction_Percent']}% הפחתה)")
+                        else:
+                            original = int(row['Original_Words'])
+                            cleaned = int(row['Cleaned_Words'])
+                            reduction = row['Reduction_Percent']
+                            files = int(row['Files_Completed'])
+                            print(
+                                f"   • {row['Dataset']:12}: {files:3} קבצים | {original:,} → {cleaned:,} מילים ({reduction}% הפחתה)")
 
-                        print(
-                            f"   • {row['Dataset']:12}: {files:2} קבצים | {original:,} → {cleaned:,} מילים ({reduction}% הפחתה)")
-
-                    # סיכום כולל
-                    total_original = summary_by_dataset['Original_Words'].sum()
-                    total_cleaned = summary_by_dataset['Cleaned_Words'].sum()
-                    total_reduction = (
-                                (total_original - total_cleaned) / total_original * 100) if total_original > 0 else 0
-
-                    print("=" * 60)
-                    print(f"🎯 סה\"כ כולל: {total_original:,} → {total_cleaned:,} מילים ({total_reduction:.1f}% הפחתה)")
-
-                return detailed_filename, summary_filename
+                return detailed_filename, summary_filename, words_filename
 
             else:
                 print("⚠️ אין נתונים מושלמים ליצירת דוח")
-                return None, None
+                return None, None, None
 
         except Exception as e:
             print(f"❌ שגיאה ביצירת דוחות: {e}")
             import traceback
             traceback.print_exc()
-            return None, None
+            return None, None, None
 
     def cleanup_instances(self):
         """ניקוי מכונות"""
@@ -563,7 +621,7 @@ def main():
 
         # יצירת דוחות סיכום
         print("\n" + "=" * 60)
-        detailed_report, summary_report = orchestrator.generate_summary_reports()
+        detailed_report, summary_report, words_report = orchestrator.generate_summary_reports()
 
         # שאלה על ניקוי
         response = input("\n🧹 לסיים ולנקות מכונות? (y/N): ").strip().lower()
@@ -572,10 +630,11 @@ def main():
         else:
             print("⚠️ המכונות נשארות פעילות - זכור לסיים אותן ידנית!")
 
-        if detailed_report and summary_report:
+        if detailed_report and summary_report and words_report:
             print(f"\n📊 דוחות נוצרו:")
             print(f"   📋 מפורט: {detailed_report}")
             print(f"   📈 מסכם: {summary_report}")
+            print(f"   📝 מילים: {words_report} ⭐")
 
         print("🎉 הושלם!")
 
