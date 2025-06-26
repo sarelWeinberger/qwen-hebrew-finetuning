@@ -1,0 +1,47 @@
+{
+  "instance_type": "ml.p5.48xlarge",
+  "gpu_count": 8,
+  "gpu_type": "H100",
+  "gpu_memory": "80GB",
+  "total_gpu_memory": "640GB",
+  "cpu_count": 192,
+  "ram": "2048GB",
+  "network": "3200 Gbps",
+  "batch_size_per_gpu": 6,
+  "gradient_accumulation_steps": 1,
+  "deepspeed_config": "configs/deepspeed/p5_deepspeed_config.json",
+  "training_config": "configs/training_configs/p5_training_config.json",
+  "estimated_hourly_cost": 98.32,
+  "optimization_notes": "Maximum performance with latest H100 GPUs and high-bandwidth networking",
+  "recommended_use_cases": [
+    "Maximum performance training",
+    "Large datasets",
+    "Time-critical projects",
+    "Production training workflows"
+  ],
+  "performance_characteristics": {
+    "memory_efficiency": "excellent",
+    "compute_efficiency": "maximum",
+    "cost_efficiency": "premium",
+    "network_efficiency": "excellent"
+  },
+  "training_parameters": {
+    "learning_rate": 1e-5,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.03,
+    "max_grad_norm": 1.0,
+    "fp16": true,
+    "gradient_checkpointing": false
+  },
+  "h100_optimizations": {
+    "transformer_engine": true,
+    "flash_attention": true,
+    "tensor_parallelism": true,
+    "pipeline_parallelism": false
+  },
+  "expected_performance": {
+    "relative_speed": 1.0,
+    "tokens_per_second_estimate": 8000,
+    "memory_utilization_target": 0.85
+  }
+}
