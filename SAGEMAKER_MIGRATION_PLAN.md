@@ -1,10 +1,10 @@
-# SageMaker Migration Plan: P4/P5 Instance Performance Comparison
+# SageMaker Migration Plan: P5 Instance Performance Comparison
 
 ## Overview
 Migrate the Qwen Hebrew fine-tuning project to SageMaker with:
-- **Training**: P4 and P5 instances for performance comparison
+- **Training**: P5 instances (P5, P5e, P5en) for performance comparison
 - **Data Preparation**: CPU instances (m5.large/m5.xlarge) for cost-effective preprocessing
-- **Automated Performance Benchmarking**: Compare P4d.24xlarge, P4de.24xlarge, and P5.48xlarge
+- **Automated Performance Benchmarking**: Compare P5.48xlarge, P5e.48xlarge, and P5en.48xlarge
 
 ## Architecture Design
 
@@ -13,9 +13,9 @@ graph TB
     A[Data Preparation Job<br/>CPU Instance m5.xlarge] --> B[S3 Processed Data]
     B --> C[Training Job Controller]
     
-    C --> D[P4d.24xlarge Training]
-    C --> E[P4de.24xlarge Training] 
-    C --> F[P5.48xlarge Training]
+    C --> D[P5.48xlarge Training]
+    C --> E[P5e.48xlarge Training]
+    C --> F[P5en.48xlarge Training]
     
     D --> G[Performance Metrics Collector]
     E --> G
@@ -40,9 +40,9 @@ graph TB
 
 ### Phase 2: Training Infrastructure (GPU-based)
 **Target Instances**:
-- **P4d.24xlarge**: 8x A100 40GB, 1.1 TB RAM, 8x 1000 Gbps network
-- **P4de.24xlarge**: 8x A100 80GB, 1.1 TB RAM, 8x 1000 Gbps network, 8x 3.8TB NVMe SSD
 - **P5.48xlarge**: 8x H100 80GB, 2 TB RAM, 8x 3200 Gbps network
+- **P5e.48xlarge**: 8x H100 80GB, 2 TB RAM, 8x 3200 Gbps network, 8x 7.6TB NVMe SSD
+- **P5en.48xlarge**: 8x H100 80GB, 2 TB RAM, 8x 3200 Gbps network + EFA
 
 ### Phase 3: Performance Comparison Framework
 - Automated job submission across instance types

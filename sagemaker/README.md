@@ -81,6 +81,248 @@ For a complete interactive experience, use the provided Jupyter notebook:
 jupyter notebook notebooks/setup_and_run_benchmark.ipynb
 ```
 
+## 🚀 How to Run SageMaker Training
+
+### Step-by-Step Guide
+
+#### Step 1: Set Up AWS Environment
+
+1. **Configure AWS CLI**:
+   ```bash
+   aws configure
+   # Enter your AWS Access Key ID, Secret Access Key, and region
+   ```
+
+2. **Create SageMaker Execution Role**:
+   ```bash
+   # Create a role with SageMaker, S3, and ECR permissions
+   aws iam create-role --role-name SageMakerExecutionRole --assume-role-policy-document '{
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Principal": {
+           "Service": "sagemaker.amazonaws.com"
+         },
+         "Action": "sts:AssumeRole"
+       }
+     ]
+   }'
+   
+   # Attach necessary policies
+   aws iam attach-role-policy --role-name SageMakerExecutionRole --policy-arn arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
+   aws iam attach-role-policy --role-name SageMakerExecutionRole --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
+   aws iam attach-role-policy --role-name SageMakerExecutionRole --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
+   ```
+
+3. **Create S3 Bucket**:
+   ```bash
+   aws s3 mb s3://your-qwen-hebrew-bucket --region us-east-1
+   ```
+
+#### Step 2: Build and Deploy Containers
+
+1. **Navigate to container directory**:
+   ```bash
+   cd sagemaker/containers/training/
+   ```
+
+2. **Make build script executable**:
+   ```bash
+   chmod +x build_and_push.sh
+   ```
+
+3. **Build and push to ECR**:
+   ```bash
+   ./build_and_push.sh
+   ```
+
+#### Step 3: Prepare Your Data
+
+1. **Option A: Use existing Hebrew dataset**:
+   ```bash
+   # Upload your Hebrew text files to S3
+   aws s3 cp your-hebrew-data.json s3://your-qwen-hebrew-bucket/raw-data/
+   ```
+
+2. **Option B: Run data preparation job**:
+   ```bash
+   python scripts/data_preparation.py \
+       --s3-bucket your-qwen-hebrew-bucket \
+       --s3-prefix raw-data/ \
+       --output-data s3://your-qwen-hebrew-bucket/processed-data/
+   ```
+
+#### Step 4: Check Region Availability
+
+```bash
+# Find best regions for P5 instances
+python scripts/find_available_regions.py
+
+# Output will show:
+# ✅ us-east-1 (recommended)
+# ✅ us-east-2 (alternative)
+# ✅ us-west-2 (west coast)
+```
+
+#### Step 5: Run Performance Benchmark
+
+```bash
+# Get your role ARN
+ROLE_ARN=$(aws iam get-role --role-name SageMakerExecutionRole --query 'Role.Arn' --output text)
+
+# Run benchmark across all P5 instances
+python scripts/benchmark_runner.py \
+    --role-arn $ROLE_ARN \
+    --bucket-name your-qwen-hebrew-bucket \
+    --dataset-path s3://your-qwen-hebrew-bucket/processed-data/dataset/ \
+    --region us-east-1 \
+    --epochs 1 \
+    --max-steps 100
+```
+
+#### Step 6: Monitor Training Jobs
+
+1. **Check job status**:
+   ```bash
+   aws sagemaker list-training-jobs --status-equals InProgress
+   ```
+
+2. **View logs in CloudWatch**:
+   ```bash
+   aws logs describe-log-streams --log-group-name /aws/sagemaker/TrainingJobs
+   ```
+
+3. **Monitor in SageMaker Console**:
+   - Go to AWS Console → SageMaker → Training Jobs
+   - Click on your job to see metrics and logs
+
+#### Step 7: Analyze Results
+
+The benchmark will generate:
+- **Console output**: Summary of performance and costs
+- **CSV report**: Detailed metrics comparison
+- **W&B dashboard**: Real-time training metrics
+- **S3 artifacts**: Model checkpoints and logs
+
+### Production Training Workflow
+
+Once you've identified the best instance type from benchmarking:
+
+```bash
+# Submit production training job
+python -c "
+from sagemaker.infrastructure.sagemaker_jobs import SageMakerJobManager
+import datetime
+
+job_manager = SageMakerJobManager(
+    role_arn='$ROLE_ARN',
+    bucket_name='your-qwen-hebrew-bucket'
+)
+
+job_name = job_manager.submit_training_job(
+    job_name=f'qwen-hebrew-production-{datetime.datetime.now().strftime(\"%Y%m%d-%H%M%S\")}',
+    instance_type='ml.p5e.48xlarge',  # Based on benchmark results
+    dataset_path='s3://your-qwen-hebrew-bucket/processed-data/dataset/',
+    epochs=3,
+    wandb_project='qwen-hebrew-production'
+)
+
+print(f'Production job submitted: {job_name}')
+"
+```
+
+### Cost Management
+
+1. **Set up billing alerts**:
+   ```bash
+   aws budgets create-budget --account-id YOUR_ACCOUNT_ID --budget '{
+     "BudgetName": "SageMaker-Training-Budget",
+     "BudgetLimit": {
+       "Amount": "1000",
+       "Unit": "USD"
+     },
+     "TimeUnit": "MONTHLY",
+     "BudgetType": "COST"
+   }'
+   ```
+
+2. **Monitor costs**:
+   ```bash
+   aws ce get-cost-and-usage \
+       --time-period Start=2024-01-01,End=2024-01-31 \
+       --granularity MONTHLY \
+       --metrics BlendedCost \
+       --group-by Type=DIMENSION,Key=SERVICE
+   ```
+
+3. **Stop running jobs if needed**:
+   ```bash
+   aws sagemaker stop-training-job --training-job-name YOUR_JOB_NAME
+   ```
+
+### Troubleshooting
+
+#### Common Issues:
+
+1. **Permission Errors**:
+   ```bash
+   # Check role permissions
+   aws iam list-attached-role-policies --role-name SageMakerExecutionRole
+   ```
+
+2. **Container Build Failures**:
+   ```bash
+   # Login to ECR
+   aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_ACCOUNT.dkr.ecr.us-east-1.amazonaws.com
+   ```
+
+3. **Instance Unavailability**:
+   ```bash
+   # Check instance limits
+   aws service-quotas get-service-quota --service-code sagemaker --quota-code L-1194F1E0
+   ```
+
+4. **Out of Memory Errors**:
+   - Reduce batch size in instance configuration
+   - Enable gradient checkpointing
+   - Use smaller model or sequence length
+
+### Advanced Usage
+
+#### Multi-Region Training:
+```bash
+# Run benchmarks in multiple regions
+for region in us-east-1 us-west-2 eu-west-1; do
+    python scripts/benchmark_runner.py \
+        --role-arn $ROLE_ARN \
+        --bucket-name your-qwen-hebrew-bucket \
+        --dataset-path s3://your-qwen-hebrew-bucket/processed-data/dataset/ \
+        --region $region \
+        --epochs 1
+done
+```
+
+#### Hyperparameter Tuning:
+```bash
+python -c "
+from sagemaker.infrastructure.sagemaker_jobs import SageMakerJobManager
+
+job_manager = SageMakerJobManager(
+    role_arn='$ROLE_ARN',
+    bucket_name='your-qwen-hebrew-bucket'
+)
+
+tuning_job = job_manager.submit_hyperparameter_tuning_job(
+    tuning_job_name='qwen-hebrew-hp-tuning',
+    instance_type='ml.p5.48xlarge',
+    dataset_path='s3://your-qwen-hebrew-bucket/processed-data/dataset/',
+    max_jobs=20,
+    max_parallel_jobs=4
+)
+"
+```
+
 ## 📁 Directory Structure
 
 ```
