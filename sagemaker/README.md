@@ -46,11 +46,13 @@ chmod +x build_and_push.sh
 ### 4. Prepare Your Data
 
 ```bash
-# Submit data preparation job (runs on CPU instance for cost efficiency)
-python scripts/data_preparation.py \
-    --s3-bucket your-bucket-name \
-    --s3-prefix hebrew-text/ \
-    --output-data s3://your-bucket-name/processed-data/
+# Submit data preparation job (runs on CPU instance for cost efficiency) ex: [make sure you have s3 premissens on your IAM]
+python scripts/data_preperation_sagemaker.py \
+    --s3-bucket gepeta-datasets \
+    --s3-prefix processed/wikipedia/wikipedia_he_part_001.jsonl \
+    --output-data s3://gepeta-datasets/fortrain/wiki/ \
+    --min-length 10 \
+    --max-length 5000
 ```
 
 ### 5. Run Performance Benchmark
