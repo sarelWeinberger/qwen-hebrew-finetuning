@@ -41,8 +41,8 @@ graph TB
 ### Phase 2: Training Infrastructure (GPU-based)
 **Target Instances**:
 - **P5.48xlarge**: 8x H100 80GB, 2 TB RAM, 8x 3200 Gbps network
-- **P5e.48xlarge**: 8x H100 80GB, 2 TB RAM, 8x 3200 Gbps network, 8x 7.6TB NVMe SSD
-- **P5en.48xlarge**: 8x H100 80GB, 2 TB RAM, 8x 3200 Gbps network + EFA
+- **P5e.48xlarge**: 8x H200 80GB, 2 TB RAM, 8x 3200 Gbps network, 8x 7.6TB NVMe SSD
+- **P5en.48xlarge**: 8x H200 80GB, 2 TB RAM, 8x 3200 Gbps network + EFA
 
 ### Phase 3: Performance Comparison Framework
 - Automated job submission across instance types
