@@ -23,3 +23,23 @@ requests>=2.28.0
 packaging>=20.0
 pyyaml>=6.0
 boto3>=1.38.28
+
+#for aws: 
+# First, install the specific version of botocore required by aiobotocore
+#pip install "botocore>=1.37.0,<1.37.2"
+
+# Install nvidia-ml-py3 as required by autogluon-multimodal
+#pip install "nvidia-ml-py3>=7.352.0,<8.0"
+
+# Install the correct version of transformers
+#pip install "transformers[sentencepiece]>=4.38.0,<4.50"
+
+# Install the correct version of coreforecast
+#pip install "coreforecast>=0.0.12,<0.0.16"
+
+# Update dill and multiprocess
+#pip install "dill>=0.4.0"
+#pip install "multiprocess>=0.70.18"
+
+# Install the specific version of sparkmagic
+#pip install "sparkmagic==0.22.0"
