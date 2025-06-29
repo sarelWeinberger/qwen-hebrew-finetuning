@@ -35,9 +35,6 @@ class SampleSaver:
         
         for dir_path in [self.before_dir, self.after_dir, self.comparison_dir]:
             dir_path.mkdir(exist_ok=True)
-        
-        logger.info(f"SampleSaver initialized with {sample_percentage*100}% sampling rate")
-        logger.info(f"Output directory: {self.output_dir}")
     
     def select_sample_indices(self, total_rows: int) -> List[int]:
         """
@@ -56,7 +53,6 @@ class SampleSaver:
         selected_indices = random.sample(indices, sample_size)
         selected_indices.sort()  # Keep them in order for easier comparison
         
-        logger.info(f"Selected {len(selected_indices)} samples from {total_rows} total rows")
         return selected_indices
     
     def save_samples(self, 
@@ -112,11 +108,9 @@ class SampleSaver:
         
         # Save before sample
         before_sample.to_csv(before_file, index=False, encoding='utf-8')
-        logger.info(f"Saved before sample: {before_file}")
         
         # Save after sample
         after_sample.to_csv(after_file, index=False, encoding='utf-8')
-        logger.info(f"Saved after sample: {after_file}")
         
         # Create comparison DataFrame
         comparison_df = pd.DataFrame({
@@ -136,7 +130,6 @@ class SampleSaver:
         
         # Save comparison
         comparison_df.to_csv(comparison_file, index=False, encoding='utf-8')
-        logger.info(f"Saved comparison: {comparison_file}")
         
         # Save metadata
         metadata_dict = {
@@ -160,8 +153,6 @@ class SampleSaver:
         
         with open(metadata_file, 'w', encoding='utf-8') as f:
             json.dump(metadata_dict, f, indent=2, ensure_ascii=False)
-        
-        logger.info(f"Saved metadata: {metadata_file}")
         
         return {
             'before_sample': str(before_file),

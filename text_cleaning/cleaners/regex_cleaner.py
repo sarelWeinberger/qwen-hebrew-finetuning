@@ -8,7 +8,7 @@ class RegExCleaner(BaseCleaner):
     def __init__(self, patterns: list[tuple[str, str]] = None, save_samples: bool = True, sample_percentage: float = 0.05):
         super().__init__(save_samples=save_samples, sample_percentage=sample_percentage)
         self.patterns = [(regex.compile(p), r) for p, r in patterns or []]
-        logger.info(f"Initialized RegExCleaner with {len(self.patterns)} patterns")
+        logger.info(f"Initialized RegExCleaner")
 
     def _clean_implementation(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -50,12 +50,6 @@ class RegExCleaner(BaseCleaner):
         original_texts = df["text"].astype(str).tolist()
         modified_count = sum(1 for orig, cleaned in zip(original_texts, cleaned_texts) if orig != cleaned)
         self.stats['rows_modified'] = modified_count
-        
-        logger.info(f"RegExCleaner processed {len(df)} rows")
-        logger.info(f"Modified {self.stats['rows_modified']} rows")
-
-        for pattern, count in self.stats['patterns_matched'].items():
-            logger.info(f"Pattern '{pattern}' matched {count} times")
 
         return result_df
 

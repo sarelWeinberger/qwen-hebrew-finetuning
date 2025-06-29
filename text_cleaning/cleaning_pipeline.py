@@ -17,8 +17,6 @@ class CleaningPipeline:
         logger.info(f"Starting to process {total_files} files...")
         
         for i, file_path in enumerate(files, 1):
-            logger.info(f"Processing file {i}/{total_files}: {file_path}")
-            
             # Process single file
             df = self.fetcher.fetch_single_file(file_path)
             if not df.empty:
@@ -30,7 +28,7 @@ class CleaningPipeline:
                 
                 # Save cleaned data
                 self.fetcher.save_cleaned_data(df, self.source_name, file_path)
-                logger.info(f"Completed processing file {i}/{total_files}")
+                logger.info(f"Done processing file {i}/{total_files}")
             else:
                 logger.warning(f"Skipped empty file {i}/{total_files}")
         

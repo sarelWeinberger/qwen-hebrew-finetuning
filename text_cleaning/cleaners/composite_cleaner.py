@@ -16,9 +16,7 @@ class CompositeCleaner(BaseCleaner):
         """
         super().__init__(save_samples=save_samples, sample_percentage=sample_percentage)
         self.cleaners = cleaners
-        logger.info(f"Initialized CompositeCleaner with {len(cleaners)} cleaners")
-        for i, cleaner in enumerate(cleaners, 1):
-            logger.info(f"Cleaner {i}: {cleaner.__class__.__name__}")
+        logger.info(f"Initialized CompositeCleaner")
 
     def _clean_implementation(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -32,11 +30,8 @@ class CompositeCleaner(BaseCleaner):
         """
         current_df = df.copy()
         
-        logger.info(f"Starting cleaning pipeline on {len(df)} rows")
-        
         for i, cleaner in enumerate(self.cleaners, 1):
             cleaner_start_time = time.time()
-            logger.info(f"Applying cleaner {i}/{len(self.cleaners)}: {cleaner.__class__.__name__}")
             
             # Get initial stats
             initial_length = current_df['text'].str.len().sum()
@@ -52,23 +47,5 @@ class CompositeCleaner(BaseCleaner):
             # Update composite stats
             self.stats['characters_removed'] += chars_removed
             self.stats['characters_added'] += chars_added
-            
-            # Log cleaner-specific stats
-            cleaner_stats = cleaner.get_stats()
-            logger.info(f"Cleaner {i} statistics:")
-            logger.info(f"  - Rows modified: {cleaner_stats['rows_modified']}")
-            logger.info(f"  - Characters removed: {chars_removed}")
-            logger.info(f"  - Characters added: {chars_added}")
-            logger.info(f"  - Execution time: {time.time() - cleaner_start_time:.2f} seconds")
-            
-            if cleaner_stats['patterns_matched']:
-                logger.info("  - Pattern matches:")
-                for pattern, count in cleaner_stats['patterns_matched'].items():
-                    logger.info(f"    * {pattern}: {count} matches")
-        
-        # Log final statistics
-        logger.info("Cleaning pipeline completed")
-        logger.info(f"Total characters removed: {self.stats['characters_removed']}")
-        logger.info(f"Total characters added: {self.stats['characters_added']}")
         
         return current_df

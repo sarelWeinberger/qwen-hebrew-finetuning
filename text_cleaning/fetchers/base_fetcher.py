@@ -16,7 +16,7 @@ class BaseFetcher:
             'errors': [],
             'file_stats': {}
         }
-        logger.info(f"Initialized {self.__class__.__name__} for source: {source_name}")
+        logger.info(f"Initialized {self.__class__.__name__}")
 
     def get_files_to_process(self) -> List[str]:
         """
@@ -48,21 +48,4 @@ class BaseFetcher:
     
     def log_stats(self):
         """Log the fetching statistics."""
-        logger.info(f"Fetching statistics for {self.__class__.__name__} - Source: {self.source_name}")
-        logger.info(f"Total files processed: {self.stats['total_files_processed']}")
-        logger.info(f"Total rows fetched: {self.stats['total_rows_fetched']}")
-        logger.info(f"Total bytes read: {self.stats['total_bytes_read']}")
-        logger.info(f"Total execution time: {self.stats['execution_time']:.2f} seconds")
-        
-        if self.stats['errors']:
-            logger.warning(f"Encountered {len(self.stats['errors'])} errors:")
-            for error in self.stats['errors']:
-                logger.warning(f"  - {error}")
-        
-        if self.stats['file_stats']:
-            logger.info("File-specific statistics:")
-            for file_path, stats in self.stats['file_stats'].items():
-                logger.info(f"  - {file_path}:")
-                logger.info(f"    * Rows: {stats.get('rows', 0)}")
-                logger.info(f"    * Size: {stats.get('size_bytes', 0)} bytes")
-                logger.info(f"    * Processing time: {stats.get('processing_time', 0):.2f} seconds")
+        logger.info(f"Done {self.__class__.__name__}")

@@ -17,7 +17,7 @@ class QualityCleaner(BaseCleaner):
         self.metrics = metrics or {
             "single_char_percentage": self.calculate_single_char_percentage
         }
-        logger.info(f"Initialized QualityCleaner with {len(self.metrics)} metrics")
+        logger.info(f"Initialized QualityCleaner")
 
     def calculate_single_char_percentage(self, text: str) -> float:
         """
@@ -60,7 +60,6 @@ class QualityCleaner(BaseCleaner):
             calculation_func (Callable): Function that calculates the metric
         """
         self.metrics[name] = calculation_func
-        logger.info(f"Added quality metric: {name}")
 
     def _clean_implementation(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -84,8 +83,5 @@ class QualityCleaner(BaseCleaner):
         
         # Calculate rows modified (any row that has new metrics added)
         self.stats['rows_modified'] = len(result_df)  # All rows get metrics added
-        
-        logger.info(f"QualityCleaner processed {len(df)} rows")
-        logger.info(f"Added {len(self.metrics)} quality metrics to all rows")
         
         return result_df

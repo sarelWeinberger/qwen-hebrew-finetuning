@@ -38,9 +38,7 @@ class LLMCleaner(BaseCleaner):
             "device": str(self.model.device)
         })
         
-        logger.info(f"Initialized LLMCleaner with model: {model_id}")
-        logger.info(f"Device: {self.model.device}")
-        logger.info(f"Torch dtype: {torch_dtype}")
+        logger.info(f"Initialized LLMCleaner")
 
     def _log_metrics(self, input_length, output_length, processing_time):
         """Log metrics to wandb including GPU usage"""
@@ -60,7 +58,6 @@ class LLMCleaner(BaseCleaner):
                     f"gpu_{i}_memory_total": gpu.memoryTotal,
                     f"gpu_{i}_utilization": gpu.load * 100
                 })
-                logger.debug(f"GPU {i} - Memory Used: {gpu.memoryUsed}MB, Utilization: {gpu.load*100:.1f}%")
         except Exception as e:
             logger.warning(f"Could not log GPU metrics: {e}")
         
@@ -94,8 +91,6 @@ class LLMCleaner(BaseCleaner):
         cleaned_texts = []
         n_words = []
         
-        logger.info(f"LLMCleaner processing {len(df)} rows")
-        
         for idx, row in df.iterrows():
             raw_text = row['text']
             
@@ -103,9 +98,6 @@ class LLMCleaner(BaseCleaner):
                 cleaned_text = self._clean_single_text(raw_text)
                 cleaned_texts.append(cleaned_text)
                 n_words.append(len(cleaned_text.split()))
-                
-                if idx % 10 == 0:  # Log progress every 10 rows
-                    logger.info(f"Processed {idx + 1}/{len(df)} rows")
                     
             except Exception as e:
                 logger.error(f"Error processing row {idx}: {str(e)}")
@@ -118,9 +110,6 @@ class LLMCleaner(BaseCleaner):
             'text': cleaned_texts,
             'n_words': n_words
         })
-        
-        logger.info(f"LLMCleaner completed processing {len(df)} rows")
-        logger.info(f"Modified {self.stats['rows_modified']} rows")
         
         return result_df
 
@@ -135,8 +124,6 @@ class LLMCleaner(BaseCleaner):
             Cleaned text
         """
         start_time = time.time()
-        
-        logger.debug(f"Processing text of length {len(raw_text)} characters")
         
         full_chat = self.few_shot_prompt + [{"role": "user", "content": f"טקסט: {raw_text}"}]
         prompt_input = self.tokenizer.apply_chat_template(full_chat, add_generation_prompt=True, return_tensors="pt").to(self.model.device)
@@ -155,10 +142,6 @@ class LLMCleaner(BaseCleaner):
             processing_time=processing_time
         )
         
-        logger.debug(f"Cleaning completed in {processing_time:.2f} seconds")
-        logger.debug(f"Input length: {len(raw_text)}, Output length: {len(cleaned_text)}")
-        logger.debug(f"Compression ratio: {len(cleaned_text)/len(raw_text):.2f}")
-        
         return cleaned_text
 
     def extract_response(self, text) -> str:
@@ -168,4 +151,3 @@ class LLMCleaner(BaseCleaner):
         """Clean up wandb run when the cleaner is destroyed"""
         if wandb.run is not None:
             wandb.finish()
-            logger.info("Wandb run finished")
