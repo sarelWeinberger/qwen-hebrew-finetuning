@@ -1,18 +1,23 @@
 import pandas as pd
 from typing import Dict, Any, Callable, List
+from .base_cleaner import BaseCleaner
+from utils.logger import logger
 
-class QualityCleaner:
-    def __init__(self, metrics: Dict[str, Callable] = None):
+class QualityCleaner(BaseCleaner):
+    def __init__(self, metrics: Dict[str, Callable] = None, save_samples: bool = True, sample_percentage: float = 0.05):
         """
         Initialize the quality cleaner with configurable metrics.
         
         Args:
             metrics (Dict[str, Callable]): Dictionary mapping metric names to their calculation functions
+            save_samples: Whether to save before/after samples
+            sample_percentage: Percentage of data to sample
         """
+        super().__init__(save_samples=save_samples, sample_percentage=sample_percentage)
         self.metrics = metrics or {
             "single_char_percentage": self.calculate_single_char_percentage
         }
-
+        logger.info(f"Initialized QualityCleaner with {len(self.metrics)} metrics")
 
     def calculate_single_char_percentage(self, text: str) -> float:
         """
@@ -46,7 +51,6 @@ class QualityCleaner:
         
         return (single_chars / total_chars) * 100
 
-
     def add_metric(self, name: str, calculation_func: Callable) -> None:
         """
         Add a new quality metric to the cleaner.
@@ -56,23 +60,32 @@ class QualityCleaner:
             calculation_func (Callable): Function that calculates the metric
         """
         self.metrics[name] = calculation_func
+        logger.info(f"Added quality metric: {name}")
 
-    def clean(self, df: pd.DataFrame, text_column: str) -> pd.DataFrame:
+    def _clean_implementation(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Add quality metrics to the dataframe.
         
         Args:
-            df (pd.DataFrame): Input dataframe
-            text_column (str): Name of the column containing text to analyze
+            df (pd.DataFrame): Input dataframe with 'text' column
             
         Returns:
-            pd.DataFrame: Dataframe with added quality metrics
+            pd.DataFrame: Dataframe with added quality metrics and updated 'n_words'
         """
         # Create a copy to avoid modifying the original dataframe
-        df = df.copy()
+        result_df = df.copy()
         
         # Calculate and add each quality metric
         for metric_name, calculation_func in self.metrics.items():
-            df[metric_name] = df[text_column].apply(calculation_func)
+            result_df[metric_name] = result_df['text'].apply(calculation_func)
         
-        return df
+        # Update word count
+        result_df['n_words'] = result_df['text'].str.split().str.len()
+        
+        # Calculate rows modified (any row that has new metrics added)
+        self.stats['rows_modified'] = len(result_df)  # All rows get metrics added
+        
+        logger.info(f"QualityCleaner processed {len(df)} rows")
+        logger.info(f"Added {len(self.metrics)} quality metrics to all rows")
+        
+        return result_df

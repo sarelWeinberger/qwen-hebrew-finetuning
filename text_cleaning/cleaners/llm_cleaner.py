@@ -17,8 +17,10 @@ class LLMCleaner(BaseCleaner):
     def __init__(self, model_id, processor, few_shot_prompt: list,
                 raw_text: str,
                 torch_dtype=torch.float16,
-                wandb_project="text-cleaning"):
-        super().__init__()
+                wandb_project="text-cleaning",
+                save_samples: bool = True,
+                sample_percentage: float = 0.05):
+        super().__init__(save_samples=save_samples, sample_percentage=sample_percentage)
         self.model = AutoModelForCausalLM.from_pretrained(model_id, device_map="auto", torch_dtype=torch_dtype)
         self.tokenizer = processor
         self.few_shot_prompt = few_shot_prompt
@@ -79,11 +81,62 @@ class LLMCleaner(BaseCleaner):
         if input_length != output_length:
             self.stats['rows_modified'] += 1
 
-    def clean(self, raw_text: str) -> str:
-        import time
+    def _clean_implementation(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Clean the DataFrame using LLM processing.
+        
+        Args:
+            df: Input DataFrame with 'text' column
+            
+        Returns:
+            Cleaned DataFrame with 'text' and 'n_words' columns
+        """
+        cleaned_texts = []
+        n_words = []
+        
+        logger.info(f"LLMCleaner processing {len(df)} rows")
+        
+        for idx, row in df.iterrows():
+            raw_text = row['text']
+            
+            try:
+                cleaned_text = self._clean_single_text(raw_text)
+                cleaned_texts.append(cleaned_text)
+                n_words.append(len(cleaned_text.split()))
+                
+                if idx % 10 == 0:  # Log progress every 10 rows
+                    logger.info(f"Processed {idx + 1}/{len(df)} rows")
+                    
+            except Exception as e:
+                logger.error(f"Error processing row {idx}: {str(e)}")
+                # Keep original text if cleaning fails
+                cleaned_texts.append(raw_text)
+                n_words.append(len(raw_text.split()))
+        
+        # Create result DataFrame
+        result_df = pd.DataFrame({
+            'text': cleaned_texts,
+            'n_words': n_words
+        })
+        
+        logger.info(f"LLMCleaner completed processing {len(df)} rows")
+        logger.info(f"Modified {self.stats['rows_modified']} rows")
+        
+        return result_df
+
+    def _clean_single_text(self, raw_text: str) -> str:
+        """
+        Clean a single text using LLM.
+        
+        Args:
+            raw_text: Input text to clean
+            
+        Returns:
+            Cleaned text
+        """
         start_time = time.time()
         
-        logger.info(f"Processing text of length {len(raw_text)} characters")
+        logger.debug(f"Processing text of length {len(raw_text)} characters")
         
         full_chat = self.few_shot_prompt + [{"role": "user", "content": f"טקסט: {raw_text}"}]
         prompt_input = self.tokenizer.apply_chat_template(full_chat, add_generation_prompt=True, return_tensors="pt").to(self.model.device)
@@ -102,9 +155,9 @@ class LLMCleaner(BaseCleaner):
             processing_time=processing_time
         )
         
-        logger.info(f"Cleaning completed in {processing_time:.2f} seconds")
-        logger.info(f"Input length: {len(raw_text)}, Output length: {len(cleaned_text)}")
-        logger.info(f"Compression ratio: {len(cleaned_text)/len(raw_text):.2f}")
+        logger.debug(f"Cleaning completed in {processing_time:.2f} seconds")
+        logger.debug(f"Input length: {len(raw_text)}, Output length: {len(cleaned_text)}")
+        logger.debug(f"Compression ratio: {len(cleaned_text)/len(raw_text):.2f}")
         
         return cleaned_text
 

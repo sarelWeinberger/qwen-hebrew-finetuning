@@ -5,17 +5,23 @@ import time
 from utils.logger import logger
 
 class RegExCleaner(BaseCleaner):
-    def __init__(self, patterns: list[tuple[str, str]] = None):
-        super().__init__()
+    def __init__(self, patterns: list[tuple[str, str]] = None, save_samples: bool = True, sample_percentage: float = 0.05):
+        super().__init__(save_samples=save_samples, sample_percentage=sample_percentage)
         self.patterns = [(regex.compile(p), r) for p, r in patterns or []]
         logger.info(f"Initialized RegExCleaner with {len(self.patterns)} patterns")
 
-    def clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        start_time = time.time()
+    def _clean_implementation(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Clean the DataFrame using the defined regex patterns.
+        
+        Args:
+            df: Input DataFrame with 'text' column
+            
+        Returns:
+            Cleaned DataFrame with 'text' and 'n_words' columns
+        """
         cleaned_texts = []
         n_words = []
-
-        self.stats['total_rows_processed'] = len(df)
 
         _DELIM = "UNIQUE_DELIMITER_XYZ123_456_789_899_234_123"
 
@@ -34,24 +40,28 @@ class RegExCleaner(BaseCleaner):
         cleaned_texts = [t.strip() for t in joined_text.split(_DELIM)]
         n_words = [len(t.split()) for t in cleaned_texts]
 
-        res_df = pd.DataFrame({
+        # Create result DataFrame
+        result_df = pd.DataFrame({
             "text": cleaned_texts,
-            "n_count": n_words
+            "n_words": n_words
         })
-
-        self.stats['execution_time'] = time.time() - start_time
-        logger.info(f"Processed {len(df)} rows in {self.stats['execution_time']:.2f}s")
+        
+        # Calculate rows modified
+        original_texts = df["text"].astype(str).tolist()
+        modified_count = sum(1 for orig, cleaned in zip(original_texts, cleaned_texts) if orig != cleaned)
+        self.stats['rows_modified'] = modified_count
+        
+        logger.info(f"RegExCleaner processed {len(df)} rows")
         logger.info(f"Modified {self.stats['rows_modified']} rows")
 
         for pattern, count in self.stats['patterns_matched'].items():
             logger.info(f"Pattern '{pattern}' matched {count} times")
 
-        return res_df
-    
-    
+        return result_df
+
     def clean(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Clean the DataFrame using the defined regex patterns.
         """        
-        cleaned_df = self.clean_dataframe(df)
+        cleaned_df = self._clean_implementation(df)
         return cleaned_df

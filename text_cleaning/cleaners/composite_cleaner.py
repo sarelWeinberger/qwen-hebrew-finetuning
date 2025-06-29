@@ -5,20 +5,22 @@ from utils.logger import logger
 
 
 class CompositeCleaner(BaseCleaner):
-    def __init__(self, cleaners: list[BaseCleaner]):
+    def __init__(self, cleaners: list[BaseCleaner], save_samples: bool = True, sample_percentage: float = 0.05):
         """
         Initialize a composite cleaner that applies multiple cleaners in sequence.
         
         Args:
             cleaners: List of cleaner instances to apply in sequence
+            save_samples: Whether to save before/after samples for the composite process
+            sample_percentage: Percentage of data to sample
         """
-        super().__init__()
+        super().__init__(save_samples=save_samples, sample_percentage=sample_percentage)
         self.cleaners = cleaners
         logger.info(f"Initialized CompositeCleaner with {len(cleaners)} cleaners")
         for i, cleaner in enumerate(cleaners, 1):
             logger.info(f"Cleaner {i}: {cleaner.__class__.__name__}")
 
-    def clean(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _clean_implementation(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Apply all cleaners in sequence to the input DataFrame.
         
@@ -28,9 +30,7 @@ class CompositeCleaner(BaseCleaner):
         Returns:
             DataFrame with cleaned text and word count
         """
-        start_time = time.time()
         current_df = df.copy()
-        self.stats['total_rows_processed'] = len(df)
         
         logger.info(f"Starting cleaning pipeline on {len(df)} rows")
         
@@ -41,8 +41,8 @@ class CompositeCleaner(BaseCleaner):
             # Get initial stats
             initial_length = current_df['text'].str.len().sum()
             
-            # Apply cleaner
-            current_df = cleaner.clean(current_df)
+            # Apply cleaner (this will handle its own sample saving)
+            current_df = cleaner.clean(current_df, file_name=f"step_{i}_{cleaner.__class__.__name__}")
             
             # Calculate changes
             final_length = current_df['text'].str.len().sum()
@@ -66,11 +66,8 @@ class CompositeCleaner(BaseCleaner):
                 for pattern, count in cleaner_stats['patterns_matched'].items():
                     logger.info(f"    * {pattern}: {count} matches")
         
-        self.stats['execution_time'] = time.time() - start_time
-        
         # Log final statistics
         logger.info("Cleaning pipeline completed")
-        logger.info(f"Total execution time: {self.stats['execution_time']:.2f} seconds")
         logger.info(f"Total characters removed: {self.stats['characters_removed']}")
         logger.info(f"Total characters added: {self.stats['characters_added']}")
         
