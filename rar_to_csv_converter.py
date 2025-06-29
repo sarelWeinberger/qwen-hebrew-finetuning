@@ -319,39 +319,12 @@ class RARToCSVConverter:
             logger.error(f"Error during conversion: {str(e)}")
             raise
 
-
-def main():
-    """
-    Main function with example usage.
-    """
-    import argparse
     
-    parser = argparse.ArgumentParser(description='Convert RAR file from S3 to CSV files')
-    parser.add_argument('--bucket', required=True, help='S3 bucket name')
-    parser.add_argument('--rar-key', required=True, help='S3 key of the RAR file')
-    parser.add_argument('--output-prefix', default='csv_output', help='S3 prefix for output files')
-    parser.add_argument('--max-size-mb', type=int, default=100, help='Maximum size in MB for each CSV file')
-    
-    args = parser.parse_args()
-    
-    # Create converter and run conversion
-    converter = RARToCSVConverter(
-        bucket_name=args.bucket,
-        rar_file_key=args.rar_key,
-        output_prefix=args.output_prefix
-    )
-    
-    try:
-        uploaded_files = converter.convert(max_size_mb=args.max_size_mb)
-        print(f"\nConversion completed! Uploaded {len(uploaded_files)} files:")
-        for file_key in uploaded_files:
-            print(f"  s3://{args.bucket}/{file_key}")
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return 1
-    
-    return 0
-
 
 if __name__ == "__main__":
-    exit(main()) 
+    converter = RARToCSVConverter(
+        bucket_name='israllm-datasets',
+        rar_file_key='raw-datasets/rar/AllHebNLIFiles.tar.gz',
+        output_prefix='israllm-datasets/raw-datasets/rar/test'
+        )
+    uploaded_files = converter.convert()
