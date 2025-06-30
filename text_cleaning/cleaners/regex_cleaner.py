@@ -8,8 +8,8 @@ from utils.logger import logger
 from utils.cleaner_constants import CLEANUP_RULES
 
 class RegExCleaner(BaseCleaner):
-    def __init__(self, patterns: list[tuple[str, str]] = None, save_samples: bool = True, sample_percentage: float = 0.05, debug_mode: bool = False):
-        super().__init__(save_samples=save_samples, sample_percentage=sample_percentage)
+    def __init__(self, patterns: list[tuple[str, str]] = None, debug_mode: bool = False):
+        super().__init__()
         # Handle both string and callable replacements
         self.patterns = []
         for p, r in patterns or []:

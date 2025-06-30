@@ -1,4 +1,4 @@
-html_tags = r'</?(html|head|body|style|script|title|meta|link|div|span|p|a|img|br|h[1-6]|ul|ol|li|table|thead|tbody|tr|th|td|form|input|button|label|select|option|textarea|strong|b|em|i|u|small|footer|header|nav|section|article|aside|main|figure|figcaption|hr)[^>]*>'
+html_tags = r'</?(html|head|body|style|script|title|meta|link|div|span|p|a|img|br|h[1-6]|ul|ol|li|table|thead|tbody|tr|th|td|form|input|button|label|select|option|textarea|strong|b|em|i|u|small|footer|header|nav|section|article|aside|main|figure|figcaption|hr)\b[^>]*>'
 CLEANUP_RULES = [
     {
         'regex': (r'(&quot;|&#34;)', '"'),

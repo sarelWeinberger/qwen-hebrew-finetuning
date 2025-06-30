@@ -5,8 +5,8 @@ from utils.logger import logger
 
 
 class DuplicateRemoverCleaner(BaseCleaner):
-    def __init__(self, save_samples: bool = True, sample_percentage: float = 0.05):
-        super().__init__(save_samples=save_samples, sample_percentage=sample_percentage)
+    def __init__(self):
+        super().__init__()
         logger.info("Initialized DuplicateRemoverCleaner")
 
     def _clean_implementation(self, df: pd.DataFrame) -> pd.DataFrame:

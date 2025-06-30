@@ -5,16 +5,14 @@ from utils.logger import logger
 
 
 class CompositeCleaner(BaseCleaner):
-    def __init__(self, cleaners: list[BaseCleaner], save_samples: bool = True, sample_percentage: float = 0.05):
+    def __init__(self, cleaners: list[BaseCleaner]):
         """
         Initialize a composite cleaner that applies multiple cleaners in sequence.
         
         Args:
             cleaners: List of cleaner instances to apply in sequence
-            save_samples: Whether to save before/after samples for the composite process
-            sample_percentage: Percentage of data to sample
         """
-        super().__init__(save_samples=save_samples, sample_percentage=sample_percentage)
+        super().__init__()
         self.cleaners = cleaners
         logger.info(f"Initialized CompositeCleaner")
 
@@ -36,8 +34,7 @@ class CompositeCleaner(BaseCleaner):
             # Get initial stats
             initial_length = current_df['text'].str.len().sum()
             
-            # Apply cleaner (this will handle its own sample saving)
-            current_df = cleaner.clean(current_df, file_name=f"step_{i}_{cleaner.__class__.__name__}")
+            current_df = cleaner.clean(current_df)
             
             # Calculate changes
             final_length = current_df['text'].str.len().sum()

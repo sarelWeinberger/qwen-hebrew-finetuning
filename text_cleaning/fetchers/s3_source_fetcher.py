@@ -40,27 +40,13 @@ class S3SourceFetcher(BaseFetcher):
         """
         Fetch data from a single S3 file.
         """
-        start_time = time.time()
-        file_stats = {
-            'rows': 0,
-            'size_bytes': 0,
-            'processing_time': 0
-        }
-        
+    
         try:
             # Get object metadata
-            head_response = self.s3.head_object(Bucket=self.bucket_name, Key=file_path)
-            file_stats['size_bytes'] = head_response['ContentLength']
-            
+            head_response = self.s3.head_object(Bucket=self.bucket_name, Key=file_path)            
             # Get object data
             response = self.s3.get_object(Bucket=self.bucket_name, Key=file_path)
             df = pd.read_csv(io.BytesIO(response["Body"].read()), header=None, names=["text", "n_words"])
-            file_stats['rows'] = len(df)
-            
-            # Update statistics
-            self.stats['total_files_processed'] += 1
-            self.stats['total_rows_fetched'] += len(df)
-            self.stats['total_bytes_read'] += file_stats['size_bytes']
 
             return df
             
@@ -69,10 +55,6 @@ class S3SourceFetcher(BaseFetcher):
             logger.error(error_msg)
             self.stats['errors'].append(error_msg)
             return pd.DataFrame()
-            
-        finally:
-            file_stats['processing_time'] = time.time() - start_time
-            self.stats['file_stats'][file_path] = file_stats
 
     def save_cleaned_data(self, df: pd.DataFrame, source_name: str, original_file_path: str):
         """
