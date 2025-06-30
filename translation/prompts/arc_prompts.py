@@ -6,6 +6,14 @@ ARC_INSTRUCT = """Your task is to translate the given English question and possi
 3. Maintain the same formatting as the original English version, including any bullet points, numbering, or other formatting elements.
 4. Provide the Hebrew translation immediately after these instructions, without any preamble or additional context."""
 
+ARC_INSTRUCT_MULTI = """Your task is to translate the given English question and possible answers into possible Hebrew translations. Follow these guidelines:
+
+1. Only translate the question and answer options provided. Do not add any additional text or instructions.
+2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
+3. Maintain the same formatting and style as the original English version.
+4. Provide {X} possible translations for the question and each one of the answers.
+5. Provide the Hebrew translation immediately after these instructions, without any preamble or additional context."""
+
 # Format prompts (to be used in the prompt when needed)
 ARC_FORMAT = """<response_format>
 <question>Translated question</question>

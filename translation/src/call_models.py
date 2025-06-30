@@ -66,7 +66,10 @@ def call_gemini(google_client, message, config=None):
     return response
 
 
-def all_string_gemini_config(str_lst, system_instruction=None):
+def create_gemini_config(str_lst, system_instruction=None, output_type=None, enum=None):
+    if output_type is None:
+        output_type = types.Type.STRING
+
     return types.GenerateContentConfig(
         temperature=0,
         topK=1,
@@ -81,8 +84,48 @@ def all_string_gemini_config(str_lst, system_instruction=None):
             propertyOrdering=str_lst,
             properties={
                 p: genai.types.Schema(
-                    type=genai.types.Type.STRING,
+                    type=output_type,
+                    enum=enum,
                 ) for p in str_lst
             },
         ),
-    )    
+    )
+
+
+def all_string_gemini_config(str_lst, system_instruction=None, enum=None):
+    return create_gemini_config(str_lst, system_instruction=system_instruction, enum=enum)
+
+
+def all_int_gemini_config(str_lst, system_instruction=None):
+    return create_gemini_config(
+        str_lst,
+        system_instruction=system_instruction,
+        output_type=types.Type.INTEGER
+    )
+
+
+def all_list_gemini_config(str_lst, system_instruction=None, length=3):
+    return types.GenerateContentConfig(
+        temperature=0,
+        topK=1,
+        thinking_config=types.ThinkingConfig(
+            thinking_budget=-1,
+        ),
+        system_instruction=system_instruction,
+        response_mime_type="application/json",
+        response_schema=genai.types.Schema(
+            type=genai.types.Type.OBJECT,
+            required=str_lst,
+            propertyOrdering=str_lst,
+            properties={
+                p: genai.types.Schema(
+                    type=genai.types.Type.ARRAY,
+                    items=genai.types.Schema(
+                        type=genai.types.Type.STRING
+                    ),
+                    minItems=length,
+                    maxItems=length,
+                ) for p in str_lst
+            },
+        ),
+    )
