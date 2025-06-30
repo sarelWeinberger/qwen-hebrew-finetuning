@@ -1,7 +1,6 @@
 import pandas as pd
 from typing import Dict, Any, Optional
 from utils.logger import logger
-from utils.sample_saver import SampleSaver
 import time
 
 class BaseCleaner:
@@ -26,13 +25,7 @@ class BaseCleaner:
         # Sample saving configuration
         self.save_samples = save_samples
         self.sample_percentage = sample_percentage
-        self.sample_saver = None
-        
-        if self.save_samples:
-            self.sample_saver = SampleSaver(
-                output_dir=sample_output_dir,
-                sample_percentage=sample_percentage
-            )
+    
     
     def clean(self, df: pd.DataFrame, file_name: str = "unknown") -> pd.DataFrame:
         """

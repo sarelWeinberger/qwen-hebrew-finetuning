@@ -10,11 +10,21 @@ from utils.cleaner_constants import CLEANUP_RULES
 class RegExCleaner(BaseCleaner):
     def __init__(self, patterns: list[tuple[str, str]] = None, save_samples: bool = True, sample_percentage: float = 0.05, debug_mode: bool = False):
         super().__init__(save_samples=save_samples, sample_percentage=sample_percentage)
-        self.patterns = [(regex.compile(p), r) for p, r in patterns or []]
+        # Handle both string and callable replacements
+        self.patterns = []
+        for p, r in patterns or []:
+            if callable(r):
+                # For callable replacements, we need to handle them differently
+                self.patterns.append((regex.compile(p), r))
+            else:
+                self.patterns.append((regex.compile(p), r))
+        
         self.debug_mode = debug_mode
         self.s3_client = boto3.client('s3') if debug_mode else None
+        # Initialize examples tracking for each regex pattern from CLEANUP_RULES
         self.examples_collected = {rule['regex'][0]: 0 for rule in CLEANUP_RULES} if debug_mode else {}
         self.examples_data = {rule['regex'][0]: [] for rule in CLEANUP_RULES} if debug_mode else {}
+        self.should_stop_processing = False
         logger.info(f"Initialized RegExCleaner with debug_mode={debug_mode}")
 
     def _save_examples_to_s3(self, rule_info: dict, examples_df: pd.DataFrame):
@@ -93,6 +103,11 @@ class RegExCleaner(BaseCleaner):
                 if self.examples_collected[regex_pattern] == 50:
                     examples_df = pd.DataFrame(self.examples_data[regex_pattern])
                     self._save_examples_to_s3(rule_info, examples_df)
+                    
+                    # Check if we've collected enough examples for all patterns
+                    if all(count >= 50 for count in self.examples_collected.values()):
+                        logger.info("Collected 50 examples for all patterns. Will stop processing after current batch.")
+                        self.should_stop_processing = True
 
     def _clean_implementation(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -104,6 +119,10 @@ class RegExCleaner(BaseCleaner):
         Returns:
             Cleaned DataFrame with 'text' and 'n_words' columns
         """
+        if self.should_stop_processing:
+            logger.info("Debug mode: Stopping processing as all examples have been collected.")
+            return df
+
         cleaned_texts = []
         n_words = []
 
@@ -115,10 +134,31 @@ class RegExCleaner(BaseCleaner):
 
         # 2. Apply every (pattern → replacement) once over the *entire* string
         for pattern, repl in self.patterns:
+            if self.should_stop_processing:
+                break
+                
             # Store original text before applying this pattern
             text_before_pattern = joined_text
             
-            joined_text, n_subs = pattern.subn(repl, joined_text)
+            # Handle callable replacements differently
+            if callable(repl):
+                # For callable replacements, we need to apply them differently
+                # This is more complex and we'll need to process each text individually
+                texts_before = text_before_pattern.split(_DELIM)
+                texts_after = []
+                total_subs = 0
+                
+                for text in texts_before:
+                    new_text, n_subs = pattern.subn(repl, text)
+                    texts_after.append(new_text)
+                    total_subs += n_subs
+                
+                joined_text = _DELIM.join(texts_after)
+                n_subs = total_subs
+            else:
+                # Regular string replacement
+                joined_text, n_subs = pattern.subn(repl, joined_text)
+            
             if n_subs:  # update stats only when we actually replaced something
                 self.stats["patterns_matched"][pattern.pattern] = (
                     self.stats["patterns_matched"].get(pattern.pattern, 0) + n_subs
@@ -135,16 +175,21 @@ class RegExCleaner(BaseCleaner):
                     
                     if rule_info:
                         # Split back to individual texts to collect examples
-                        texts_before = text_before_pattern.split(_DELIM)
-                        texts_after = joined_text.split(_DELIM)
+                        if callable(repl):
+                            # We already have the before/after texts
+                            texts_before_split = texts_before
+                            texts_after_split = texts_after
+                        else:
+                            texts_before_split = text_before_pattern.split(_DELIM)
+                            texts_after_split = joined_text.split(_DELIM)
                         
                         # Collect examples for this pattern
-                        for i, (orig, cleaned) in enumerate(zip(texts_before, texts_after)):
+                        for i, (orig, cleaned) in enumerate(zip(texts_before_split, texts_after_split)):
+                            if self.should_stop_processing:
+                                break
                             if orig != cleaned:
                                 self._collect_example(orig, cleaned, pattern.pattern, rule_info)
-                                # Stop if we've collected enough examples for all patterns
-                                if all(count >= 50 for count in self.examples_collected.values()):
-                                    logger.info("Collected 50 examples for all patterns. Stopping debug collection.")
+                                if self.should_stop_processing:
                                     break
 
         # 3. Split back to the original rows and final post-processing
@@ -170,9 +215,8 @@ class RegExCleaner(BaseCleaner):
         cleaned_df = self._clean_implementation(df)
         
         # If in debug mode and we've collected examples for all patterns, stop processing
-        if self.debug_mode and all(count >= 50 for count in self.examples_collected.values()):
+        if self.debug_mode and self.should_stop_processing:
             logger.info("Debug mode: Collected 50 examples for all patterns. Stopping processing.")
-            return cleaned_df
             
         return cleaned_df
 
@@ -189,5 +233,6 @@ class RegExCleaner(BaseCleaner):
         return {
             'examples_collected': self.examples_collected,
             'total_examples': sum(self.examples_collected.values()),
-            'patterns_with_50_examples': sum(1 for count in self.examples_collected.values() if count >= 50)
+            'patterns_with_50_examples': sum(1 for count in self.examples_collected.values() if count >= 50),
+            'should_stop_processing': self.should_stop_processing
         }
