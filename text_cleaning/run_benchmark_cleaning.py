@@ -57,9 +57,32 @@ def load_benchmark_data(file_path: str) -> pd.DataFrame:
     return df
 
 
-def apply_cleaners(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def get_cleaners() -> List[Tuple[str, object]]:
     """
-    Apply duplicate and regex cleaners to the data.
+    Define the list of cleaners to apply in order.
+    Each cleaner should be a tuple of (name, cleaner_instance).
+    
+    Returns:
+        List of (cleaner_name, cleaner_instance) tuples
+    """
+    cleaners = [
+        ("duplicate_remover", DuplicateRemoverCleaner()),
+        ("regex_cleaner", RegExCleaner(
+            patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+            debug_mode=False, 
+            save_cleaned_data=False
+        ))
+    ]
+    
+    # To add more cleaners in the future, simply add them here:
+    # cleaners.append(("new_cleaner_name", NewCleaner()))
+    
+    return cleaners
+
+
+def apply_cleaners_step_by_step(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    """
+    Apply each cleaner individually and return results after each step.
     
     Args:
         df: Input DataFrame with 'original_text' column
@@ -74,57 +97,52 @@ def apply_cleaners(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     working_df['text'] = working_df['original_text']
     working_df['n_words'] = working_df['text'].str.split().str.len().fillna(0)
     
-    # Apply duplicate remover
-    print("Applying duplicate remover...")
-    duplicate_cleaner = DuplicateRemoverCleaner()
-    duplicate_cleaned = duplicate_cleaner.clean(working_df)
-    results['clean1'] = duplicate_cleaned
-    
-    # Apply regex cleaner
-    print("Applying regex cleaner...")
-    # Extract patterns from CLEANUP_RULES
-    patterns = [(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES]
-    regex_cleaner = RegExCleaner(patterns=patterns, debug_mode=False, save_cleaned_data=False)
-    regex_cleaned = regex_cleaner.clean(duplicate_cleaned)
-    results['clean2'] = regex_cleaned
+    # Apply each cleaner individually
+    cleaners = get_cleaners()
+    for cleaner_name, cleaner in cleaners:
+        print(f"Applying {cleaner_name}...")
+        cleaned_df = cleaner.clean(working_df)
+        results[cleaner_name] = cleaned_df.copy()
+        working_df = cleaned_df  # Use result as input for next cleaner
     
     return results
 
 
 def calculate_levenshtein_metrics(df: pd.DataFrame, cleaned_dfs: Dict[str, pd.DataFrame]) -> Dict[str, float]:
     """
-    Calculate normalized Levenshtein distances.
+    Calculate normalized Levenshtein distances for each cleaning step (cumulative).
     
     Args:
         df: Original DataFrame with manual_clean column
-        cleaned_dfs: Dictionary of cleaned DataFrames
+        cleaned_dfs: Dictionary of cleaned DataFrames for each step (cumulative)
         
     Returns:
         Dictionary with Levenshtein distance metrics
     """
     metrics = {}
     
-    # Calculate distance from original to manual clean
-    original_to_manual_distances = []
-    for orig_text, manual_clean in zip(df['original_text'], df['manual_clean']):
-        if pd.isna(orig_text) or pd.isna(manual_clean):
-            continue
-        dist = normalize_levenshtein_distance(str(orig_text), str(manual_clean))
-        original_to_manual_distances.append(dist)
+    # Distance from original to manual
+    orig_to_manual = [normalize_levenshtein_distance(str(orig), str(manual))
+                      for orig, manual in zip(df['original_text'], df['manual_clean'])
+                      if not (pd.isna(orig) or pd.isna(manual))]
+    metrics['levenshtein_dist_original_to_manual'] = round(np.mean(orig_to_manual), 3) if orig_to_manual else 0.0
     
-    metrics['levenshtein_original_to_manual'] = np.mean(original_to_manual_distances) if original_to_manual_distances else 0.0
-    
-    # Calculate distances from each cleaning step to original
-    for step_name, cleaned_df in cleaned_dfs.items():
-        step_to_original_distances = []
-        for i, (orig_text, cleaned_text) in enumerate(zip(df['original_text'], cleaned_df['text'])):
-            if i >= len(cleaned_df) or pd.isna(orig_text) or pd.isna(cleaned_text):
-                continue
-            dist = normalize_levenshtein_distance(str(orig_text), str(cleaned_text))
-            step_to_original_distances.append(dist)
-        
-        metrics[f'levenshtein_{step_name}_to_original'] = np.mean(step_to_original_distances) if step_to_original_distances else 0.0
-    
+    # Cumulative: duplicate_remover, then duplicate_and_regex
+    step_names = list(cleaned_dfs.keys())
+    prev_df = df
+    for i, step_name in enumerate(step_names):
+        cleaned_df = cleaned_dfs[step_name]
+        # Distance from this step's output to manual
+        step_to_manual = [normalize_levenshtein_distance(str(cleaned), str(manual))
+                          for cleaned, manual in zip(cleaned_df['text'], df['manual_clean'])
+                          if not (pd.isna(cleaned) or pd.isna(manual))]
+        if i == 0:
+            metrics[f'levenshtein_dist_{step_name}_to_manual'] = round(np.mean(step_to_manual), 3) if step_to_manual else 0.0
+        else:
+            # Cumulative name for all up to this step
+            cum_name = '_and_'.join(step_names[:i+1])
+            metrics[f'levenshtein_dist_{cum_name}_to_manual'] = round(np.mean(step_to_manual), 3) if step_to_manual else 0.0
+        prev_df = cleaned_df
     return metrics
 
 
@@ -143,26 +161,36 @@ def process_benchmark_file(file_path: str) -> Tuple[str, Dict[str, float], pd.Da
     # Load data
     df = load_benchmark_data(file_path)
     
-    # Apply cleaners
-    cleaned_dfs = apply_cleaners(df)
+    # Apply cleaners step by step
+    cleaned_dfs = apply_cleaners_step_by_step(df)
     
-    # Calculate metrics
+    # Calculate metrics for each step
     metrics = calculate_levenshtein_metrics(df, cleaned_dfs)
     
     # Create result DataFrame
     result_df = df.copy()
     
-    # Add cleaned text columns
+    # Determine the next clean column number
+    existing_clean_cols = [col for col in result_df.columns if col.startswith('clean') and col[5:].isdigit()]
+    if existing_clean_cols:
+        # Find the highest number and increment
+        max_num = max(int(col[5:]) for col in existing_clean_cols)
+        next_clean_num = max_num + 1
+    else:
+        next_clean_num = 1
+    
+    # Add cleaned text columns for each step
     for step_name, cleaned_df in cleaned_dfs.items():
-        # Ensure we have the same number of rows
+        clean_col_name = f'clean{next_clean_num}_{step_name}'
+        
         if len(cleaned_df) == len(result_df):
-            result_df[f'cleaned_{step_name}'] = cleaned_df['text']
+            result_df[clean_col_name] = cleaned_df['text']
         else:
             # If lengths don't match, pad with NaN
             cleaned_texts = list(cleaned_df['text'])
             while len(cleaned_texts) < len(result_df):
                 cleaned_texts.append(np.nan)
-            result_df[f'cleaned_{step_name}'] = cleaned_texts[:len(result_df)]
+            result_df[clean_col_name] = cleaned_texts[:len(result_df)]
     
     # Extract file name
     file_name = os.path.basename(file_path).replace('.csv', '')
@@ -175,9 +203,16 @@ def main():
     Main function to process all benchmark files.
     """
     benchmark_dir = "banchmark"
-    benchmark_files = glob.glob(os.path.join(benchmark_dir, "data-clean-banchmark - *.csv"))
-    # Only process files that do NOT end with '_with_cleaned.csv'
-    benchmark_files = [f for f in benchmark_files if not f.endswith('_with_cleaned.csv')]
+    # Get all CSV files in the benchmark directory
+    all_csv_files = glob.glob(os.path.join('text_cleaning' , os.path.join(benchmark_dir, "*.csv")))
+    
+    # Filter to only include original benchmark files (not the ones we've already processed)
+    benchmark_files = []
+    for file_path in all_csv_files:
+        file_name = os.path.basename(file_path)
+        # Only include files that start with "data-clean-banchmark - " and don't end with "_with_cleaned.csv"
+        if file_name.startswith("data-clean-banchmark - ") and not file_name.endswith("_with_cleaned.csv"):
+            benchmark_files.append(file_path)
     
     if not benchmark_files:
         print("No benchmark files found!")
@@ -214,12 +249,12 @@ def main():
     summary_df = summary_df[cols]
     
     # Save results
-    summary_df.to_csv('banchmark/benchmark_cleaning_summary.csv', index=False)
-    print(f"Saved summary to banchmark/benchmark_cleaning_summary.csv")
+    summary_df.to_csv('text_cleaning/banchmark/benchmark_cleaning_summary.csv', index=False)
+    print(f"Saved summary to text_cleaning/banchmark/benchmark_cleaning_summary.csv")
     
     # Save individual result files
     for file_name, result_df in all_results.items():
-        output_path = f"banchmark/{file_name}_with_cleaned.csv"
+        output_path = f"text_cleaning/banchmark/{file_name}_with_cleaned.csv"
         result_df.to_csv(output_path, index=False)
         print(f"Saved {file_name} results to {output_path}")
     
@@ -228,7 +263,7 @@ def main():
     print(summary_df.to_string(index=False))
     
     # Calculate overall averages
-    numeric_cols = [col for col in summary_df.columns if col.startswith('levenshtein')]
+    numeric_cols = [col for col in summary_df.columns if col.startswith('levenshtein_dist_')]
     if numeric_cols:
         print(f"\n=== OVERALL AVERAGES ===")
         for col in numeric_cols:

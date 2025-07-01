@@ -1,3 +1,5 @@
+import regex
+
 html_tags = r'</?(html|head|body|style|script|title|meta|link|div|span|p|a|img|br|h[1-6]|ul|ol|li|table|thead|tbody|tr|th|td|form|input|button|label|select|option|textarea|strong|b|em|i|u|small|footer|header|nav|section|article|aside|main|figure|figcaption|hr)\b[^>]*>'
 CLEANUP_RULES = [
     {
@@ -67,17 +69,31 @@ CLEANUP_RULES = [
         'info': 'PII deletion – IP delete except local list, delete mail addresses.'
     },
     {
-        'regex': (r'^[ \t]*[•●■▪◆◦][ \t]*\n', ''),
+        'regex': (r'\n[ \t]*[•●■▪◆◦][ \t]*\n', '\n'),
         'bucket_name': 'gepeta-datasets',
         'path': 'partly-processed/round_2_test_examples/empty_line_with_bullet/',
-        'info': 'Remove empty lines with only bullet point symbols like •, ●, ■, or ◦, block symbols such as ■, ▪, and ◆. (\n•\n)'
+        'info': 'Remove bullet point symbols like •, ●, ■, or ◦, block symbols such as ■, ▪, and ◆, only when they appear alone on a line.'
     },
     {
-        'regex': (r'^[ \t]*[-=*_~•●■▪◆◦]{4,}[ \t]*\n?', ''),
+       'regex': (r'^[ \t]*[-=*_~•●■▪◆◦]{4,}[ \t]*\n?', ''),
+       'bucket_name': 'gepeta-datasets',
+       'path': 'partly-processed/round_2_test_examples/multiple_hyphens/',
+       'info': 'Remove long separator lines made of multiple hyphens or similar symbols.'
+    },
+    {
+        'regex': (r'[àáâäãåāèéêëēìíîïīòóôöõøōùúûüūýÿçñšžßæœĳÀÁÂÄÃÅĀÈÉÊËĒÌÍÎÏĪÒÓÔÖÕØŌÙÚÛÜŪÝŸÇÑŠŽÆŒĲ·]', ''),
         'bucket_name': 'gepeta-datasets',
-        'path': 'partly-processed/round_2_test_examples/multiple_hyphens/',
-        'info': 'Remove long separator lines made of multiple hyphens or similar symbols.'
-    }
+        'path': 'partly-processed/round_2_test_examples/special_chars/',
+        'info': ''
+
+    },
+    {
+        'regex': (r'[\u0591-\u05C7]', ''),
+        'bucket_name': 'gepeta-datasets',
+        'path': 'partly-processed/round_2_test_examples/nikud/',
+        'info': ''
+
+    },
 ]
 
 # Define the source names
