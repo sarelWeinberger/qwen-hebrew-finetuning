@@ -13,11 +13,6 @@ def create_cleaner_registries(debug_mode: bool = False):
     """
     # Extract regex patterns from CLEANUP_RULES
     regex_patterns = [rule['regex'] for rule in CLEANUP_RULES]
-    
-    # Create registry dictionaries
-    duplicate_cleaner_registry: Dict[str, DuplicateRemoverCleaner] = {
-        source: DuplicateRemoverCleaner() for source in SOURCES
-    }
 
     regex_cleaner_registry: Dict[str, RegExCleaner] = {
         source: RegExCleaner(patterns=regex_patterns, debug_mode=debug_mode) for source in SOURCES
@@ -25,12 +20,11 @@ def create_cleaner_registries(debug_mode: bool = False):
 
     # Create composite cleaners for each source
     composite_cleaner_registry: Dict[str, CompositeCleaner] = {
-        source: CompositeCleaner([duplicate_cleaner_registry[source], regex_cleaner_registry[source]])
+        source: CompositeCleaner([regex_cleaner_registry[source]])
         for source in SOURCES
     }
 
     # Create lists of cleaners for each type
-    duplicate_cleaners: List[DuplicateRemoverCleaner] = list(duplicate_cleaner_registry.values())
     regex_cleaners: List[RegExCleaner] = list(regex_cleaner_registry.values())
     composite_cleaners: List[CompositeCleaner] = list(composite_cleaner_registry.values())
 
