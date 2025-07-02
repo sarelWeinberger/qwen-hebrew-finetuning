@@ -33,21 +33,26 @@ class RegionAvailabilityChecker:
             'me-south-1'
         ]
         
-        # P5-type instances we want to check
+        # P-type instances we want to check (SageMaker)
         self.p_instances = [
+            'ml.p4de.24xlarge',
             'ml.p5.48xlarge',
             'ml.p5e.48xlarge',
             'ml.p5en.48xlarge'
         ]
+        
+        # EC2 P5e instances to check
+        self.ec2_p5e_instances = [
+            'p5e.48xlarge'
+        ]
     
     def check_region_availability(self, region: str) -> Dict[str, bool]:
         """Check which P-type instances are available in a specific region"""
+        availability = {}
+        
+        # Check SageMaker instances
         try:
             sagemaker = boto3.client('sagemaker', region_name=region)
-            
-            # Try to describe training job with each instance type
-            # This is a way to check if the instance type is supported
-            availability = {}
             
             for instance_type in self.p_instances:
                 try:
@@ -68,11 +73,40 @@ class RegionAvailabilityChecker:
                         # Assume available if we can't determine
                         availability[instance_type] = True
             
-            return availability
+        except Exception as e:
+            logger.warning(f"Could not check SageMaker in region {region}: {e}")
+            for instance in self.p_instances:
+                availability[instance] = False
+        
+        # Check EC2 P5e instances
+        try:
+            ec2 = boto3.client('ec2', region_name=region)
+            
+            for instance_type in self.ec2_p5e_instances:
+                try:
+                    # Check if instance type is available in EC2
+                    response = ec2.describe_instance_type_offerings(
+                        Filters=[
+                            {
+                                'Name': 'instance-type',
+                                'Values': [instance_type]
+                            }
+                        ]
+                    )
+                    
+                    # If we get offerings, the instance type is available
+                    availability[f"ec2_{instance_type}"] = len(response['InstanceTypeOfferings']) > 0
+                    
+                except Exception as e:
+                    logger.warning(f"Could not check EC2 instance {instance_type} in region {region}: {e}")
+                    availability[f"ec2_{instance_type}"] = False
             
         except Exception as e:
-            logger.warning(f"Could not check region {region}: {e}")
-            return {instance: False for instance in self.p_instances}
+            logger.warning(f"Could not check EC2 in region {region}: {e}")
+            for instance in self.ec2_p5e_instances:
+                availability[f"ec2_{instance}"] = False
+        
+        return availability
     
     def check_all_regions(self, max_workers: int = 10) -> Dict[str, Dict[str, bool]]:
         """Check availability across all regions using parallel execution"""
@@ -105,29 +139,53 @@ class RegionAvailabilityChecker:
         # Based on AWS documentation and known availability
         known_availability = {
             'us-east-1': {
+                'ml.p4de.24xlarge': True,
                 'ml.p5.48xlarge': True,
                 'ml.p5e.48xlarge': True,
-                'ml.p5en.48xlarge': True
+                'ml.p5en.48xlarge': True,
+                'ec2_p5e.48xlarge': True
             },
             'us-east-2': {
+                'ml.p4de.24xlarge': True,
                 'ml.p5.48xlarge': True,
                 'ml.p5e.48xlarge': True,
-                'ml.p5en.48xlarge': True
+                'ml.p5en.48xlarge': True,
+                'ec2_p5e.48xlarge': True
             },
             'us-west-2': {
+                'ml.p4de.24xlarge': True,
                 'ml.p5.48xlarge': True,
                 'ml.p5e.48xlarge': True,
-                'ml.p5en.48xlarge': True
+                'ml.p5en.48xlarge': True,
+                'ec2_p5e.48xlarge': True
             },
             'eu-west-1': {
+                'ml.p4de.24xlarge': True,
                 'ml.p5.48xlarge': False,  # Limited availability
                 'ml.p5e.48xlarge': False,
-                'ml.p5en.48xlarge': False
+                'ml.p5en.48xlarge': False,
+                'ec2_p5e.48xlarge': False
             },
             'ap-southeast-2': {
+                'ml.p4de.24xlarge': True,
                 'ml.p5.48xlarge': False,
                 'ml.p5e.48xlarge': False,
-                'ml.p5en.48xlarge': False
+                'ml.p5en.48xlarge': False,
+                'ec2_p5e.48xlarge': False
+            },
+            'eu-central-1': {
+                'ml.p4de.24xlarge': True,
+                'ml.p5.48xlarge': False,
+                'ml.p5e.48xlarge': False,
+                'ml.p5en.48xlarge': False,
+                'ec2_p5e.48xlarge': False
+            },
+            'ap-northeast-1': {
+                'ml.p4de.24xlarge': True,
+                'ml.p5.48xlarge': False,
+                'ml.p5e.48xlarge': False,
+                'ml.p5en.48xlarge': False,
+                'ec2_p5e.48xlarge': False
             }
         }
         
@@ -135,9 +193,11 @@ class RegionAvailabilityChecker:
         for region in self.all_regions:
             if region not in known_availability:
                 known_availability[region] = {
+                    'ml.p4de.24xlarge': region.startswith(('us-', 'eu-west-1', 'eu-central-1', 'ap-southeast-2', 'ap-northeast-1')),
                     'ml.p5.48xlarge': region.startswith('us-'),
                     'ml.p5e.48xlarge': region.startswith('us-'),
-                    'ml.p5en.48xlarge': region.startswith('us-')
+                    'ml.p5en.48xlarge': region.startswith('us-'),
+                    'ec2_p5e.48xlarge': region.startswith('us-')
                 }
         
         return known_availability
@@ -145,9 +205,9 @@ class RegionAvailabilityChecker:
     def generate_availability_report(self, availability_data: Dict[str, Dict[str, bool]]) -> str:
         """Generate a formatted availability report"""
         report = []
-        report.append("# SageMaker P5 Instance Availability by Region\n")
-        report.append("| Region | P5.48xlarge | P5e.48xlarge | P5en.48xlarge |")
-        report.append("|--------|-------------|--------------|---------------|")
+        report.append("# SageMaker and EC2 P-type Instance Availability by Region\n")
+        report.append("| Region | P4de.24xlarge | P5.48xlarge | P5e.48xlarge | P5en.48xlarge | EC2 P5e.48xlarge |")
+        report.append("|--------|---------------|-------------|--------------|---------------|------------------|")
         
         # Sort regions for better readability
         sorted_regions = sorted(availability_data.keys())
@@ -156,24 +216,42 @@ class RegionAvailabilityChecker:
             availability = availability_data[region]
             row = f"| {region} |"
             
+            # Add SageMaker instances
             for instance in self.p_instances:
                 status = "✅" if availability.get(instance, False) else "❌"
                 row += f" {status} |"
+            
+            # Add EC2 P5e instance
+            ec2_status = "✅" if availability.get('ec2_p5e.48xlarge', False) else "❌"
+            row += f" {ec2_status} |"
             
             report.append(row)
         
         # Add summary
         report.append("\n## Summary\n")
         
+        # SageMaker instances summary
+        report.append("### SageMaker Instances\n")
         for instance in self.p_instances:
             available_regions = [
-                region for region, availability in availability_data.items() 
+                region for region, availability in availability_data.items()
                 if availability.get(instance, False)
             ]
             report.append(f"**{instance}**: Available in {len(available_regions)} regions")
             if available_regions:
                 report.append(f"  - Regions: {', '.join(sorted(available_regions))}")
             report.append("")
+        
+        # EC2 instances summary
+        report.append("### EC2 Instances\n")
+        ec2_available_regions = [
+            region for region, availability in availability_data.items()
+            if availability.get('ec2_p5e.48xlarge', False)
+        ]
+        report.append(f"**ec2_p5e.48xlarge**: Available in {len(ec2_available_regions)} regions")
+        if ec2_available_regions:
+            report.append(f"  - Regions: {', '.join(sorted(ec2_available_regions))}")
+        report.append("")
         
         # Add recommendations
         report.append("## Recommendations\n")

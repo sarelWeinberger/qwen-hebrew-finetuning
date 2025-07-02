@@ -1,10 +1,11 @@
-# SageMaker Migration Plan: P5 Instance Performance Comparison
+# SageMaker Migration Plan: P-type Instance Performance Comparison
 
 ## Overview
 Migrate the Qwen Hebrew fine-tuning project to SageMaker with:
-- **Training**: P5 instances (P5, P5e, P5en) for performance comparison
+- **Training**: P-type instances (P4de, P5, P5e, P5en) for comprehensive performance comparison
 - **Data Preparation**: CPU instances (m5.large/m5.xlarge) for cost-effective preprocessing
-- **Automated Performance Benchmarking**: Compare P5.48xlarge, P5e.48xlarge, and P5en.48xlarge
+- **Automated Performance Benchmarking**: Compare P4de.24xlarge, P5.48xlarge, P5e.48xlarge, and P5en.48xlarge
+- **EC2 Availability Checking**: Monitor EC2 P5e instance availability across all AWS regions
 
 ## Architecture Design
 
@@ -13,20 +14,23 @@ graph TB
     A[Data Preparation Job<br/>CPU Instance m5.xlarge] --> B[S3 Processed Data]
     B --> C[Training Job Controller]
     
-    C --> D[P5.48xlarge Training]
-    C --> E[P5e.48xlarge Training]
-    C --> F[P5en.48xlarge Training]
+    C --> D[P4de.24xlarge Training]
+    C --> E[P5.48xlarge Training]
+    C --> F[P5e.48xlarge Training]
+    C --> G[P5en.48xlarge Training]
     
-    D --> G[Performance Metrics Collector]
-    E --> G
-    F --> G
+    D --> H[Performance Metrics Collector]
+    E --> H
+    F --> H
+    G --> H
     
-    G --> H[Cost Analysis Engine]
-    H --> I[Best Instance Recommendation]
+    H --> I[Cost Analysis Engine]
+    I --> J[Best Instance Recommendation]
     
-    J[Model Registry] --> C
-    K[CloudWatch Metrics] --> G
-    L[W&B Integration] --> G
+    K[Model Registry] --> C
+    L[CloudWatch Metrics] --> H
+    M[W&B Integration] --> H
+    N[EC2 P5e Availability Checker] --> C
 ```
 
 ## Implementation Components
@@ -40,6 +44,7 @@ graph TB
 
 ### Phase 2: Training Infrastructure (GPU-based)
 **Target Instances**:
+- **P4de.24xlarge**: 8x A100 80GB, 1.15 TB RAM, 4x 100 Gbps network, 8x 3.8TB NVMe SSD
 - **P5.48xlarge**: 8x H100 80GB, 2 TB RAM, 8x 3200 Gbps network
 - **P5e.48xlarge**: 8x H100 80GB, 2 TB RAM, 8x 3200 Gbps network, 8x 7.6TB NVMe SSD
 - **P5en.48xlarge**: 8x H100 80GB, 2 TB RAM, 8x 3200 Gbps network + EFA
@@ -113,6 +118,34 @@ graph TB
 }
 ```
 
+#### 2.4 P5e.48xlarge Configuration
+```json
+{
+  "instance_type": "ml.p5e.48xlarge",
+  "gpu_count": 8,
+  "gpu_memory": "80GB",
+  "batch_size_per_gpu": 6,
+  "gradient_accumulation_steps": 1,
+  "deepspeed_config": "p5e_deepspeed_config.json",
+  "use_nvme_cache": true,
+  "async_checkpointing": true
+}
+```
+
+#### 2.5 P5en.48xlarge Configuration
+```json
+{
+  "instance_type": "ml.p5en.48xlarge",
+  "gpu_count": 8,
+  "gpu_memory": "80GB",
+  "batch_size_per_gpu": 6,
+  "gradient_accumulation_steps": 1,
+  "deepspeed_config": "p5en_deepspeed_config.json",
+  "efa_enabled": true,
+  "multi_node_optimized": true
+}
+```
+
 ### 3. Performance Benchmarking System
 
 #### 3.1 Benchmark Runner
@@ -153,6 +186,18 @@ graph TB
 - Optimized for H100 80GB
 - ZeRO-2 with minimal offloading
 - Maximum performance settings
+
+#### 4.4 P5e DeepSpeed Config
+**File**: `sagemaker/configs/p5e_deepspeed_config.json`
+- Optimized for H100 80GB with NVMe SSD
+- ZeRO-2 with NVMe-accelerated checkpointing
+- Async checkpoint writing to NVMe storage
+
+#### 4.5 P5en DeepSpeed Config
+**File**: `sagemaker/configs/p5en_deepspeed_config.json`
+- Optimized for H100 80GB with EFA networking
+- ZeRO-2 with EFA-optimized communication
+- Multi-node training support
 
 ### 5. SageMaker Job Definitions
 
@@ -198,27 +243,33 @@ training_job_template = {
 
 ## Expected Performance Comparison Results
 
-### P4d.24xlarge (A100 40GB)
-- **Pros**: Good balance of performance and cost
-- **Cons**: Limited GPU memory may require smaller batch sizes
-- **Expected Use Case**: Medium-scale training with budget constraints
-
 ### P4de.24xlarge (A100 80GB + NVMe)
-- **Pros**: Double GPU memory, fast local storage
-- **Cons**: Higher cost than P4d
-- **Expected Use Case**: Large batch training with checkpointing optimization
+- **Pros**: Cost-effective high performance, fast local storage
+- **Cons**: Older GPU architecture compared to H100
+- **Expected Use Case**: Budget-conscious projects with high performance needs
 
 ### P5.48xlarge (H100 80GB)
-- **Pros**: Latest GPU architecture, highest performance
-- **Cons**: Highest cost, limited availability
-- **Expected Use Case**: Maximum performance training, time-critical projects
+- **Pros**: Latest GPU architecture, highest compute performance
+- **Cons**: High cost, limited availability
+- **Expected Use Case**: Maximum compute performance, time-critical projects
+
+### P5e.48xlarge (H100 80GB + NVMe SSD)
+- **Pros**: H100 performance + ultra-fast NVMe storage for checkpointing
+- **Cons**: High cost, storage may be underutilized for some workloads
+- **Expected Use Case**: Storage-intensive workloads, frequent checkpointing
+
+### P5en.48xlarge (H100 80GB + EFA)
+- **Pros**: H100 performance + enhanced networking for multi-node training
+- **Cons**: High cost, networking benefits only for distributed training
+- **Expected Use Case**: Multi-node distributed training, network-intensive workloads
 
 ## Cost Estimation Framework
 
 ### Hourly Rates (approximate)
-- **P4d.24xlarge**: ~$32/hour
-- **P4de.24xlarge**: ~$40/hour  
-- **P5.48xlarge**: ~$98/hour
+- **P4de.24xlarge**: ~$40.96/hour
+- **P5.48xlarge**: ~$98.32/hour
+- **P5e.48xlarge**: ~$98.32/hour
+- **P5en.48xlarge**: ~$98.32/hour
 
 ### Performance Metrics to Track
 1. **Training Throughput**: Tokens processed per hour

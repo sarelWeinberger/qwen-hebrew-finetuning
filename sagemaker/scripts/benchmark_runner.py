@@ -224,6 +224,12 @@ class SageMakerBenchmarkRunner:
     def _get_instance_config(self, instance_type: str) -> Dict:
         """Get instance configuration details"""
         config_map = {
+            'ml.p4de.24xlarge': {
+                'gpu_count': 8,
+                'gpu_type': 'A100',
+                'gpu_memory_gb': 80,
+                'estimated_hourly_cost': 40.96
+            },
             'ml.p5.48xlarge': {
                 'gpu_count': 8,
                 'gpu_type': 'H100',
@@ -398,7 +404,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=1, help='Number of training epochs')
     parser.add_argument('--max-steps', type=int, default=None, help='Maximum training steps for quick benchmark')
     parser.add_argument('--instance-types', type=str, nargs='+',
-                       default=['ml.p5.48xlarge', 'ml.p5e.48xlarge', 'ml.p5en.48xlarge'],
+                       default=['ml.p4de.24xlarge', 'ml.p5.48xlarge', 'ml.p5e.48xlarge', 'ml.p5en.48xlarge'],
                        help='Instance types to benchmark')
     
     return parser.parse_args()

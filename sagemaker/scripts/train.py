@@ -148,6 +148,7 @@ def parse_args():
 def load_instance_config(instance_type):
     """Load instance-specific configuration"""
     config_map = {
+        'ml.p4de.24xlarge': 'configs/instance_configs/p4de_config.json',
         'ml.p5.48xlarge': 'configs/instance_configs/p5_config.json',
         'ml.p5e.48xlarge': 'configs/instance_configs/p5e_config.json',
         'ml.p5en.48xlarge': 'configs/instance_configs/p5en_config.json'

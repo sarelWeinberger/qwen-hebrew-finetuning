@@ -1,6 +1,6 @@
 # SageMaker Implementation for Qwen Hebrew Fine-tuning
 
-This directory contains a complete SageMaker implementation for running Qwen Hebrew fine-tuning with automated P5 instance performance comparison across **3 instance types**: P5, P5e, and P5en.
+This directory contains a complete SageMaker implementation for running Qwen Hebrew fine-tuning with automated P-type instance performance comparison across **4 instance types**: P4de, P5, P5e, and P5en, plus EC2 P5e availability checking.
 
 ## 🚀 Quick Start
 
@@ -13,15 +13,15 @@ This directory contains a complete SageMaker implementation for running Qwen Heb
 
 ### 2. Find Available Regions
 
-Before starting, check which regions support your desired P5 instances:
+Before starting, check which regions support your desired P-type instances (includes both SageMaker and EC2 P5e availability):
 
 ```bash
-# Check region availability for all P5 instances
+# Check region availability for all P-type instances (includes EC2 P5e checking)
 python scripts/find_available_regions.py
 
 # Check specific instances only
 python scripts/find_available_regions.py \
-    --instances ml.p5e.48xlarge ml.p5en.48xlarge
+    --instances ml.p4de.24xlarge ml.p5e.48xlarge ml.p5en.48xlarge
 
 # Perform live availability check (slower but more accurate)
 python scripts/find_available_regions.py --check-live
@@ -56,7 +56,7 @@ python scripts/data_preparation.py \
 ### 5. Run Performance Benchmark
 
 ```bash
-# Run automated benchmark across ALL 3 P5 instances
+# Run automated benchmark across ALL 4 P-type instances (P4de, P5, P5e, P5en)
 python scripts/benchmark_runner.py \
     --role-arn arn:aws:iam::YOUR_ACCOUNT:role/SageMakerExecutionRole \
     --bucket-name your-bucket-name \
@@ -69,7 +69,7 @@ python scripts/benchmark_runner.py \
     --role-arn arn:aws:iam::YOUR_ACCOUNT:role/SageMakerExecutionRole \
     --bucket-name your-bucket-name \
     --dataset-path s3://your-bucket-name/processed-data/dataset/ \
-    --instance-types ml.p5e.48xlarge ml.p5en.48xlarge \
+    --instance-types ml.p4de.24xlarge ml.p5e.48xlarge ml.p5en.48xlarge \
     --epochs 1
 ```
 
@@ -339,10 +339,12 @@ sagemaker/
 │   └── find_available_regions.py  # Region availability checker
 ├── configs/
 │   ├── instance_configs/          # Instance-specific configurations
+│   │   ├── p4de_config.json      # P4de.24xlarge configuration
 │   │   ├── p5_config.json        # P5.48xlarge configuration
 │   │   ├── p5e_config.json       # P5e.48xlarge configuration
 │   │   └── p5en_config.json      # P5en.48xlarge configuration
 │   └── deepspeed/                 # DeepSpeed configurations
+│       ├── p4de_deepspeed_config.json  # P4de optimizations
 │       ├── p5_deepspeed_config.json
 │       ├── p5e_deepspeed_config.json   # P5e optimizations
 │       └── p5en_deepspeed_config.json  # P5en optimizations
@@ -375,6 +377,12 @@ sagemaker/
 
 ### Instance Configurations
 
+#### P4de.24xlarge (A100 80GB) ✨ RE-ADDED
+- **GPUs**: 8x A100 80GB
+- **Strategy**: Cost-effective high performance
+- **Best For**: Budget-conscious projects with high performance needs
+- **Estimated Cost**: ~$40.96/hour
+
 #### P5.48xlarge (H100 80GB)
 - **GPUs**: 8x H100 80GB
 - **Strategy**: Maximum performance optimization
@@ -399,6 +407,7 @@ sagemaker/
 
 Each instance type has optimized DeepSpeed configurations:
 
+- **P4de**: ZeRO-2 with A100-optimized settings for cost-effective performance
 - **P5**: ZeRO-2 with minimal offloading for maximum performance
 - **P5e**: ZeRO-2 with NVMe-accelerated checkpointing and async writes
 - **P5en**: ZeRO-2 with EFA-optimized communication and multi-node support
@@ -442,7 +451,7 @@ python scripts/find_available_regions.py --check-live
 
 ### Quick Benchmark (Recommended First Step)
 ```bash
-# Test ALL 3 P5 instances (default)
+# Test ALL 4 P-type instances (P4de, P5, P5e, P5en) - default
 python scripts/benchmark_runner.py \
     --role-arn arn:aws:iam::YOUR_ACCOUNT:role/SageMakerExecutionRole \
     --bucket-name your-bucket-name \
@@ -455,7 +464,7 @@ python scripts/benchmark_runner.py \
     --role-arn arn:aws:iam::YOUR_ACCOUNT:role/SageMakerExecutionRole \
     --bucket-name your-bucket-name \
     --dataset-path s3://your-bucket-name/processed-data/dataset/ \
-    --instance-types ml.p5e.48xlarge ml.p5en.48xlarge \
+    --instance-types ml.p4de.24xlarge ml.p5e.48xlarge ml.p5en.48xlarge \
     --epochs 1
 ```
 
