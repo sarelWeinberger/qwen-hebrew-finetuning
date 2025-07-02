@@ -93,7 +93,6 @@ CLEANUP_RULES = [
 SOURCES = [
     "AllHebNLIFiles-Deduped-D2.forgpt",
     "AllOfHEOscarData-Combined-Deduped-DC4.forgpt",
-    "AllOfNewHebrewWikipediaWithArticles-Oct29-2023.forgpt",
     "AllTzenzuraData-Combined-Deduped-DC4.forgpt",
     "BooksNLI2-Combined-Deduped.forgpt",
     "GeektimeCorpus-Combined-Deduped.forgpt",
