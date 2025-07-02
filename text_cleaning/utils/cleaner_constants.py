@@ -1,6 +1,6 @@
 import regex
 
-html_tags = r'</?(html|head|body|style|script|title|meta|link|div|span|p|a|img|br|h[1-6]|ul|ol|li|table|thead|tbody|tr|th|td|form|input|button|label|select|option|textarea|strong|b|em|i|u|small|footer|header|nav|section|article|aside|main|figure|figcaption|hr)\b[^>]*>'
+html_tags = r'</?(html|head|body|style|script|title|meta|link|div|span|p|a|img|br|h[1-6]|ul|ol|li|table|thead|tbody|tr|th|td|form|input|button|label|select|option|textarea|strong|b|em|i|u|small|footer|header|nav|section|article|aside|main|figure|figcaption|hr)[^>]*>'
 CLEANUP_RULES = [
     {
         'regex': (r'(&quot;|&#34;)', '"'),
@@ -15,7 +15,7 @@ CLEANUP_RULES = [
         'info': 'html_escape_codes - Replaces HTML escape codes such as &quot;, &#34;, and &#39; with their respective characters.'
     },
     {
-        'regex': (r'<style.*?>.*?</style>', ''),
+        'regex': (r'<style[^>]*>[^<]*</style>', ''),
         'bucket_name': 'gepeta-datasets',
         'path': 'partly-processed/round_2_test_examples/CSS/',
         'info': 'Remove CSS (between <style> tags) and HTML tags'
@@ -27,7 +27,13 @@ CLEANUP_RULES = [
         'info': 'Remove CSS (between <style> tags) and HTML tags'
     },
     {
-        'regex': (r'\r', ''),
+        'regex': (r'^\s*$', '', regex.MULTILINE),
+        'bucket_name': 'gepeta-datasets',
+        'path': 'partly-processed/round_2_test_examples/',
+        'info': 'Newline and spaces handling: Remove carriage return (\r), and replace more than 3 consecutive new lines to maximum of 3'
+    },
+    {
+        'regex': (r'\r\n?', '\n'),
         'bucket_name': 'gepeta-datasets',
         'path': 'partly-processed/round_2_test_examples/',
         'info': 'Newline and spaces handling: Remove carriage return (\r), and replace more than 3 consecutive new lines to maximum of 3'
@@ -38,62 +44,49 @@ CLEANUP_RULES = [
         'path': 'partly-processed/round_2_test_examples/cr_and_3_newlines/',
         'info': 'Newline and spaces handling: Remove carriage return (\r), and replace more than 3 consecutive new lines to maximum of 3'
     },
-    {
-        'regex': (r'\n{2,}', '\n\n'),
-        'bucket_name': 'gepeta-datasets',
-        'path': 'partly-processed/round_2_test_examples/cr_and_3_newlines/',
-        'info': 'Newline and spaces handling: Remove carriage return (\r), and replace more than 3 consecutive new lines to maximum of 3'
-    },
     {    
-        'regex': (r'(?m)^(?!\|).*?(?<=\s)( {4,})', lambda m: ' ' * min((len(m.group(1)) // 4) * 4, 16)),
+        'regex': (r'^(( {4})+(?!\s))|^\s+|\s+$|( ) +', r'\1\3', regex.MULTILINE),
         'bucket_name': 'gepeta-datasets',
         'path': 'partly-processed/round_2_test_examples/multiple_spaces/',
         'info': 'Multiple space: replace multiple space to its lower 4 multiplier (10->8, 12->12, 7->4), until a max of 16 (28->16). x//4 . exclude for markdown tables.'
     },
     {
-        'regex': (r'^\s+|\s+$', ''),
-        'bucket_name': 'gepeta-datasets',
-        'path': 'partly-processed/round_2_test_examples/start_end_white_space/',
-        'info': 'Strips whitespace from the start and end of all the text.'
-    },
-    {
-        'regex': (r'\b(?!(?:127\.0\.0\.1|0\.0\.0\.0|localhost|::1)\b)(?:\d{1,3}\.){3}\d{1,3}\b', ''),
+        'regex': (r'\b(?!(?:127\.0\.0\.1|0\.0\.0\.0)\b)(?:\d{1,3}\.){3}\d{1,3}\b', '<IP>'),
         'bucket_name': 'gepeta-datasets',
         'path': 'partly-processed/round_2_test_examples/PII/',
         'info': 'PII deletion – IP delete except local list, delete mail addresses.'
     },
     {
-        'regex': (r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b', ''),
+        'regex': (r'\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b', '<email>'),
         'bucket_name': 'gepeta-datasets',
         'path': 'partly-processed/round_2_test_examples/PII/',
         'info': 'PII deletion – IP delete except local list, delete mail addresses.'
     },
     {
-        'regex': (r'\n[ \t]*[•●■▪◆◦][ \t]*\n', '\n'),
-        'bucket_name': 'gepeta-datasets',
-        'path': 'partly-processed/round_2_test_examples/empty_line_with_bullet/',
-        'info': 'Remove bullet point symbols like •, ●, ■, or ◦, block symbols such as ■, ▪, and ◆, only when they appear alone on a line.'
-    },
-    {
-       'regex': (r'^[ \t]*[-=*_~•●■▪◆◦]{4,}[ \t]*\n?', ''),
+       'regex': (r'^[\-=*_~•●■▪◆◦\s-[\n]]+$', '', regex.MULTILINE),
        'bucket_name': 'gepeta-datasets',
        'path': 'partly-processed/round_2_test_examples/multiple_hyphens/',
        'info': 'Remove long separator lines made of multiple hyphens or similar symbols.'
     },
     {
-        'regex': (r'[àáâäãåāèéêëēìíîïīòóôöõøōùúûüūýÿçñšžßæœĳÀÁÂÄÃÅĀÈÉÊËĒÌÍÎÏĪÒÓÔÖÕØŌÙÚÛÜŪÝŸÇÑŠŽÆŒĲ·]', ''),
+        'regex': (r'[\u0591-\u05C7-[\u05be]]', ''),
         'bucket_name': 'gepeta-datasets',
-        'path': 'partly-processed/round_2_test_examples/special_chars/',
-        'info': ''
-
+        'path': 'partly-processed/round_2_test_examples/nikud/',
+        'info': '05be it upper dash which we want to keep'
     },
     {
-        'regex': (r'[\u0591-\u05C7]', ''),
+        'regex': (r'\u00A0', ' '),
         'bucket_name': 'gepeta-datasets',
         'path': 'partly-processed/round_2_test_examples/nikud/',
         'info': ''
-
     },
+    {
+        'regex': (r'[\u200E\u200F\u202A-\u202F]', ''),
+        'bucket_name': 'gepeta-datasets',
+        'path': 'partly-processed/round_2_test_examples/nikud/',
+        'info': ''
+    }
+
 ]
 
 # Define the source names

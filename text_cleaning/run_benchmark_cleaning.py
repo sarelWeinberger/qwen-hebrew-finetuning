@@ -34,6 +34,26 @@ def normalize_levenshtein_distance(str1: str, str2: str) -> float:
     return levenshtein_distance(str1, str2) / max_len
 
 
+def has_cleaned_text_column(file_path: str) -> bool:
+    """
+    Check if a file already has a cleaned text column (cleaned_text, model_cleaned, etc.).
+    
+    Args:
+        file_path: Path to the CSV file
+        
+    Returns:
+        True if the file has a cleaned text column, False otherwise
+    """
+    try:
+        df = pd.read_csv(file_path)
+        # Check for various cleaned text column names (case insensitive)
+        cleaned_text_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['cleaned_text', 'model_cleaned', 'cleaned'])]
+        return len(cleaned_text_cols) > 0
+    except Exception as e:
+        print(f"Error checking columns in {file_path}: {str(e)}")
+        return False
+
+
 def load_benchmark_data(file_path: str) -> pd.DataFrame:
     """
     Load benchmark data from CSV file.
@@ -46,13 +66,24 @@ def load_benchmark_data(file_path: str) -> pd.DataFrame:
     """
     df = pd.read_csv(file_path)
     
-    # Ensure required columns exist
-    if 'original_text' not in df.columns or 'manual_clean' not in df.columns:
-        raise ValueError(f"File {file_path} must contain 'original_text' and 'manual_clean' columns")
+    # Ensure original_text column exists
+    if 'original_text' not in df.columns:
+        raise ValueError(f"File {file_path} must contain 'original_text' column")
+    
+    # Find manual clean column (supports various names)
+    manual_clean_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['manual_clean', 'manual_cleaned'])]
+    if not manual_clean_cols:
+        raise ValueError(f"File {file_path} must contain a manual clean column (manual_clean or manual_cleaned)")
+    
+    manual_clean_col = manual_clean_cols[0]
+    print(f"Using manual clean column: {manual_clean_col}")
     
     # Handle NaN values by converting them to empty strings
     df['original_text'] = df['original_text'].fillna('')
-    df['manual_clean'] = df['manual_clean'].fillna('')
+    df[manual_clean_col] = df[manual_clean_col].fillna('')
+    
+    # Rename the manual clean column to 'manual_clean' for consistency
+    df = df.rename(columns={manual_clean_col: 'manual_clean'})
     
     return df
 
@@ -66,7 +97,6 @@ def get_cleaners() -> List[Tuple[str, object]]:
         List of (cleaner_name, cleaner_instance) tuples
     """
     cleaners = [
-        ("duplicate_remover", DuplicateRemoverCleaner()),
         ("regex_cleaner", RegExCleaner(
             patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
             debug_mode=False, 
@@ -146,6 +176,45 @@ def calculate_levenshtein_metrics(df: pd.DataFrame, cleaned_dfs: Dict[str, pd.Da
     return metrics
 
 
+def calculate_metrics_for_precleaned_file(df: pd.DataFrame) -> Dict[str, float]:
+    """
+    Calculate metrics for files that already have a cleaned text column.
+    
+    Args:
+        df: DataFrame with original_text, manual_clean, and a cleaned text column
+        
+    Returns:
+        Dictionary with Levenshtein distance metrics
+    """
+    metrics = {}
+    
+    # Find the cleaned text column (supports various names)
+    cleaned_text_cols = [col for col in df.columns if any(keyword in col.lower() for keyword in ['cleaned_text', 'model_cleaned', 'cleaned'])]
+    if not cleaned_text_cols:
+        raise ValueError("No cleaned text column found in pre-cleaned file")
+    
+    # Use the first cleaned text column found
+    cleaned_text_col = cleaned_text_cols[0]
+    print(f"Using pre-cleaned column: {cleaned_text_col}")
+    
+    # Handle NaN values in cleaned text column
+    df[cleaned_text_col] = df[cleaned_text_col].fillna('')
+    
+    # Distance from original to manual
+    orig_to_manual = [normalize_levenshtein_distance(str(orig), str(manual))
+                      for orig, manual in zip(df['original_text'], df['manual_clean'])
+                      if not (pd.isna(orig) or pd.isna(manual))]
+    metrics['levenshtein_dist_original_to_manual'] = round(np.mean(orig_to_manual), 3) if orig_to_manual else 0.0
+    
+    # Distance from cleaned text to manual
+    cleaned_to_manual = [normalize_levenshtein_distance(str(cleaned), str(manual))
+                         for cleaned, manual in zip(df[cleaned_text_col], df['manual_clean'])
+                         if not (pd.isna(cleaned) or pd.isna(manual))]
+    metrics[f'levenshtein_dist_{cleaned_text_col}_to_manual'] = round(np.mean(cleaned_to_manual), 3) if cleaned_to_manual else 0.0
+    
+    return metrics
+
+
 def process_benchmark_file(file_path: str) -> Tuple[str, Dict[str, float], pd.DataFrame]:
     """
     Process a single benchmark file.
@@ -158,39 +227,54 @@ def process_benchmark_file(file_path: str) -> Tuple[str, Dict[str, float], pd.Da
     """
     print(f"Processing {file_path}...")
     
-    # Load data
-    df = load_benchmark_data(file_path)
+    # Check if file already has cleaned_text column
+    is_precleaned = has_cleaned_text_column(file_path)
     
-    # Apply cleaners step by step
-    cleaned_dfs = apply_cleaners_step_by_step(df)
-    
-    # Calculate metrics for each step
-    metrics = calculate_levenshtein_metrics(df, cleaned_dfs)
-    
-    # Create result DataFrame
-    result_df = df.copy()
-    
-    # Determine the next clean column number
-    existing_clean_cols = [col for col in result_df.columns if col.startswith('clean') and col[5:].isdigit()]
-    if existing_clean_cols:
-        # Find the highest number and increment
-        max_num = max(int(col[5:]) for col in existing_clean_cols)
-        next_clean_num = max_num + 1
-    else:
-        next_clean_num = 1
-    
-    # Add cleaned text columns for each step
-    for step_name, cleaned_df in cleaned_dfs.items():
-        clean_col_name = f'clean{next_clean_num}_{step_name}'
+    if is_precleaned:
+        print(f"File {file_path} already has cleaned_text column - skipping cleaning process")
+        # Load data
+        df = load_benchmark_data(file_path)
         
-        if len(cleaned_df) == len(result_df):
-            result_df[clean_col_name] = cleaned_df['text']
+        # Calculate metrics for pre-cleaned file
+        metrics = calculate_metrics_for_precleaned_file(df)
+        
+        # Return the original DataFrame as result (no additional cleaning needed)
+        result_df = df.copy()
+        
+    else:
+        # Load data
+        df = load_benchmark_data(file_path)
+        
+        # Apply cleaners step by step
+        cleaned_dfs = apply_cleaners_step_by_step(df)
+        
+        # Calculate metrics for each step
+        metrics = calculate_levenshtein_metrics(df, cleaned_dfs)
+        
+        # Create result DataFrame
+        result_df = df.copy()
+        
+        # Determine the next clean column number
+        existing_clean_cols = [col for col in result_df.columns if col.startswith('clean') and col[5:].isdigit()]
+        if existing_clean_cols:
+            # Find the highest number and increment
+            max_num = max(int(col[5:]) for col in existing_clean_cols)
+            next_clean_num = max_num + 1
         else:
-            # If lengths don't match, pad with NaN
-            cleaned_texts = list(cleaned_df['text'])
-            while len(cleaned_texts) < len(result_df):
-                cleaned_texts.append(np.nan)
-            result_df[clean_col_name] = cleaned_texts[:len(result_df)]
+            next_clean_num = 1
+        
+        # Add cleaned text columns for each step
+        for step_name, cleaned_df in cleaned_dfs.items():
+            clean_col_name = f'clean{next_clean_num}_{step_name}'
+            
+            if len(cleaned_df) == len(result_df):
+                result_df[clean_col_name] = cleaned_df['text']
+            else:
+                # If lengths don't match, pad with NaN
+                cleaned_texts = list(cleaned_df['text'])
+                while len(cleaned_texts) < len(result_df):
+                    cleaned_texts.append(np.nan)
+                result_df[clean_col_name] = cleaned_texts[:len(result_df)]
     
     # Extract file name
     file_name = os.path.basename(file_path).replace('.csv', '')
@@ -206,12 +290,13 @@ def main():
     # Get all CSV files in the benchmark directory
     all_csv_files = glob.glob(os.path.join('text_cleaning' , os.path.join(benchmark_dir, "*.csv")))
     
-    # Filter to only include original benchmark files (not the ones we've already processed)
+    # Filter to include both original benchmark files and pre-cleaned files
     benchmark_files = []
     for file_path in all_csv_files:
         file_name = os.path.basename(file_path)
-        # Only include files that start with "data-clean-banchmark - " and don't end with "_with_cleaned.csv"
-        if file_name.startswith("data-clean-banchmark - ") and not file_name.endswith("_with_cleaned.csv"):
+        # Include files that start with "data-clean-banchmark - " and don't end with "_with_cleaned.csv"
+        # OR files that have cleaned_text column (regardless of name)
+        if (file_name.startswith("data-clean-banchmark - ") and not file_name.endswith("_with_cleaned.csv")) or has_cleaned_text_column(file_path):
             benchmark_files.append(file_path)
     
     if not benchmark_files:
