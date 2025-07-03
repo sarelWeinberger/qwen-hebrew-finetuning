@@ -1,12 +1,44 @@
+"""
+This file contains variables with prompts to be used when translating the 'ARC_AI2' benchmark:
+https://huggingface.co/datasets/allenai/ai2_arc
+
+This file contains only the chosen prompts to be used.
+The file 'old_arc_prompts.py' contains old version prompts that we have tested.
+"""
+
+
 # Instruction prompts
-ARC_INSTRUCT = """Your task is to translate the given English question and possible answers into Hebrew. Follow these guidelines:
+ARC_INSTRUCT_V6_CLAUDE = """<instruction>
+Your task is to translate the given English question and possible answers into Hebrew. Follow these guidelines:
 
-1. Only translate the question and answer options provided. Do not add any additional text or instructions.
+1. Translate only the question and answer options provided. Do not add any additional text or instructions.
 2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
-3. Maintain the same formatting as the original English version, including any bullet points, numbering, or other formatting elements.
-4. Provide the Hebrew translation immediately after these instructions, without any preamble or additional context."""
+3. Maintain the same formatting as the original English version.
+4. Write the translations in a clear and concise style suitable for grade school-level science questions.
+</instruction>"""
 
-ARC_INSTRUCT_MULTI = """Your task is to translate the given English question and possible answers into possible Hebrew translations. Follow these guidelines:
+ARC_INSTRUCT_V1_GEMINI = """Your task is to translate the given English question and possible answers into Hebrew. Follow these guidelines:
+
+1. Translate only the question and answer options provided. Do not add any additional text or instructions.
+2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
+3. Maintain the same formatting as the original English version.
+4. Write the translations in a clear and concise style suitable for grade school-level science questions."""
+
+ARC_SYSTEM_V2_GEMINI = """You are an expert translator specializing in educational content. Your task is to translate grade-level science questions from English to Hebrew for the ARC_AI2 benchmark. Your primary audience is Israeli grade school students (grade 6)."""
+
+ARC_INSTRUCT_V2_GEMINI = """Translate the following English science question and answers into Hebrew.
+
+**Key Guidelines:**
+
+1.  **Target Audience:** The translation must be clear, natural, and scientifically accurate for an Israeli middle school student (תלמיד/ת חטיבת ביניים). Use terminology that is standard in the Israeli science curriculum for this age group.
+2.  **Accuracy:** Preserve the precise scientific meaning of the original text. Do not simplify the core concept, but ensure the language used to explain it is accessible.
+3.  **Grammar:** Pay close attention to Hebrew grammar, especially gender and number agreement (e.g., `דלת המקרר מוליכה` vs. `הברזל מוליך`).
+4.  **Conciseness:** Be direct and to the point. Avoid overly academic or verbose phrasing.
+5.  **Purity:** Translate *only* the text within the `<question>` and `<option>` tags. Do not add any introductory phrases, explanations, or text outside the required format."""
+
+
+# Multiple translation prompts
+ARC_INSTRUCT_MULTI_V1 = """Your task is to translate the given English question and possible answers into possible Hebrew translations. Follow these guidelines:
 
 1. Only translate the question and answer options provided. Do not add any additional text or instructions.
 2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
@@ -14,7 +46,8 @@ ARC_INSTRUCT_MULTI = """Your task is to translate the given English question and
 4. Provide {X} possible translations for the question and each one of the answers.
 5. Provide the Hebrew translation immediately after these instructions, without any preamble or additional context."""
 
-# Format prompts (to be used in the prompt when needed)
+
+# Format prompts (to be used in claude's prompt)
 ARC_FORMAT = """<response_format>
 <question>Translated question</question>
 <option 1>Translated answer option 1</option 1>
@@ -23,9 +56,9 @@ ARC_FORMAT = """<response_format>
 <option 4>Translated answer option 4</option 4>
 </response_format>"""
 
+
 # The few-shots samples
 ARC_FEW_SHOTS = """<fewshot_examples>
-
 <example>
 English:
 <question>George wants to warm his hands quickly by rubbing them. Which skin surface will produce the most heat?</question>
@@ -100,6 +133,4 @@ Hebrew:
 <option 3>צפון</option 3>
 <option 4>דרום</option 4>
 </example>
-
-
 </fewshot_examples>"""

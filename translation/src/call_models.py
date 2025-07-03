@@ -4,7 +4,8 @@ from google import genai
 from google.genai import types
 
 CLAUDE_MODEL = "arn:aws:bedrock:us-east-1:670967753077:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
-GEMINI_MODEL = "gemini-2.5-flash-lite-preview-06-17"
+# GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-2.5-pro"
 
 
 def bedrock_connect(acceess_id, secret_key):
@@ -17,7 +18,7 @@ def bedrock_connect(acceess_id, secret_key):
 
 
 # Claude call
-def call_claude_bedrock(bedrock_client, message, max_tokens=300):
+def call_claude_bedrock(bedrock_client, message, max_tokens=1_000):
     """
     Call Claude through AWS Bedrock
     """

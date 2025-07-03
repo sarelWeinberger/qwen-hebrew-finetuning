@@ -3,6 +3,10 @@ from src.call_models import call_gemini, all_string_gemini_config, all_list_gemi
 from datasets import Dataset
 import re
 from tqdm.notebook import tqdm
+from time import time, sleep
+
+# The gmeini version is important because of quotas
+from src.call_models import GEMINI_MODEL
 
 # The base prompt of the English-Hebrew
 BASE_PROMPT = "English:\n{X}\nHebrew:\n{Y}"
@@ -16,6 +20,10 @@ CHOOSE_MODEL_INSTRUCT = """Your task is to choose the best translation from Engl
 1. The input is 'English: <key>text</key>\n\noption A: <key>translated text</key>\n\noption B: <key>translated text</key>'.
 2. Choose the option which have the best fluency, while maintaining the same style and semantic meaning as the original.
 3. The output should be either 'option A' or 'option B', according to the better translation."""
+
+
+def dict_to_prompt(dct):
+    return '\n'.join([f'<{k}>{dct[k]}</{k}>' for k in dct])
 
 
 def claude_translation(bedrock_client, datasets, instruct, few_shots, sample_format, sample_to_dict, dict_to_sample):
@@ -35,7 +43,7 @@ def claude_translation(bedrock_client, datasets, instruct, few_shots, sample_for
             dct = sample_to_dict(sample)
 
             # Enter into prompt
-            samples_query = '\n'.join([f'<{k}>{dct[k]}</{k}>' for k in dct])
+            samples_query = dict_to_prompt(dct)
             query = final_prompt + BASE_PROMPT.format(X=samples_query, Y='')
 
             # Call claude
@@ -61,7 +69,13 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
     # The final prompt for the models
     final_prompt = few_shots + '\n\n'
     hebrew_dataset = {}
+    if 'pro' in GEMINI_MODEL:
+        quota_min = 5
+    else:
+        quota_min = 10
+        
     # Run on the different splits in the dataset
+    start_time = time()
     for key in datasets:
         fields = sample_to_dict(datasets[key][0]).keys()
         config = all_string_gemini_config(fields, instruct)
@@ -69,12 +83,12 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
         print(f'Translating {key}...')
         hebrew_dataset[key] = []
         # Run on all the split's samples
-        for sample in tqdm(datasets[key], total=datasets[key].num_rows):
+        for cnt, sample in enumerate(tqdm(datasets[key], total=datasets[key].num_rows), start=1):
             # from sample to dict
             dct = sample_to_dict(sample)
 
             # Enter into prompt
-            samples_query = '\n'.join([f'<{k}>{dct[k]}</{k}>' for k in dct])
+            samples_query = dict_to_prompt(dct)
             query = final_prompt + BASE_PROMPT.format(X=samples_query, Y='')
 
             # Call gemini
@@ -86,6 +100,14 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
             # Create New sample
             new_sample = dict_to_sample(sample, result)
             hebrew_dataset[key].append(new_sample)
+
+            if cnt % quota_min == 0:
+                passed = time() - start_time
+                if passed < 60:
+                    print('\r' + ' ' * 50 + '\rSleeping.... ', end='')
+                    sleep(61 - passed)
+                    print('Done!', end='')
+                start_time = time()
 
         hebrew_dataset[key] = Dataset.from_list(hebrew_dataset[key])
     return hebrew_dataset
@@ -119,7 +141,7 @@ def gemini_multi_translation(google_client, datasets, instruct, few_shots, sampl
             dct = sample_to_dict(sample)
 
             # Enter into prompt
-            samples_query = '\n'.join([f'<{k}>{dct[k]}</{k}>' for k in dct])
+            samples_query = dict_to_prompt(dct)
             query = final_prompt + BASE_PROMPT.format(X=samples_query, Y='')
 
             # Call gemini
@@ -177,7 +199,7 @@ def gemini_claude_best_translation(
             dct = sample_to_dict(sample)
 
             # Enter into prompt
-            samples_query = '\n'.join([f'<{k}>{dct[k]}</{k}>' for k in dct])
+            samples_query = dict_to_prompt(dct)
             claude_query = claude_final_prompt + BASE_PROMPT.format(X=samples_query, Y='')
             gemini_query = gemini_final_prompt + BASE_PROMPT.format(X=samples_query, Y='')
 
@@ -192,8 +214,8 @@ def gemini_claude_best_translation(
             gemini_result = gemini_output.parsed
             
             # Choose best betweeb the two
-            gemini_tran_query = '\n'.join([f'<{k}>{gemini_result[k]}</{k}>' for k in gemini_result])
-            claude_tran_query = '\n'.join([f'<{k}>{claude_result[k]}</{k}>' for k in claude_result])
+            gemini_tran_query = dict_to_prompt(gemini_result)
+            claude_tran_query = dict_to_prompt(claude_result)
             compare_query = f'English: {samples_query}\n\noption A: {gemini_tran_query}\n\noption B: {claude_tran_query}'
             
             output = call_gemini(google_client, compare_query, choose_model_config)

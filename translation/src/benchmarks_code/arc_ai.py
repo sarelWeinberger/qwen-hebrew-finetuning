@@ -46,24 +46,3 @@ def arc_dict_to_sample(sample, dct):
     sample['choices']['label'] = [MAP_LABELS[label] for label in sample['choices']['label']]
     sample['answerKey'] = MAP_LABELS[sample['answerKey']]
     return sample
-    
-
-# def into_arc_prompt_v2(id, question, choices, answerKey):
-#     answers_str = '[' + ']\n['.join(choices['text']) + ']'
-#     return f"<question>{question}</question>\n<answers>\n{answers_str}\n</answers>"
-
-
-# def back_to_arc_v2(x, text):
-#     # x - a sample from the dataset
-#     question_match = re.search(r"<question>(.*?)</question>", text, re.DOTALL)
-#     question = question_match.group(1).strip()
-    
-#     # Extract all answers within square brackets
-#     answers_match = re.findall(r"\[(.*?)\]", text, re.DOTALL)
-#     answers = [ans.strip() for ans in answers_match]
-
-#     x['question'] = question
-#     x['choices']['text'] = answers
-#     x['choices']['label'] = [MAP_LABELS[label] for label in x['choices']['label']]
-#     x['answerKey'] = MAP_LABELS[x['answerKey']]
-#     return x
