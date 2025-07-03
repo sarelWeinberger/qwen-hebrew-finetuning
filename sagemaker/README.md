@@ -40,7 +40,7 @@ cd containers/training/
 
 # Build and push training container
 chmod +x build_and_push.sh
-./build_and_push.sh
+./build_and_push.sh us-east-1 # choose from Recommended Regions
 ```
 
 ### 4. Prepare Your Data
