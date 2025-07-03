@@ -274,7 +274,7 @@ class WikipediaTextCleaner:
         return text
 
     def clean_wiki_templates_and_markup(self, text: str) -> str:
-        """כלל 11a,b: הסרת תבניות ו-markup של ויקי"""
+        """כלל 11a: הסרת תבניות ו-markup של ויקי"""
         original_text = text
 
         # הסרת תבניות מורכבות עם תבניות מקוננות {{}}
@@ -284,17 +284,6 @@ class WikipediaTextCleaner:
             text = re.sub(r'\{\{[^{}]*\}\}', '', text)
             if text == old_text:  # אם לא השתנה, מפסיק
                 break
-
-        # הסרת קישורי קבצים/תמונות לפני קישורים רגילים
-        media_link_patterns = [
-            r'\[\[קובץ:.*?\]\]',
-            r'\[\[File:.*?\]\]',
-            r'\[\[Image:.*?\]\]',
-            r'\[\[תמונה:.*?\]\]'
-        ]
-
-        for pattern in media_link_patterns:
-            text = re.sub(pattern, '', text, flags=re.DOTALL | re.IGNORECASE)
 
         # הסרת קישורים פנימיים [[]] עם תיאורים
         # מטפל בקישורים מהצורה [[קישור|תיאור]] → תיאור
@@ -327,46 +316,136 @@ class WikipediaTextCleaner:
         return text
 
     def clean_wiki_media_descriptions(self, text: str) -> str:
-        """כלל 11b: הסרת תיאורי מדיה ותמונות"""
+        """כלל 11b: הסרת תיאורי מדיה ותמונות - גרסה מתוקנת"""
         original_text = text
 
-        # הסרת תיאורי מיקום תמונות - באופן ספציפי
-        location_keywords = ['שמאל', 'ימין', 'מרכז', 'ממוזער', 'thumb', 'thumbnail', 'frame', 'framed', 'left', 'right',
-                             'center']
+        # 1. הסרת קישורי קבצים/תמונות מלאים לפני הכל
+        media_link_patterns = [
+            r'\[\[קובץ:[^\]]*\]\]',
+            r'\[\[File:[^\]]*\]\]',
+            r'\[\[Image:[^\]]*\]\]',
+            r'\[\[תמונה:[^\]]*\]\]',
+            r'\[\[media:[^\]]*\]\]',
+            r'\[\[מדיה:[^\]]*\]\]'
+        ]
 
+        for pattern in media_link_patterns:
+            text = re.sub(pattern, '', text, flags=re.DOTALL | re.IGNORECASE)
+
+        # 2. הסרת תיאורי מיקום תמונות - דפוסים משופרים
+        location_keywords = [
+            'שמאל', 'ימין', 'מרכז', 'ממוזער', 'מוקטן', 'מסגרת',
+            'thumb', 'thumbnail', 'frame', 'framed', 'frameless',
+            'left', 'right', 'center', 'centre', 'none',
+            'upright', 'border'
+        ]
+
+        # הסרת תיאורי מיקום עם סימן |
         for keyword in location_keywords:
-            # הסרה ספציפית של תיאורי מיקום (כמו ממוזער|300px|)
-            pattern = rf'\b{keyword}\|[^|]*?\|'
+            # דפוסים שונים לתיאורי מיקום
+            patterns = [
+                rf'\|{keyword}\|',  # |שמאל|
+                rf'\|{keyword}\b[^|]*\|',  # |שמאל עם פרמטרים|
+                rf'^{keyword}\|',  # שמאל| בתחילת שורה
+                rf'\s{keyword}\|',  # רווח שמאל|
+                rf'\|{keyword}$',  # |שמאל בסוף
+                rf'\|{keyword}\s',  # |שמאל רווח
+            ]
+
+            for pattern in patterns:
+                text = re.sub(pattern, '|', text, flags=re.IGNORECASE | re.MULTILINE)
+
+        # 3. הסרת הגדרות גודל תמונות
+        size_patterns = [
+            r'\b\d+px\b',  # 300px
+            r'\|\d+px\|',  # |300px|
+            r'\|\d+px\b',  # |300px
+            r'\b\d+x\d+px\b',  # 300x200px
+            r'\|\d+x\d+px\|',  # |300x200px|
+            r'width\s*=\s*["\']?\d+["\']?',  # width="300"
+            r'height\s*=\s*["\']?\d+["\']?',  # height="200"
+        ]
+
+        for pattern in size_patterns:
             text = re.sub(pattern, '', text, flags=re.IGNORECASE)
 
-        # הסרת הפניות "ראו" - תמיכה בעברית ואנגלית
+        # 4. הסרת תיאורים בסוגריים עם מונחי מדיה
+        media_terms = ['px', 'ממוזער', 'thumb', 'frame', 'שמאל', 'ימין', 'מרכז', 'תמונה', 'קובץ']
+        for term in media_terms:
+            pattern = rf'\([^)]*{term}[^)]*\)'
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+
+        # 5. הסרת פרמטרי תמונה נוספים
+        image_params = [
+            r'\|alt\s*=[^|]*',  # alt text
+            r'\|caption\s*=[^|]*',  # כיתוב
+            r'\|class\s*=[^|]*',  # CSS class
+            r'\|link\s*=[^|]*',  # קישור
+            r'\|page\s*=[^|]*',  # עמוד
+            r'\|lang\s*=[^|]*',  # שפה
+        ]
+
+        for pattern in image_params:
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+
+        # 6. הסרת הפניות "ראו" - תמיכה מורחבת
         see_patterns = [
-            r'ראו [A-Za-z\s,א-ת\.]+',
-            r'ראה [A-Za-z\s,א-ת\.]+',
-            r'see [A-Za-z\s,\.]+',
-            r'See [A-Za-z\s,\.]+',
-            r'ראו גם [A-Za-z\s,א-ת\.]+',
-            r'ראה גם [A-Za-z\s,א-ת\.]+',
-            r'see also [A-Za-z\s,\.]+',
-            r'See also [A-Za-z\s,\.]+',
+            r'ראו [A-Za-z\s,א-ת\.\:\-]+',
+            r'ראה [A-Za-z\s,א-ת\.\:\-]+',
+            r'see [A-Za-z\s,\.\:\-]+',
+            r'See [A-Za-z\s,\.\:\-]+',
+            r'ראו גם [A-Za-z\s,א-ת\.\:\-]+',
+            r'ראה גם [A-Za-z\s,א-ת\.\:\-]+',
+            r'see also [A-Za-z\s,\.\:\-]+',
+            r'See also [A-Za-z\s,\.\:\-]+',
+            r'להרחבה ראו [A-Za-z\s,א-ת\.\:\-]+',
+            r'לפרטים נוספים ראו [A-Za-z\s,א-ת\.\:\-]+',
+            r'for more details see [A-Za-z\s,\.\:\-]+',
         ]
 
         for pattern in see_patterns:
             text = re.sub(pattern, '', text, flags=re.IGNORECASE)
 
-        # הסרת תיאורים בסוגריים שמכילים מידע על מדיה
-        text = re.sub(r'\([^)]*(?:px|ממוזער|thumb|frame)[^)]*\)', '', text, flags=re.IGNORECASE)
+        # 7. הסרת שורות "ראו גם" שלמות
+        see_also_line_patterns = [
+            r'^ראו גם\s*[:]*\s*$',
+            r'^ראה גם\s*[:]*\s*$',
+            r'^see also\s*[:]*\s*$',
+            r'^See also\s*[:]*\s*$',
+            r'^\s*ראו גם\s*[:]*.*$',
+            r'^\s*see also\s*[:]*.*$',
+        ]
 
-        # הסרת מידע על גודל תמונות
-        text = re.sub(r'\b\d+px\b', '', text)
+        for pattern in see_also_line_patterns:
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE | re.MULTILINE)
 
-        # ניקוי שורות ריקות עודפות שנוצרו
+        # 8. הסרת תיאורי gallery ומדיה מורכבים
+        gallery_patterns = [
+            r'<gallery[^>]*>.*?</gallery>',
+            r'\{\{gallery[^}]*\}\}',
+            r'<imagemap[^>]*>.*?</imagemap>',
+        ]
+
+        for pattern in gallery_patterns:
+            text = re.sub(pattern, '', text, flags=re.DOTALL | re.IGNORECASE)
+
+        # 9. ניקוי סימני | מיותרים שנותרו
+        text = re.sub(r'\|\s*\|', '|', text)  # ||
+        text = re.sub(r'^\|', '', text, flags=re.MULTILINE)  # | בתחילת שורה
+        text = re.sub(r'\|$', '', text, flags=re.MULTILINE)  # | בסוף שורה
+        text = re.sub(r'\|\s*$', '', text, flags=re.MULTILINE)  # | ורווחים בסוף שורה
+
+        # 10. ניקוי שורות ריקות עודפות שנוצרו
         text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)
+        text = re.sub(r'\n{4,}', '\n\n\n', text)
 
-        # ניקוי רווחים מיותרים (רק רווחים וטאבים, לא שורות חדשות)
+        # 11. ניקוי רווחים מיותרים (רק רווחים וטאבים, לא שורות חדשות)
         text = re.sub(r'[ \t]+', ' ', text)
         text = re.sub(r'^[ \t]+', '', text, flags=re.MULTILINE)
         text = re.sub(r'[ \t]+$', '', text, flags=re.MULTILINE)
+
+        # 12. הסרת שורות ריקות שנותרו עם רק סימני פיסוק
+        text = re.sub(r'^\s*[,\.;:]+\s*$', '', text, flags=re.MULTILINE)
 
         # שמירת דוגמה אם השתנה משהו
         if text != original_text:
@@ -466,7 +545,7 @@ class WikipediaTextCleaner:
         except:
             text = raw_wikitext
 
-        # הפעלת כל הכללים בסדר
+        # הפעלת כל הכללים בסדר המעודכן
         text = self.clean_html_escape_codes(text)  # כלל 1
         text = self.clean_newlines_and_spaces(text)  # כלל 2
         text = self.clean_multiple_spaces(text)  # כלל 3
@@ -476,10 +555,10 @@ class WikipediaTextCleaner:
         text = self.clean_separator_lines(text)  # כלל 8
         text = self.clean_css_from_tables(text)  # כלל 9
         text = self.convert_tables_to_markdown(text)  # כלל 10
-        text = self.clean_wiki_templates_and_markup(text)  # כלל 11a,b
-        text = self.clean_wiki_media_descriptions(text)  # כלל 11b
+        text = self.clean_wiki_citations(text)  # כלל 11e - מועבר לפני markup
+        text = self.clean_wiki_media_descriptions(text)  # כלל 11b - מועבר לפני markup
+        text = self.clean_wiki_templates_and_markup(text)  # כלל 11a - אחרי media
         text = self.clean_wiki_headers(text)  # כלל 11d
-        text = self.clean_wiki_citations(text)  # כלל 11e
 
         # בדיקה סופית של איכות
         if not text or len(text) < min_length:
@@ -502,7 +581,7 @@ class WikipediaTextCleaner:
         """
         self.stats["text_only_processed"] += 1
 
-        # הפעלת כל הכללים בסדר (ללא בדיקת redirect כי זה לא ויקי-טקסט מלא)
+        # הפעלת כל הכללים בסדר המעודכן (ללא בדיקת redirect כי זה לא ויקי-טקסט מלא)
         text = self.clean_html_escape_codes(text)  # כלל 1
         text = self.clean_newlines_and_spaces(text)  # כלל 2
         text = self.clean_multiple_spaces(text)  # כלל 3
@@ -512,10 +591,10 @@ class WikipediaTextCleaner:
         text = self.clean_separator_lines(text)  # כלל 8
         text = self.clean_css_from_tables(text)  # כלל 9
         text = self.convert_tables_to_markdown(text)  # כלל 10
-        text = self.clean_wiki_templates_and_markup(text)  # כלל 11a,b
-        text = self.clean_wiki_media_descriptions(text)  # כלל 11b
+        text = self.clean_wiki_citations(text)  # כלל 11e - מועבר לפני markup
+        text = self.clean_wiki_media_descriptions(text)  # כלל 11b - מועבר לפני markup
+        text = self.clean_wiki_templates_and_markup(text)  # כלל 11a - אחרי media
         text = self.clean_wiki_headers(text)  # כלל 11d
-        text = self.clean_wiki_citations(text)  # כלל 11e
 
         # בדיקה סופית של איכות
         if not text or len(text) < min_length:

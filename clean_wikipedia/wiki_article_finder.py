@@ -220,7 +220,7 @@ def main():
 
     # הגדרות
     dump_path = r'C:\Users\Dan Revital\OneDrive\Documents\gepeta\data\wikipedia\hewiki-latest-pages-articles.xml.bz2'
-    article_title = 'הבינום של ניוטון'
+    article_title = 'קוד פתוח'
     output_dir = "article_output"
     save_examples = True  # שמירת דוגמאות ניקוי
 
