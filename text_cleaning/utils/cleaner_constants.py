@@ -91,7 +91,6 @@ CLEANUP_RULES = [
 
 # Define the source names
 SOURCES = [
-    "AllHebNLIFiles-Deduped-D2.forgpt",
     "AllOfHEOscarData-Combined-Deduped-DC4.forgpt",
     "AllTzenzuraData-Combined-Deduped-DC4.forgpt",
     "BooksNLI2-Combined-Deduped.forgpt",

@@ -8,12 +8,14 @@ import time
 from utils.logger import logger
 
 class S3SourceFetcher(BaseFetcher):
-    def __init__(self, bucket_name: str, prefix: str, source_name: str, output_prefix: str):
+    def __init__(self, bucket_name: str, prefix: str, source_name: str, output_prefix: str, 
+                 output_bucket_name: str):
         super().__init__(source_name)
         self.s3 = boto3.client("s3")
         self.bucket_name = bucket_name
         self.prefix = prefix.rstrip("/") + "/"
         self.output_prefix = output_prefix
+        self.output_bucket_name = output_bucket_name
         logger.info(f"Initialized S3SourceFetcher")
 
     def get_files_to_process(self) -> List[str]:
@@ -73,7 +75,7 @@ class S3SourceFetcher(BaseFetcher):
             
             # Upload to S3
             self.s3.put_object(
-                Bucket=self.bucket_name,
+                Bucket=self.output_bucket_name,
                 Key=output_key,
                 Body=csv_data,
                 ContentType='text/csv'
