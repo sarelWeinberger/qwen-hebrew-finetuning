@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Gepeta EC2 Worker - עובד יחיד לקובץ אחד
+Gepeta EC2 Worker - עובד יחיד לקובץ אחד עם שימוש בבאצ'ים
 Usage: python worker.py --prefix Geektime --part 0 --dataset geektime
 
 NOTE: This script expects to run in a virtual environment at /opt/venv
 """
 
-import google.generativeai as genai
+from google import genai
+from google.genai.types import CreateBatchJobConfig
 import boto3
 import pandas as pd
 from io import StringIO
@@ -15,7 +16,8 @@ import os
 import argparse
 import json
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import jsonlines
+import fsspec
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,22 +30,24 @@ TARGET_PREFIX = "processed/"
 STATUS_BUCKET = "gepeta-datasets"
 STATUS_PREFIX = "worker-status/"
 
-# הגדרות עיבוד
-MAX_WORKERS = 10
-BATCH_SIZE = 50
+# הגדרות GCP
+PROJECT_ID = "pwcnext-sandbox01"
+LOCATION = "us-central1"
+BATCH_BUCKET = "gepeta-batches"
+
+# הגדרות מודל
+MODEL_ID = "gemini-2.0-flash-001"
 
 
 class SingleFileProcessor:
     def __init__(self, api_key, prefix, part_number, dataset_name):
-        if not api_key:
-            raise ValueError("❌ חסר GOOGLE_API_KEY!")
-
         self.prefix = prefix
         self.part_number = part_number
         self.dataset_name = dataset_name.lower()
 
-        genai.configure(api_key=api_key)
-        self.model_name = 'gemini-2.0-flash'
+        # Initialize GCP Vertex AI client
+        self.client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
+
         self.s3_client = boto3.client('s3')
         self.worker_id = f"{prefix}_part-{part_number}"
 
@@ -59,9 +63,9 @@ class SingleFileProcessor:
             'rows_already_clean': 0,
             'rows_processed_now': 0,
             'rate_limit_errors_found': 0,
-            'rows_skipped_so_far': 0,  # כמה כבר דילגנו
-            'rows_processed_so_far': 0,  # כמה כבר עיבדנו
-            'new_rate_limit_errors': 0  # שגיאות rate limit חדשות שיצרנו
+            'rows_skipped_so_far': 0,
+            'rows_processed_so_far': 0,
+            'new_rate_limit_errors': 0
         }
 
     def update_status(self, status, **kwargs):
@@ -179,57 +183,123 @@ class SingleFileProcessor:
             print(f"🔍 DEBUG: נמצא Rate Limit Error: {text[:100]}...")
 
         return is_error
-        """בדיקה אם cleaned_text תקין (לא rate limit error)"""
-        if pd.isna(text) or not isinstance(text, str):
-            return False
 
-        # אם זה שגיאה, לא תקין
-        if text.startswith("[API_ERROR]") or text.startswith("[RATE_LIMIT_ERROR]"):
-            return False
+    def create_batch_jsonl(self, texts):
+        """יצירת קובץ JSONL עבור הבאצ'"""
+        jsonl_filename = f"{self.worker_id}_batch.jsonl"
 
-        # אם זה ריק או קצר מדי, לא תקין
-        if len(text.strip()) < 3:
-            return False
-
-        return True
-
-    def clean_text_with_api(self, text):
-        """ניקוי טקסט עם Google API"""
-        model = genai.GenerativeModel(self.model_name)
-
-        prompt = f"""נקה את הטקסט העברי הבא מפגמי קידוד, תגיות HTML, פרסומות ותבניות. החזר רק טקסט נקי בעברית:
+        prompt = """נקה את הטקסט העברי הבא מפגמי קידוד, תגיות HTML, פרסומות ותבניות. החזר רק טקסט נקי בעברית:
 
 {text}
 
 טקסט נקי:"""
 
-        try:
-            response = model.generate_content(prompt)
-            return response.text.strip()
-        except Exception as e:
-            # אם זה שגיאת rate limit - עדכן מונה
-            error_msg = f"[API_ERROR] {str(e)}"
-            if "429" in str(e) or "RATE_LIMIT_EXCEEDED" in str(e) or "Quota exceeded" in str(e):
-                self.stats['new_rate_limit_errors'] += 1
-            return error_msg
+        with jsonlines.open(jsonl_filename, mode="w") as writer:
+            for i, text in enumerate(texts):
+                generationConfig = {
+                    "temperature": 0,
+                    "maxOutputTokens": 8192
+                }
 
-    def process_texts_parallel(self, texts):
-        """עיבוד מקבילי"""
-        results = [''] * len(texts)
+                writer.write({
+                    "request": {
+                        "contents": [
+                            {
+                                "role": "user",
+                                "parts": [
+                                    {"text": prompt.format(text=text)}
+                                ]
+                            }
+                        ],
+                        "generationConfig": generationConfig
+                    }
+                })
 
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            future_to_index = {
-                executor.submit(self.clean_text_with_api, text): i
-                for i, text in enumerate(texts)
-            }
+        return jsonl_filename
 
-            for future in as_completed(future_to_index):
-                index = future_to_index[future]
-                try:
-                    result = future.result()
-                    results[index] = result
-                except Exception as e:
-                    results[index] = f"[ERROR] {str(e)}"
+    def upload_batch_to_gcs(self, jsonl_filename):
+        """העלאת קובץ הבאצ' ל-GCS"""
+        from google.cloud import storage
+
+        storage_client = storage.Client(project=PROJECT_ID)
+        bucket = storage_client.bucket(BATCH_BUCKET)
+        blob = bucket.blob(jsonl_filename)
+        blob.upload_from_filename(jsonl_filename)
+
+        return f"gs://{BATCH_BUCKET}/{jsonl_filename}"
+
+    def process_texts_with_batch(self, texts):
+        """עיבוד טקסטים עם batch API"""
+        print(f"🔄 מעבד {len(texts)} טקסטים עם batch API...")
+
+        # יצירת JSONL
+        jsonl_filename = self.create_batch_jsonl(texts)
+
+        # העלאה ל-GCS
+        input_uri = self.upload_batch_to_gcs(jsonl_filename)
+
+        # יצירת batch job
+        dest_uri = f"gs://{BATCH_BUCKET}/results/{self.worker_id}"
+
+        batch_job = self.client.batches.create(
+            model=MODEL_ID,
+            src=input_uri,
+            config=CreateBatchJobConfig(dest=dest_uri),
+        )
+
+        print(f"📋 Batch job נוצר: {batch_job.name}")
+
+        # המתנה לסיום
+        while not batch_job.state in ["JOB_STATE_SUCCEEDED", "JOB_STATE_FAILED", "JOB_STATE_UNEXECUTED"]:
+            time.sleep(10)
+            batch_job = self.client.batches.get(name=batch_job.name)
+            print(f"⏳ מחכה לסיום batch... סטטוס: {batch_job.state}")
+
+        if batch_job.state == "JOB_STATE_SUCCEEDED":
+            print("✅ Batch job הושלם בהצלחה!")
+
+            # קריאת תוצאות
+            results = self.load_batch_results(batch_job.dest.gcs_uri)
+
+            # ניקוי
+            os.remove(jsonl_filename)
+            self.client.batches.delete(name=batch_job.name)
+
+            return results
+        else:
+            print(f"❌ Batch job נכשל: {batch_job.error}")
+            return [f"[API_ERROR] Batch failed: {batch_job.error}"] * len(texts)
+
+    def load_batch_results(self, dest_uri):
+        """טעינת תוצאות הבאצ'"""
+        fs = fsspec.filesystem("gcs")
+        file_paths = fs.glob(f"{dest_uri}/*/predictions.jsonl")
+
+        if not file_paths:
+            print("❌ לא נמצאו תוצאות")
+            return []
+
+        # טעינת התוצאות
+        df = pd.read_json(f"gs://{file_paths[-1]}", lines=True)
+
+        results = []
+        for _, row in df.iterrows():
+            try:
+                response = row['response']
+                if 'candidates' in response and response['candidates']:
+                    candidate = response['candidates'][0]
+                    if 'content' in candidate and 'parts' in candidate['content']:
+                        parts = candidate['content']['parts']
+                        if parts and 'text' in parts[0]:
+                            results.append(parts[0]['text'].strip())
+                        else:
+                            results.append("[API_ERROR] No text in response")
+                    else:
+                        results.append("[API_ERROR] No content in candidate")
+                else:
+                    results.append("[API_ERROR] No candidates in response")
+            except Exception as e:
+                results.append(f"[API_ERROR] {str(e)}")
 
         return results
 
@@ -265,7 +335,7 @@ class SingleFileProcessor:
                 # עדכון stats
                 self.stats['total_rows'] = total_rows
                 self.stats['rows_already_clean'] = valid_clean
-                self.stats['rows_processed_now'] = 0  # יעודכן במהלך העיבוד
+                self.stats['rows_processed_now'] = 0
                 self.stats['rate_limit_errors_found'] = rate_limit_errors
 
                 print(f"📈 ניתוח קובץ מעובד:")
@@ -274,7 +344,7 @@ class SingleFileProcessor:
                 print(f"   • שגיאות rate limit: {rate_limit_errors:,}")
 
                 if rate_limit_errors > 0:
-                    # עיבוד רק שורות עם rate limit errors
+                    # איסוף טקסטים לעיבוד
                     texts_to_process = []
                     indices_to_process = []
 
@@ -287,65 +357,31 @@ class SingleFileProcessor:
 
                     print(f"🔄 מתקן {len(texts_to_process)} שגיאות rate limit...")
 
-                    # עדכון מספר השורות שמתעבדות
                     self.stats['rows_processed_now'] = len(texts_to_process)
-
-                    # שלח עדכון סטטוס עם כל הנתונים
                     self.update_status("processing")
 
                     if texts_to_process:
-                        total_batches = (len(texts_to_process) + BATCH_SIZE - 1) // BATCH_SIZE
-                        self.update_status("processing")
-
-                        processed_results = []
-                        for batch_idx in range(0, len(texts_to_process), BATCH_SIZE):
-                            batch_num = (batch_idx // BATCH_SIZE) + 1
-                            batch = texts_to_process[batch_idx:batch_idx + BATCH_SIZE]
-
-                            progress_percent = (batch_num / total_batches) * 100
-                            self.update_status("processing",
-                                               current_batch=batch_num,
-                                               progress_percent=progress_percent)
-
-                            cleaned_batch = self.process_texts_parallel(batch)
-                            processed_results.extend(cleaned_batch)
-
-                            # עדכון מונה השורות שעובדו
-                            self.stats['rows_processed_so_far'] = min(len(processed_results), len(texts_to_process))
-                            self.update_status("processing", progress_percent=progress_percent)
-
-                            if batch_num < total_batches:
-                                time.sleep(0.5)
+                        # עיבוד עם batch API
+                        self.update_status("processing", progress_percent=25)
+                        processed_results = self.process_texts_with_batch(texts_to_process)
+                        self.update_status("processing", progress_percent=75)
 
                         # החלפת שגיאות rate limit בטקסט נקי
                         for i, idx in enumerate(indices_to_process):
                             if i < len(processed_results):
                                 df.loc[idx, 'cleaned_text'] = processed_results[i]
 
-                    # עכשיו עבור על כל השורות לעדכון מונים סופי
-                    print("📊 מעדכן מונים...")
-                    for idx, row in df.iterrows():
-                        if self.is_valid_clean_text(row.get('cleaned_text')):
-                            # שורה נקייה - נחשבת כ"דולגה"
-                            if idx < valid_clean:  # רק אם באמת היתה נקייה מלכתחילה
-                                self.stats['rows_skipped_so_far'] = min(self.stats['rows_skipped_so_far'] + 1,
-                                                                        valid_clean)
+                        self.stats['rows_processed_so_far'] = len(processed_results)
+                        self.update_status("processing", progress_percent=90)
 
-                        # עדכן סטטוס כל 500 שורות
-                        if (idx + 1) % 500 == 0:
-                            self.update_status("processing")
-
-                    # סיימנו - עדכן לסטטוס סופי
                     self.stats['rows_skipped_so_far'] = valid_clean
-
                 else:
                     print("✅ כל הטקסטים כבר נקיים - רק סופר מילים")
-                    # כל השורות נקיות - עדכן מונה הדילוגים
                     self.stats['rows_skipped_so_far'] = total_rows
 
                 df_result = df.copy()
             else:
-                # קובץ מקורי - עיבוד מלא כמו הקוד המקורי
+                # קובץ מקורי - עיבוד מלא
                 print("🔄 קובץ מקורי - מעבד הכל")
 
                 texts = df['text'].dropna().tolist()
@@ -358,29 +394,13 @@ class SingleFileProcessor:
                 self.stats['rows_processed_now'] = len(texts)
                 self.stats['rate_limit_errors_found'] = 0
 
-                total_batches = (len(texts) + BATCH_SIZE - 1) // BATCH_SIZE
-                self.update_status("processing")
+                self.update_status("processing", progress_percent=10)
 
-                all_cleaned_texts = []
+                # עיבוד עם batch API
+                all_cleaned_texts = self.process_texts_with_batch(texts)
 
-                for batch_idx in range(0, len(texts), BATCH_SIZE):
-                    batch_num = (batch_idx // BATCH_SIZE) + 1
-                    batch = texts[batch_idx:batch_idx + BATCH_SIZE]
-
-                    progress_percent = (batch_num / total_batches) * 100
-
-                    # עדכן מונה השורות שעובדו עד כה
-                    self.stats['rows_processed_so_far'] = min(batch_idx + len(batch), len(texts))
-
-                    self.update_status("processing",
-                                       current_batch=batch_num,
-                                       progress_percent=progress_percent)
-
-                    cleaned_batch = self.process_texts_parallel(batch)
-                    all_cleaned_texts.extend(cleaned_batch)
-
-                    if batch_num < total_batches:
-                        time.sleep(0.5)
+                self.stats['rows_processed_so_far'] = len(all_cleaned_texts)
+                self.update_status("processing", progress_percent=80)
 
                 df_result = df.copy()
                 df_result['cleaned_text'] = all_cleaned_texts[:len(df)]
@@ -425,27 +445,6 @@ class SingleFileProcessor:
             return False
 
 
-def get_api_key_for_worker(part_number):
-    """בחירת API Key לפי מספר ה-part"""
-    # חלוקה של 143 מכונות בין 2 API Keys
-    # מכונות 0-70: SANDBOX_1 (71 מכונות)
-    # מכונות 71-142: SANDBOX_2 (72 מכונות)
-    if part_number <= 70:
-        api_key = os.getenv("GOOGLE_API_KEY_SANDBOX_1")
-        key_name = "SANDBOX_1"
-    else:
-        api_key = os.getenv("GOOGLE_API_KEY_SANDBOX_2")
-        key_name = "SANDBOX_2"
-
-    if not api_key:
-        # fallback לSANDBOX_2 אם המפתח לא נמצא
-        api_key = os.getenv("GOOGLE_API_KEY_SANDBOX_2")
-        key_name = "SANDBOX_2_FALLBACK"
-
-    print(f"🔑 משתמש ב-API Key: {key_name} (part-{part_number})")
-    return api_key
-
-
 def main():
     parser = argparse.ArgumentParser(description='Gepeta Single File Worker')
     parser.add_argument('--prefix', required=True, help='Dataset prefix')
@@ -454,15 +453,9 @@ def main():
 
     args = parser.parse_args()
 
-    # בחירת API Key לפי part number
-    api_key = get_api_key_for_worker(args.part)
-    if not api_key:
-        print("❌ לא נמצא API Key מתאים")
-        return False
-
     try:
         processor = SingleFileProcessor(
-            api_key=api_key,
+            api_key=None,  # לא נדרש עוד עבור batch API
             prefix=args.prefix,
             part_number=args.part,
             dataset_name=args.dataset

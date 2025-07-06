@@ -79,3 +79,10 @@ Thumbs.db
 
 # sandbox
 sandbox/
+
+clean_wikipedia/article_output/
+clean_wikipedia/examples/
+clean_with_gemma_api/gemini_api_orchestrator/gepeta-worker-key.pem
+clean_with_gemma_api/gemini_api_orchestrator/quick_test.py
+data/
+load_wikipedia/*.txt
