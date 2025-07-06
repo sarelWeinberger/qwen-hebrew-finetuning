@@ -24,18 +24,6 @@ ARC_INSTRUCT_V1_GEMINI = """Your task is to translate the given English question
 3. Maintain the same formatting as the original English version.
 4. Write the translations in a clear and concise style suitable for grade school-level science questions."""
 
-ARC_SYSTEM_V2_GEMINI = """You are an expert translator specializing in educational content. Your task is to translate grade-level science questions from English to Hebrew for the ARC_AI2 benchmark. Your primary audience is Israeli grade school students (grade 6)."""
-
-ARC_INSTRUCT_V2_GEMINI = """Translate the following English science question and answers into Hebrew.
-
-**Key Guidelines:**
-
-1.  **Target Audience:** The translation must be clear, natural, and scientifically accurate for an Israeli middle school student (תלמיד/ת חטיבת ביניים). Use terminology that is standard in the Israeli science curriculum for this age group.
-2.  **Accuracy:** Preserve the precise scientific meaning of the original text. Do not simplify the core concept, but ensure the language used to explain it is accessible.
-3.  **Grammar:** Pay close attention to Hebrew grammar, especially gender and number agreement (e.g., `דלת המקרר מוליכה` vs. `הברזל מוליך`).
-4.  **Conciseness:** Be direct and to the point. Avoid overly academic or verbose phrasing.
-5.  **Purity:** Translate *only* the text within the `<question>` and `<option>` tags. Do not add any introductory phrases, explanations, or text outside the required format."""
-
 
 # Multiple translation prompts
 ARC_INSTRUCT_MULTI_V1 = """Your task is to translate the given English question and possible answers into possible Hebrew translations. Follow these guidelines:

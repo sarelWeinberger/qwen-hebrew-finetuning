@@ -4,8 +4,8 @@ from google import genai
 from google.genai import types
 
 CLAUDE_MODEL = "arn:aws:bedrock:us-east-1:670967753077:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
-# GEMINI_MODEL = "gemini-2.5-flash"
-GEMINI_MODEL = "gemini-2.5-pro"
+GEMINI_MODEL_PRO = "gemini-2.5-pro"
+GEMINI_MODEL_FLASH = "gemini-2.5-flash"
 
 
 def bedrock_connect(acceess_id, secret_key):
@@ -18,12 +18,12 @@ def bedrock_connect(acceess_id, secret_key):
 
 
 # Claude call
-def call_claude_bedrock(bedrock_client, message, max_tokens=1_000):
+def call_claude_bedrock(bedrock_client, message, system_prompt=None, max_tokens=1_000):
     """
     Call Claude through AWS Bedrock
     """
     # Prepare the request body
-    body = json.dumps({
+    claude_params = {
         "anthropic_version": "bedrock-2023-05-31",
         "top_k": 1,
         "temperature": 0.0,
@@ -36,7 +36,10 @@ def call_claude_bedrock(bedrock_client, message, max_tokens=1_000):
                 "cache_control": {"type": "ephemeral"}
             }]
         }]
-    })
+    }
+    if system_prompt:
+        claude_params['system'] = system_prompt
+    body = json.dumps(claude_params)
 
     # Make the API call
     response = bedrock_client.invoke_model(
@@ -58,16 +61,20 @@ def google_connect(key):
     return genai.Client(api_key=key)
 
 
-def call_gemini(google_client, message, config=None):
+def call_gemini(google_client, message, config=None, if_pro=False):
+    if if_pro:
+        model_name = GEMINI_MODEL_PRO
+    else:
+        model_name = GEMINI_MODEL_FLASH
     response = google_client.models.generate_content(
-        model=GEMINI_MODEL,
+        model=model_name,
         contents=message,
         config=config,
     )
     return response
 
 
-def create_gemini_config(str_lst, system_instruction=None, output_type=None, enum=None):
+def create_gemini_config(str_lst, system_instruction=None, output_type=None, enum=None, think_bud=-1):
     if output_type is None:
         output_type = types.Type.STRING
 
@@ -75,7 +82,7 @@ def create_gemini_config(str_lst, system_instruction=None, output_type=None, enu
         temperature=0,
         topK=1,
         thinking_config=types.ThinkingConfig(
-            thinking_budget=-1,
+            thinking_budget=think_bud,
         ),
         system_instruction=system_instruction,
         response_mime_type="application/json",
@@ -93,15 +100,16 @@ def create_gemini_config(str_lst, system_instruction=None, output_type=None, enu
     )
 
 
-def all_string_gemini_config(str_lst, system_instruction=None, enum=None):
-    return create_gemini_config(str_lst, system_instruction=system_instruction, enum=enum)
+def all_string_gemini_config(str_lst, system_instruction=None, enum=None, think_bud=-1):
+    return create_gemini_config(str_lst, system_instruction=system_instruction, enum=enum, think_bud=think_bud)
 
 
-def all_int_gemini_config(str_lst, system_instruction=None):
+def all_int_gemini_config(str_lst, system_instruction=None, think_bud=-1):
     return create_gemini_config(
         str_lst,
         system_instruction=system_instruction,
-        output_type=types.Type.INTEGER
+        output_type=types.Type.INTEGER,
+        think_bud=think_bud,
     )
 
 

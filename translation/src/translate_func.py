@@ -5,9 +5,6 @@ import re
 from tqdm.notebook import tqdm
 from time import time, sleep
 
-# The gmeini version is important because of quotas
-from src.call_models import GEMINI_MODEL
-
 # The base prompt of the English-Hebrew
 BASE_PROMPT = "English:\n{X}\nHebrew:\n{Y}"
 
@@ -62,14 +59,14 @@ def claude_translation(bedrock_client, datasets, instruct, few_shots, sample_for
     return hebrew_dataset
 
 
-def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_dict, dict_to_sample):
+def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_dict, dict_to_sample, if_pro=False, think_bud=-1):
     """
     Translate all given datasets using one of the Gemini famaliy models.
     """
     # The final prompt for the models
     final_prompt = few_shots + '\n\n'
     hebrew_dataset = {}
-    if 'pro' in GEMINI_MODEL:
+    if if_pro:
         quota_min = 5
     else:
         quota_min = 10
@@ -78,7 +75,7 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
     start_time = time()
     for key in datasets:
         fields = sample_to_dict(datasets[key][0]).keys()
-        config = all_string_gemini_config(fields, instruct)
+        config = all_string_gemini_config(fields, instruct, think_bud=think_bud)
 
         print(f'Translating {key}...')
         hebrew_dataset[key] = []
@@ -92,7 +89,13 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
             query = final_prompt + BASE_PROMPT.format(X=samples_query, Y='')
 
             # Call gemini
-            output = call_gemini(google_client, query, config)
+            do_it = True
+            while do_it:
+                try:
+                    output = call_gemini(google_client, query, config, if_pro=if_pro)
+                    do_it = False
+                except:
+                    sleep(10)
 
             # Parse the model's output
             result = output.parsed
@@ -118,7 +121,7 @@ def options_to_prompt(original, hebrew):
     return '\n'.join([f'<{k}>{original[k]} | {hebrew[k]}</{k}>' for k in original])
 
 
-def gemini_multi_translation(google_client, datasets, instruct, few_shots, sample_to_dict, dict_to_sample, length=3):
+def gemini_multi_translation(google_client, datasets, instruct, few_shots, sample_to_dict, dict_to_sample, length=3, think_bud=-1):
     """
     Translate all given datasets using one of the Gemini famaliy models.
     Ask Gemini to give a number of different options, and choose the best one.
@@ -130,7 +133,7 @@ def gemini_multi_translation(google_client, datasets, instruct, few_shots, sampl
     # Run on the different splits in the dataset
     for key in datasets:
         fields = sample_to_dict(datasets[key][0]).keys()
-        config = all_list_gemini_config(fields, instruct.format(X=length), length)
+        config = all_list_gemini_config(fields, instruct.format(X=length), length, think_bud=think_bud)
         choose_config = all_string_gemini_config(fields, CHOOSE_INSTRUCT)
 
         print(f'Translating {key}...')
