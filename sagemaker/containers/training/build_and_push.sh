@@ -4,7 +4,7 @@
 
 # Configuration
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION=$(aws configure get region)
+REGION=$(aws configure list | grep region | awk '{print $2}')
 REPOSITORY_NAME="qwen-hebrew-training"
 IMAGE_TAG="latest"
 

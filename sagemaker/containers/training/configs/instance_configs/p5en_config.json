@@ -1,0 +1,67 @@
+{
+  "instance_type": "ml.p5en.48xlarge",
+  "gpu_count": 8,
+  "gpu_type": "H100",
+  "gpu_memory": "80GB",
+  "total_gpu_memory": "640GB",
+  "cpu_count": 192,
+  "ram": "2048GB",
+  "network": "3200 Gbps",
+  "enhanced_networking": "EFA (Elastic Fabric Adapter)",
+  "batch_size_per_gpu": 8,
+  "gradient_accumulation_steps": 1,
+  "deepspeed_config": "configs/deepspeed/p5en_deepspeed_config.json",
+  "training_config": "configs/training_configs/p5en_training_config.json",
+  "estimated_hourly_cost": 98.32,
+  "optimization_notes": "H100 with enhanced networking (EFA) for optimal multi-node communication and distributed training",
+  "recommended_use_cases": [
+    "Multi-node distributed training",
+    "Large-scale model training requiring high bandwidth",
+    "Network-intensive training workloads",
+    "Distributed hyperparameter tuning",
+    "Production training with multiple instances"
+  ],
+  "performance_characteristics": {
+    "memory_efficiency": "excellent",
+    "compute_efficiency": "maximum",
+    "cost_efficiency": "premium",
+    "network_efficiency": "maximum",
+    "distributed_efficiency": "maximum"
+  },
+  "training_parameters": {
+    "learning_rate": 1e-5,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.03,
+    "max_grad_norm": 1.0,
+    "fp16": true,
+    "gradient_checkpointing": false
+  },
+  "h100_optimizations": {
+    "transformer_engine": true,
+    "flash_attention": true,
+    "tensor_parallelism": true,
+    "pipeline_parallelism": true,
+    "data_parallelism": true
+  },
+  "networking_optimization": {
+    "efa_enabled": true,
+    "rdma_enabled": true,
+    "multi_node_optimized": true,
+    "collective_communication": "optimized",
+    "bandwidth_utilization": "maximum"
+  },
+  "distributed_training": {
+    "supports_multi_node": true,
+    "optimal_node_count": "2-16",
+    "communication_backend": "nccl",
+    "gradient_compression": false,
+    "all_reduce_optimization": true
+  },
+  "expected_performance": {
+    "relative_speed": 1.0,
+    "tokens_per_second_estimate": 8000,
+    "memory_utilization_target": 0.90,
+    "network_utilization_target": 0.85,
+    "multi_node_efficiency": 0.95
+  }
+}

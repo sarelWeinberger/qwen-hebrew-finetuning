@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# Create the target directory FIRST
+RUN mkdir -p /opt/ml/code/configs
+
 # Install Python dependencies
 COPY requirements.txt /opt/ml/code/requirements.txt
 RUN pip install --no-cache-dir -r /opt/ml/code/requirements.txt
@@ -16,14 +19,15 @@ RUN pip install --no-cache-dir -r /opt/ml/code/requirements.txt
 # Install DeepSpeed with CUDA support
 RUN pip install deepspeed
 
-# Copy training code
+# Copy training code - use relative paths, not absolute paths with ~
 COPY scripts/ /opt/ml/code/
 COPY configs/ /opt/ml/code/configs/
 
 # Set working directory
 WORKDIR /opt/ml/code
 
-# Set environment variables for SageMaker
+
+
 ENV PYTHONUNBUFFERED=TRUE
 ENV PYTHONDONTWRITEBYTECODE=TRUE
 ENV PATH="/opt/ml/code:${PATH}"
