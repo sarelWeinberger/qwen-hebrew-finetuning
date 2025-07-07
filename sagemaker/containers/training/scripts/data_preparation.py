@@ -58,7 +58,7 @@ class HebrewTextProcessor:
         self.max_length = max_length
         
         # Hebrew character range
-        self.hebrew_pattern = re.compile(r'[\u0590-\u05FF]+')
+        self.hebrew_pattern = re.compile(r'[\u0590-\u05FF]')
         
     def is_hebrew_text(self, text: str) -> bool:
         """Check if text contains Hebrew characters"""
