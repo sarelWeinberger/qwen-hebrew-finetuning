@@ -12,12 +12,166 @@ def create_registry_regex_only(debug_mode: bool = False):
     """
 
     registry = {
-        'AllHebNLI': {
+        # 'AllHebNLI': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/nli/csv_output/',
+        #         source_name='AllHebNLI',
+        #         output_prefix='processed_and_cleaned/AllHebNLI',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'AllOfHEOscarData-Combined-Deduped-DC4.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='AllOfHEOscarData-Combined-Deduped-DC4.forgpt',
+        #         output_prefix='processed_and_cleaned/AllOfHEOscarData',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },'AllTzenzuraData-Combined-Deduped-DC4.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='AllTzenzuraData-Combined-Deduped-DC4.forgpt',
+        #         output_prefix='processed_and_cleaned/AllTzenzuraData',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'BooksNLI2-Combined-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='BooksNLI2-Combined-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/BooksNLI2',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'GeektimeCorpus-Combined-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='GeektimeCorpus-Combined-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/GeektimeCorpus',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'hebrew_tweets_text_clean_full-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='hebrew_tweets_text_clean_full-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/hebrew_tweets',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'HeC4DictaCombined-Clean-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='HeC4DictaCombined-Clean-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/HeC4DictaCombined',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'YifatDataBatch2-Round3-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='YifatDataBatch2-Round3-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/YifatDataBatch2',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'YifatDataRound2-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='YifatDataRound2-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/YifatDataRound2',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'YifatToCombine-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='YifatToCombine-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/YifatToCombine',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'YisraelHayomData-Combined-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='YisraelHayomData-Combined-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/YisraelHayomData',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # 
+        # },
+        'FineWeb2': {
             'fetcher': S3SourceFetcher(
                 bucket_name='israllm-datasets',
-                prefix='raw-datasets/nli/csv_output/',
-                source_name='AllHebNLI',
-                output_prefix='processed_and_cleaned/AllHebNLI',
+                prefix='raw-datasets/fineweb2',
+                source_name='batch',
+                output_prefix='processed_and_cleaned/FineWeb2/',
                 output_bucket_name='gepeta-datasets'
             ),
             'cleaner': RegExCleaner(
@@ -26,25 +180,12 @@ def create_registry_regex_only(debug_mode: bool = False):
                 save_cleaned_data=False
             )
         },
-        'AllOfHEOscarData-Combined-Deduped-DC4.forgpt': {
+        'HeC4': {
             'fetcher': S3SourceFetcher(
                 bucket_name='israllm-datasets',
-                prefix='raw-datasets/rar/csv_output/',
-                source_name='AllOfHEOscarData-Combined-Deduped-DC4.forgpt',
-                output_prefix='processed_and_cleaned/AllOfHEOscarData',
-                output_bucket_name='gepeta-datasets'
-            ),
-            'cleaner': RegExCleaner(
-                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-                debug_mode=debug_mode,
-                save_cleaned_data=False
-            )
-        },'AllTzenzuraData-Combined-Deduped-DC4.forgpt': {
-            'fetcher': S3SourceFetcher(
-                bucket_name='israllm-datasets',
-                prefix='raw-datasets/rar/csv_output/',
-                source_name='AllTzenzuraData-Combined-Deduped-DC4.forgpt',
-                output_prefix='processed_and_cleaned/AllTzenzuraData',
+                prefix='raw-datasets/HeC4',
+                source_name='part',
+                output_prefix='processed_and_cleaned/HeC4-HF',
                 output_bucket_name='gepeta-datasets'
             ),
             'cleaner': RegExCleaner(
@@ -53,118 +194,8 @@ def create_registry_regex_only(debug_mode: bool = False):
                 save_cleaned_data=False
             )
         },
-        'BooksNLI2-Combined-Deduped.forgpt': {
-            'fetcher': S3SourceFetcher(
-                bucket_name='israllm-datasets',
-                prefix='raw-datasets/rar/csv_output/',
-                source_name='BooksNLI2-Combined-Deduped.forgpt',
-                output_prefix='processed_and_cleaned/BooksNLI2',
-                output_bucket_name='gepeta-datasets'
-            ),
-            'cleaner': RegExCleaner(
-                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-                debug_mode=debug_mode,
-                save_cleaned_data=False
-            )
-        },
-        'GeektimeCorpus-Combined-Deduped.forgpt': {
-            'fetcher': S3SourceFetcher(
-                bucket_name='israllm-datasets',
-                prefix='raw-datasets/rar/csv_output/',
-                source_name='GeektimeCorpus-Combined-Deduped.forgpt',
-                output_prefix='processed_and_cleaned/GeektimeCorpus',
-                output_bucket_name='gepeta-datasets'
-            ),
-            'cleaner': RegExCleaner(
-                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-                debug_mode=debug_mode,
-                save_cleaned_data=False
-            )
-        },
-        'hebrew_tweets_text_clean_full-Deduped.forgpt': {
-            'fetcher': S3SourceFetcher(
-                bucket_name='israllm-datasets',
-                prefix='raw-datasets/rar/csv_output/',
-                source_name='hebrew_tweets_text_clean_full-Deduped.forgpt',
-                output_prefix='processed_and_cleaned/hebrew_tweets',
-                output_bucket_name='gepeta-datasets'
-            ),
-            'cleaner': RegExCleaner(
-                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-                debug_mode=debug_mode,
-                save_cleaned_data=False
-            )
-        },
-        'HeC4DictaCombined-Clean-Deduped.forgpt': {
-            'fetcher': S3SourceFetcher(
-                bucket_name='israllm-datasets',
-                prefix='raw-datasets/rar/csv_output/',
-                source_name='HeC4DictaCombined-Clean-Deduped.forgpt',
-                output_prefix='processed_and_cleaned/HeC4DictaCombined',
-                output_bucket_name='gepeta-datasets'
-            ),
-            'cleaner': RegExCleaner(
-                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-                debug_mode=debug_mode,
-                save_cleaned_data=False
-            )
-        },
-        'YifatDataBatch2-Round3-Deduped.forgpt': {
-            'fetcher': S3SourceFetcher(
-                bucket_name='israllm-datasets',
-                prefix='raw-datasets/rar/csv_output/',
-                source_name='YifatDataBatch2-Round3-Deduped.forgpt',
-                output_prefix='processed_and_cleaned/YifatDataBatch2',
-                output_bucket_name='gepeta-datasets'
-            ),
-            'cleaner': RegExCleaner(
-                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-                debug_mode=debug_mode,
-                save_cleaned_data=False
-            )
-        },
-        'YifatDataRound2-Deduped.forgpt': {
-            'fetcher': S3SourceFetcher(
-                bucket_name='israllm-datasets',
-                prefix='raw-datasets/rar/csv_output/',
-                source_name='YifatDataRound2-Deduped.forgpt',
-                output_prefix='processed_and_cleaned/YifatDataRound2',
-                output_bucket_name='gepeta-datasets'
-            ),
-            'cleaner': RegExCleaner(
-                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-                debug_mode=debug_mode,
-                save_cleaned_data=False
-            )
-        },
-        'YifatToCombine-Deduped.forgpt': {
-            'fetcher': S3SourceFetcher(
-                bucket_name='israllm-datasets',
-                prefix='raw-datasets/rar/csv_output/',
-                source_name='YifatToCombine-Deduped.forgpt',
-                output_prefix='processed_and_cleaned/YifatToCombine',
-                output_bucket_name='gepeta-datasets'
-            ),
-            'cleaner': RegExCleaner(
-                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-                debug_mode=debug_mode,
-                save_cleaned_data=False
-            )
-        },
-        'YisraelHayomData-Combined-Deduped.forgpt': {
-            'fetcher': S3SourceFetcher(
-                bucket_name='israllm-datasets',
-                prefix='raw-datasets/rar/csv_output/',
-                source_name='YisraelHayomData-Combined-Deduped.forgpt',
-                output_prefix='processed_and_cleaned/YisraelHayomData',
-                output_bucket_name='gepeta-datasets'
-            ),
-            'cleaner': RegExCleaner(
-                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-                debug_mode=debug_mode,
-                save_cleaned_data=False
-            )
-        },
+
+
 
     }
     return registry

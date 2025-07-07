@@ -26,7 +26,7 @@ class CleaningPipeline:
                 file_name = Path(file_path).stem
                 
                 # Clean the data (this will handle sample saving if enabled)
-                df = self.cleaner.clean(df, file_name=file_name)
+                df = self.cleaner.clean(df)
                 
                 # Save cleaned data
                 self.fetcher.save_cleaned_data(df, self.source_name, file_path)

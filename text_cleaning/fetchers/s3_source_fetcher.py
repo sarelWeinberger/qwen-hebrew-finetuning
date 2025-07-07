@@ -23,7 +23,7 @@ class S3SourceFetcher(BaseFetcher):
         Get list of S3 keys that need to be processed.
         """
         paginator = self.s3.get_paginator('list_objects_v2')
-        csv_keys = []
+        files_keys = []
         total_size = 0
         
         for page in paginator.paginate(Bucket=self.bucket_name, Prefix=self.prefix):
@@ -32,11 +32,13 @@ class S3SourceFetcher(BaseFetcher):
                 size = obj['Size']
                 # Fetch files that start with source_name and end with .csv
                 filename = key.split('/')[-1]
-                if filename.startswith(self.source_name) and filename.endswith('.csv'):
-                    csv_keys.append(key)
+                files_csv = filename.startswith(self.source_name) and filename.endswith('.csv')
+                files_parquet = filename.startswith(self.source_name) and filename.endswith('.parquet')
+                if files_csv or files_parquet:
+                    files_keys.append(key)
                     total_size += size
 
-        return csv_keys
+        return files_keys
 
     def fetch_single_file(self, file_path: str) -> pd.DataFrame:
         """
@@ -48,7 +50,10 @@ class S3SourceFetcher(BaseFetcher):
             head_response = self.s3.head_object(Bucket=self.bucket_name, Key=file_path)            
             # Get object data
             response = self.s3.get_object(Bucket=self.bucket_name, Key=file_path)
-            df = pd.read_csv(io.BytesIO(response["Body"].read()), header=None, names=["text", "n_words"])
+            if file_path.endswith('.csv'):
+                df = pd.read_csv(io.BytesIO(response["Body"].read()), header=None, names=["text", "n_words"])
+            elif file_path.endswith('.parquet'):
+                df = pd.read_parquet(io.BytesIO(response["Body"].read()))
 
             return df
             
