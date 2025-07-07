@@ -98,6 +98,9 @@ class SageMakerBenchmarkRunner:
                 'TrainingInputMode': 'File'
             },
             'RoleArn': self.role_arn,
+            'Environment': {
+                'WANDB_API_KEY': '70bbb9e8a69e33f73d1adfd7577ad0783b970dd6'  # W&B API Key
+            },
             'InputDataConfig': [
                 {
                     'ChannelName': 'training',
@@ -108,7 +111,7 @@ class SageMakerBenchmarkRunner:
                             'S3DataDistributionType': 'FullyReplicated'
                         }
                     },
-                    'ContentType': 'application/x-parquet',
+                    'ContentType': 'application/jsonl',
                     'CompressionType': 'None'
                 }
             ],
@@ -140,6 +143,7 @@ class SageMakerBenchmarkRunner:
             ]
         }
         
+        logger.info('Calling self.sagemaker.create_training_job(**training_job_config)')
         response = self.sagemaker.create_training_job(**training_job_config)
         logger.info(f"Training job {job_name} submitted successfully")
         return response

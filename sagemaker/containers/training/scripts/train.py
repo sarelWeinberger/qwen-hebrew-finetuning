@@ -119,7 +119,7 @@ def parse_args():
     
     # SageMaker specific arguments
     parser.add_argument('--model-dir', type=str, default=os.environ.get('SM_MODEL_DIR', '/opt/ml/model'))
-    parser.add_argument('--train', type=str, default=os.environ.get('SM_CHANNEL_TRAINING', '/opt/ml/input/data/training'))
+    parser.add_argument('train', nargs='?', default=os.environ.get('SM_CHANNEL_TRAINING', '/opt/ml/input/data/training'))
     parser.add_argument('--output-data-dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', '/opt/ml/output/data'))
     parser.add_argument('--num-gpus', type=int, default=int(os.environ.get('SM_NUM_GPUS', '8')))
     parser.add_argument('--current-host', type=str, default=os.environ.get('SM_CURRENT_HOST', 'algo-1'))
@@ -221,18 +221,33 @@ def load_and_prepare_dataset(data_path, tokenizer, max_seq_length):
     logger.info(f"Loading dataset from {data_path}")
     
     try:
-        # Try loading as a saved dataset first
-        if os.path.exists(os.path.join(data_path, 'dataset_info.json')):
-            dataset = load_from_disk(data_path)
-            logger.info("Loaded dataset from disk")
+        # רשימת קבצים
+        import os
+        import glob
+        
+        # חפש קבצי JSONL
+        jsonl_files = glob.glob(os.path.join(data_path, "*.jsonl"))
+        
+        if jsonl_files:
+            logger.info(f"Found {len(jsonl_files)} JSONL files")
+            # טען כ-JSONL
+            dataset = load_dataset("json", data_files=jsonl_files, split="train")
         else:
-            # Try loading as JSON files
-            dataset = load_dataset("json", data_files=f"{data_path}/*.json")
-            logger.info("Loaded dataset from JSON files")
+            # fallback לJSON רגיל
+            dataset = load_dataset("json", data_files=f"{data_path}/*.json", split="train")
+            
+        logger.info(f"Dataset loaded. Number of examples: {len(dataset)}")
+        
+        # בדוק את המבנה
+        logger.info(f"Dataset columns: {dataset.column_names}")
+        if len(dataset) > 0:
+            logger.info(f"Example: {dataset[0]}")
+        
     except Exception as e:
         logger.error(f"Failed to load dataset: {e}")
         raise
     
+    # שאר הקוד של tokenization...    
     # Tokenization function
     def tokenize_function(examples):
         return tokenizer(

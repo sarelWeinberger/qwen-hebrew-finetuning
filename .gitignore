@@ -76,3 +76,7 @@ Thumbs.db
 
 # logging
 *.log
+
+./region_availability*.*
+
+.gitignore
