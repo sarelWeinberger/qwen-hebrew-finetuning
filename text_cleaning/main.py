@@ -1,28 +1,274 @@
 from cleaning_pipeline import CleaningPipeline
 from fetchers.s3_source_fetcher import S3SourceFetcher
-from utils.cleaner_config import composite_cleaner_registry
-from utils.cleaner_constants import SOURCES
+from cleaners.regex_cleaner import RegExCleaner
+from utils.cleaner_constants import SOURCES, CLEANUP_RULES
+import argparse
 
-# Create registry with all sources
-registry = {
-    source_name: {
-        'fetcher': S3SourceFetcher(
-            bucket_name='israllm-datasets',
-            prefix='raw-datasets/rar/csv_output/',
-            source_name=source_name,
-            output_prefix='raw-datasets/cleaned_data_duplicates_and_regex/'
-        ),
-        'cleaner': composite_cleaner_registry[source_name]
+
+def create_registry_regex_only(debug_mode: bool = False):
+    """
+    Create registry with only RegExCleaner for all sources.
+    s3://gepeta-datasets/processed_and_cleaned/
+    """
+
+    registry = {
+        # 'AllHebNLI': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/nli/csv_output/',
+        #         source_name='AllHebNLI',
+        #         output_prefix='processed_and_cleaned/AllHebNLI',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'AllOfHEOscarData-Combined-Deduped-DC4.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='AllOfHEOscarData-Combined-Deduped-DC4.forgpt',
+        #         output_prefix='processed_and_cleaned/AllOfHEOscarData',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },'AllTzenzuraData-Combined-Deduped-DC4.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='AllTzenzuraData-Combined-Deduped-DC4.forgpt',
+        #         output_prefix='processed_and_cleaned/AllTzenzuraData',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'BooksNLI2-Combined-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='BooksNLI2-Combined-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/BooksNLI2',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'GeektimeCorpus-Combined-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='GeektimeCorpus-Combined-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/GeektimeCorpus',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'hebrew_tweets_text_clean_full-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='hebrew_tweets_text_clean_full-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/hebrew_tweets',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'HeC4DictaCombined-Clean-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='HeC4DictaCombined-Clean-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/HeC4DictaCombined',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'YifatDataBatch2-Round3-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='YifatDataBatch2-Round3-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/YifatDataBatch2',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'YifatDataRound2-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='YifatDataRound2-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/YifatDataRound2',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'YifatToCombine-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='YifatToCombine-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/YifatToCombine',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'YisraelHayomData-Combined-Deduped.forgpt': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/rar/csv_output/',
+        #         source_name='YisraelHayomData-Combined-Deduped.forgpt',
+        #         output_prefix='processed_and_cleaned/YisraelHayomData',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # 
+        # },
+        # 'FineWeb2': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/fineweb2',
+        #         source_name='batch',
+        #         output_prefix='processed_and_cleaned/FineWeb2/',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'HeC4': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/HeC4',
+        #         source_name='part',
+        #         output_prefix='processed_and_cleaned/HeC4-HF',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        'SupremeCourtOfIsrael': {
+            'fetcher': S3SourceFetcher(
+                bucket_name='israllm-datasets',
+                prefix='raw-datasets/SupremeCourtOfIsrael/text_extraction/',
+                source_name='batch',
+                output_prefix='processed_and_cleaned/SupremeCourtOfIsrael',
+                output_bucket_name='gepeta-datasets'
+            ),
+            'cleaner': RegExCleaner(
+                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+                debug_mode=debug_mode,
+                save_cleaned_data=False
+            )
+        },
+        'YifatDataBatch2-Round4': {
+            'fetcher': S3SourceFetcher(
+                bucket_name='israllm-datasets',
+                prefix='raw-datasets/Yifat4+5/csv_output',
+                source_name='YifatDataBatch2-Round4',
+                output_prefix='processed_and_cleaned/YifatDataBatch2-Round4',
+                output_bucket_name='gepeta-datasets'
+            ),
+            'cleaner': RegExCleaner(
+                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+                debug_mode=debug_mode,
+                save_cleaned_data=False
+            )
+        },
+        'YifatDataBatch3-Round5': {
+            'fetcher': S3SourceFetcher(
+                bucket_name='israllm-datasets',
+                prefix='raw-datasets/Yifat4+5/csv_output',
+                source_name='YifatDataBatch3-Round5',
+                output_prefix='processed_and_cleaned/YifatDataBatch2-Round5',
+                output_bucket_name='gepeta-datasets'
+            ),
+            'cleaner': RegExCleaner(
+                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+                debug_mode=debug_mode,
+                save_cleaned_data=False
+            )
+        },
+
     }
-    for source_name in SOURCES
-}
+    return registry
 
-def run_all():
+
+def run_all_samples(debug_mode: bool = False):
     """
-    Run the cleaning pipeline for all sources in the registry.
+    Run the sample cleaning pipeline for all sources using only RegExCleaner.
     """
+    registry = create_registry_regex_only(debug_mode=debug_mode)
     for source_name, components in registry.items():
-        print(f"\nProcessing source: {source_name}")
+        print(f"\nProcessing sample for source: {source_name}")
+        try:
+            pipeline = CleaningPipeline(
+                fetcher=components["fetcher"],
+                cleaner=components["cleaner"],
+                source_name=source_name
+            )
+            custom_output_prefix = "partly-processed/round_2_dataset_examples/"
+            pipeline.run_sample_mode(custom_output_prefix=custom_output_prefix,
+                                     custom_bucket_name='gepeta-datasets')
+            print(f"Successfully processed sample for {source_name}")
+        except Exception as e:
+            print(f"Error processing sample for {source_name}: {str(e)}")
+
+
+def run_full_cleaning(debug_mode: bool = False):
+    """
+    Run the full cleaning pipeline for all sources using only RegExCleaner.
+    """
+    registry = create_registry_regex_only(debug_mode=debug_mode)
+    for source_name, components in registry.items():
+        print(f"\nProcessing full cleaning for source: {source_name}")
         try:
             pipeline = CleaningPipeline(
                 fetcher=components["fetcher"],
@@ -30,9 +276,11 @@ def run_all():
                 source_name=source_name
             )
             pipeline.run()
-            print(f"Successfully processed {source_name}")
+            print(f"Successfully processed full cleaning for {source_name}")
         except Exception as e:
-            print(f"Error processing {source_name}: {str(e)}")
+            print(f"Error processing full cleaning for {source_name}: {str(e)}")
+
 
 if __name__ == "__main__":
-    run_all()
+    # Default: run full cleaning. To run samples, call run_all_samples()
+    run_full_cleaning()
