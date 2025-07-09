@@ -117,9 +117,21 @@ class SageMakerMetricsCallback(TrainerCallback):
 def parse_args():
     parser = argparse.ArgumentParser(description="SageMaker Qwen Hebrew Fine-tuning")
     
+    # 🔧 SageMaker מעביר 'train' כארגומנט ראשון - positional argument!
+    parser.add_argument('command', choices=['train', 'serve'], help='Command to run (train or serve)')
+    
     # SageMaker specific arguments
     parser.add_argument('--model-dir', type=str, default=os.environ.get('SM_MODEL_DIR', '/opt/ml/model'))
-    parser.add_argument('train', nargs='?', default=os.environ.get('SM_CHANNEL_TRAINING', '/opt/ml/input/data/training'))
+    
+    # 🔧 תיקון לנתיב הדאטא 
+    train_channel = os.environ.get('SM_CHANNEL_TRAINING', '/opt/ml/input/data/training')
+    if train_channel and not train_channel.startswith('/'):
+        # אם זה רק שם הערוץ (כמו "training"), תבנה את הנתיב המלא
+        train_path = f'/opt/ml/input/data/{train_channel}'
+    else:
+        train_path = train_channel
+    
+    parser.add_argument('--train', type=str, default=train_path)
     parser.add_argument('--output-data-dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', '/opt/ml/output/data'))
     parser.add_argument('--num-gpus', type=int, default=int(os.environ.get('SM_NUM_GPUS', '8')))
     parser.add_argument('--current-host', type=str, default=os.environ.get('SM_CURRENT_HOST', 'algo-1'))
@@ -147,7 +159,59 @@ def parse_args():
 
 def load_instance_config(instance_type):
     """Load instance-specific configuration"""
+    
+    # מפה של קונפיגורציות ברירת מחדל - עם gradient_accumulation_steps = 1
+    default_configs = {
+        'ml.p4d.24xlarge': {
+            "batch_size_per_gpu": 2,
+            "gradient_accumulation_steps": 1,  # ← שונה מ-4 ל-1
+            "deepspeed_config": "configs/deepspeed/p4d_deepspeed_config.json",
+            "gpu_count": 8,
+            "gpu_type": "A100",
+            "gpu_memory": "40GB",
+            "estimated_hourly_cost": 32.77
+        },
+        'ml.p4de.24xlarge': {
+            "batch_size_per_gpu": 4,
+            "gradient_accumulation_steps": 1,  # ← שונה מ-2 ל-1
+            "deepspeed_config": "configs/deepspeed/p4de_deepspeed_config.json",
+            "gpu_count": 8,
+            "gpu_type": "A100",
+            "gpu_memory": "80GB",
+            "estimated_hourly_cost": 40.96
+        },
+        'ml.p5.48xlarge': {
+            "batch_size_per_gpu": 6,
+            "gradient_accumulation_steps": 1,  # ← שונה מ-2 ל-1
+            "deepspeed_config": "configs/deepspeed/p5_deepspeed_config.json",
+            "gpu_count": 8,
+            "gpu_type": "H100",
+            "gpu_memory": "80GB",
+            "estimated_hourly_cost": 98.32
+        },
+        'ml.p5e.48xlarge': {
+            "batch_size_per_gpu": 6,
+            "gradient_accumulation_steps": 1,  # ← שונה מ-2 ל-1
+            "deepspeed_config": "configs/deepspeed/p5e_deepspeed_config.json",
+            "gpu_count": 8,
+            "gpu_type": "H100",
+            "gpu_memory": "80GB",
+            "estimated_hourly_cost": 98.32
+        },
+        'ml.p5en.48xlarge': {
+            "batch_size_per_gpu": 6,
+            "gradient_accumulation_steps": 1,  # ← שונה מ-2 ל-1
+            "deepspeed_config": "configs/deepspeed/p5en_deepspeed_config.json",
+            "gpu_count": 8,
+            "gpu_type": "H100",
+            "gpu_memory": "80GB",
+            "estimated_hourly_cost": 98.32
+        }
+    }
+    
+    # נסה לטעון מקובץ קודם
     config_map = {
+        'ml.p4d.24xlarge': 'configs/instance_configs/p4d_config.json',
         'ml.p4de.24xlarge': 'configs/instance_configs/p4de_config.json',
         'ml.p5.48xlarge': 'configs/instance_configs/p5_config.json',
         'ml.p5e.48xlarge': 'configs/instance_configs/p5e_config.json',
@@ -155,23 +219,22 @@ def load_instance_config(instance_type):
     }
     
     config_path = config_map.get(instance_type)
-    if not config_path or not os.path.exists(config_path):
-        logger.warning(f"Config not found for {instance_type}, using default P4d config")
-        config_path = 'configs/instance_configs/p4d_config.json'
+    if config_path and os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            logger.info(f"Loaded configuration from file for {instance_type}")
+            return config
+        except Exception as e:
+            logger.warning(f"Failed to load config from file: {e}")
     
-    try:
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-        logger.info(f"Loaded configuration for {instance_type}")
-        return config
-    except Exception as e:
-        logger.error(f"Failed to load config: {e}")
-        # Return default configuration
-        return {
-            "batch_size_per_gpu": 2,
-            "gradient_accumulation_steps": 4,
-            "deepspeed_config": "configs/deepspeed/p4d_deepspeed_config.json"
-        }
+    # השתמש בקונפיגורציה מובנית
+    if instance_type in default_configs:
+        logger.info(f"Using built-in configuration for {instance_type}")
+        return default_configs[instance_type]
+    else:
+        logger.warning(f"Unknown instance type {instance_type}, using default P4d config")
+        return default_configs['ml.p4d.24xlarge']
 
 def setup_wandb(args, instance_config):
     """Initialize Weights & Biases with comprehensive configuration"""
@@ -200,7 +263,7 @@ def setup_wandb(args, instance_config):
             "max_seq_length": args.max_seq_length,
             "seed": args.seed,
             "batch_size_per_gpu": instance_config.get("batch_size_per_gpu", 2),
-            "gradient_accumulation_steps": instance_config.get("gradient_accumulation_steps", 4),
+            "gradient_accumulation_steps": instance_config.get("gradient_accumulation_steps", 1),
             
             # SageMaker information
             "sagemaker_job": True,
@@ -220,34 +283,61 @@ def load_and_prepare_dataset(data_path, tokenizer, max_seq_length):
     """Load and prepare dataset for training"""
     logger.info(f"Loading dataset from {data_path}")
     
-    try:
-        # רשימת קבצים
-        import os
-        import glob
+    # 🔧 וודא שהנתיב קיים
+    if not os.path.exists(data_path):
+        logger.error(f"Dataset path does not exist: {data_path}")
+        # נסה נתיבים אלטרנטיביים
+        alternative_paths = [
+            '/opt/ml/input/data/training',
+            '/opt/ml/input/data/train',
+            '/opt/ml/input/data/'
+        ]
         
-        # חפש קבצי JSONL
-        jsonl_files = glob.glob(os.path.join(data_path, "*.jsonl"))
-        
-        if jsonl_files:
-            logger.info(f"Found {len(jsonl_files)} JSONL files")
-            # טען כ-JSONL
-            dataset = load_dataset("json", data_files=jsonl_files, split="train")
+        for alt_path in alternative_paths:
+            if os.path.exists(alt_path):
+                logger.info(f"Found alternative path: {alt_path}")
+                data_path = alt_path
+                break
         else:
-            # fallback לJSON רגיל
-            dataset = load_dataset("json", data_files=f"{data_path}/*.json", split="train")
+            raise FileNotFoundError(f"No valid dataset path found. Tried: {[data_path] + alternative_paths}")
+    
+    # 🔧 הצג תוכן הדירקטוריה לדיבוג
+    try:
+        files = os.listdir(data_path)
+        logger.info(f"Files in {data_path}: {files[:10]}")  # הראה את 10 הקבצים הראשונים
+    except Exception as e:
+        logger.warning(f"Could not list files in {data_path}: {e}")
+    
+    try:
+        # Try loading as a saved dataset first (Hugging Face format)
+        if os.path.exists(os.path.join(data_path, 'dataset_info.json')):
+            dataset = load_from_disk(data_path)
+            logger.info("Loaded dataset from disk (Hugging Face format)")
+        else:
+            # 🔧 בדוק איזה סוג קבצים יש בדירקטוריה
+            files = os.listdir(data_path)
+            json_files = [f for f in files if f.endswith('.json') or f.endswith('.jsonl')]
+            parquet_files = [f for f in files if f.endswith('.parquet')]
             
-        logger.info(f"Dataset loaded. Number of examples: {len(dataset)}")
-        
-        # בדוק את המבנה
-        logger.info(f"Dataset columns: {dataset.column_names}")
-        if len(dataset) > 0:
-            logger.info(f"Example: {dataset[0]}")
-        
+            if json_files:
+                logger.info(f"Found JSON files: {json_files[:5]}")
+                # Try loading as JSON files
+                json_path = os.path.join(data_path, "*.json*")
+                dataset = load_dataset("json", data_files=json_path)
+                logger.info("Loaded dataset from JSON files")
+            elif parquet_files:
+                logger.info(f"Found Parquet files: {parquet_files[:5]}")
+                # Try loading as Parquet files
+                parquet_path = os.path.join(data_path, "*.parquet")
+                dataset = load_dataset("parquet", data_files=parquet_path)
+                logger.info("Loaded dataset from Parquet files")
+            else:
+                raise ValueError(f"No supported dataset files found in {data_path}. Files: {files}")
+                
     except Exception as e:
         logger.error(f"Failed to load dataset: {e}")
         raise
     
-    # שאר הקוד של tokenization...    
     # Tokenization function
     def tokenize_function(examples):
         return tokenizer(
@@ -260,23 +350,102 @@ def load_and_prepare_dataset(data_path, tokenizer, max_seq_length):
     
     # Tokenize dataset
     logger.info("Tokenizing dataset...")
-    tokenized_dataset = dataset.map(
+    
+    # 🔧 התמודד עם פורמטים שונים של דאטאסט
+    if isinstance(dataset, dict) and "train" in dataset:
+        train_dataset = dataset["train"]
+    else:
+        train_dataset = dataset
+    
+    tokenized_dataset = train_dataset.map(
         tokenize_function,
         batched=True,
         num_proc=4,
-        remove_columns=dataset["train"].column_names if "train" in dataset else dataset.column_names
+        remove_columns=train_dataset.column_names
     )
     
-    logger.info(f"Dataset tokenized. Train samples: {len(tokenized_dataset['train']) if 'train' in tokenized_dataset else len(tokenized_dataset)}")
-    return tokenized_dataset
+    logger.info(f"Dataset tokenized. Train samples: {len(tokenized_dataset)}")
+    return {"train": tokenized_dataset}
+
+def init_distributed_training(args):
+    """Initialize distributed training for multi-GPU setups"""
+    logger.info("=== Distributed Training Initialization ===")
+    
+    # Check if we have multiple GPUs
+    if args.num_gpus > 1 and torch.cuda.is_available():
+        logger.info(f"Multi-GPU detected ({args.num_gpus} GPUs), initializing distributed training...")
+        
+        # Get environment variables that SageMaker might set
+        rank = int(os.environ.get('RANK', 0))
+        world_size = int(os.environ.get('WORLD_SIZE', args.num_gpus))
+        local_rank = int(os.environ.get('LOCAL_RANK', 0))
+        
+        logger.info(f"RANK: {rank}, WORLD_SIZE: {world_size}, LOCAL_RANK: {local_rank}")
+        
+        # Set master address and port if not already set
+        if 'MASTER_ADDR' not in os.environ:
+            os.environ['MASTER_ADDR'] = 'localhost'
+            logger.info("Set MASTER_ADDR to localhost")
+        
+        if 'MASTER_PORT' not in os.environ:
+            os.environ['MASTER_PORT'] = '12355'
+            logger.info("Set MASTER_PORT to 12355")
+        
+        # Initialize distributed training if not already initialized
+        if not torch.distributed.is_initialized():
+            try:
+                torch.distributed.init_process_group(
+                    backend='nccl',
+                    init_method='env://',
+                    rank=rank,
+                    world_size=world_size,
+                    timeout=datetime.timedelta(minutes=30)
+                )
+                
+                # Set the current device
+                torch.cuda.set_device(local_rank)
+                
+                logger.info(f"✓ Distributed training initialized successfully")
+                logger.info(f"  Rank: {torch.distributed.get_rank()}")
+                logger.info(f"  World size: {torch.distributed.get_world_size()}")
+                logger.info(f"  Device: cuda:{local_rank}")
+                
+            except Exception as e:
+                logger.warning(f"Failed to initialize distributed training: {e}")
+                logger.warning("Falling back to single-GPU training")
+        else:
+            logger.info("✓ Distributed training already initialized")
+            logger.info(f"  Rank: {torch.distributed.get_rank()}")
+            logger.info(f"  World size: {torch.distributed.get_world_size()}")
+    else:
+        logger.info("Single GPU or CPU training - no distributed initialization needed")
+    
+    logger.info("=" * 50)
 
 def main():
     args = parse_args()
+    
+    # 🔧 בדוק שהפקודה היא train
+    if args.command != 'train':
+        logger.error(f"This script only supports 'train' command, got: {args.command}")
+        return
+    
+    # 🔧 NEW: Initialize distributed training FIRST
+    init_distributed_training(args)
+    
     set_seed(args.seed)
     
     logger.info(f"Starting SageMaker training on {args.instance_type}")
+    logger.info(f"Dataset path: {args.train}")
     logger.info(f"Number of GPUs: {args.num_gpus}")
     logger.info(f"Current host: {args.current_host}")
+    
+    # 🔧 דיבוג נתיבי SageMaker
+    logger.info("=== SageMaker Environment ===")
+    logger.info(f"SM_CHANNEL_TRAINING: {os.environ.get('SM_CHANNEL_TRAINING', 'NOT_SET')}")
+    logger.info(f"SM_MODEL_DIR: {os.environ.get('SM_MODEL_DIR', 'NOT_SET')}")
+    logger.info(f"Working directory: {os.getcwd()}")
+    logger.info("===============================")
     
     # Load instance-specific configuration
     instance_config = load_instance_config(args.instance_type)
@@ -300,12 +469,23 @@ def main():
         use_cache=False,
         low_cpu_mem_usage=True
     )
+
+    # הוסף מיד אחרי:
+    if torch.cuda.is_available():
+        model = model.to("cuda:0")  # Move to specific GPU
+        logger.info(f"Model moved to CUDA device 0. Available GPUs: {torch.cuda.device_count()}")
+    else:
+        logger.info("CUDA not available, using CPU")
     
-    # Enable gradient checkpointing for memory efficiency
+    # Enable gradient checkpointing
     model.gradient_checkpointing_enable()
-    
+
     # Load and prepare dataset
-    dataset = load_and_prepare_dataset(args.train, tokenizer, args.max_seq_length)
+    dataset = load_and_prepare_dataset(
+        data_path=args.train,
+        tokenizer=tokenizer, 
+        max_seq_length=args.max_seq_length
+    )
     
     # Data collator
     data_collator = DataCollatorForLanguageModeling(
@@ -314,33 +494,42 @@ def main():
     )
     
     # Setup training arguments
-    deepspeed_config = instance_config.get("deepspeed_config", "configs/deepspeed/p4d_deepspeed_config.json")
+    deepspeed_config = instance_config.get("deepspeed_config", f"configs/deepspeed/p4de_deepspeed_config.json")
     
-    training_args = TrainingArguments(
-        output_dir=args.model_dir,
-        per_device_train_batch_size=instance_config.get("batch_size_per_gpu", 2),
-        gradient_accumulation_steps=instance_config.get("gradient_accumulation_steps", 4),
-        num_train_epochs=args.epochs,
-        max_steps=args.max_steps,
-        fp16=True,
-        deepspeed=deepspeed_config if os.path.exists(deepspeed_config) else None,
-        logging_steps=10,
-        save_steps=500,
-        save_total_limit=3,
-        report_to=["wandb"],
-        dataloader_num_workers=4,
-        remove_unused_columns=False,
-        gradient_checkpointing=True,
-        warmup_ratio=0.03,
-        learning_rate=1e-5,
-        weight_decay=0.01,
-        max_grad_norm=1.0,
-        logging_first_step=True,
-        load_best_model_at_end=False,  # Disable for benchmark mode
-        metric_for_best_model="loss",
-        greater_is_better=False
-    )
+    # 🔧 תיקון: וודא שmax_steps לא None אם לא רוצים להשתמש בו
+    max_steps_value = args.max_steps if args.max_steps is not None and args.max_steps > 0 else -1
+    deepspeed_training_config = deepspeed_config if os.path.exists(deepspeed_config) else None
+    logger.info(f'deepspeed_training_config: {deepspeed_training_config}')
     
+    training_args_dict = {
+        "output_dir": args.model_dir,
+        "fp16": True,
+        "gradient_accumulation_steps": 1,  # קונקרטי
+        "per_device_train_batch_size": 2,  # קונקרטי  
+        "learning_rate": 1e-5,
+        "weight_decay": 0.01,
+        "num_train_epochs": args.epochs,
+        "save_steps": 500,
+        "save_total_limit": 3,
+        "logging_steps": 10,
+        "max_grad_norm": 1.0,
+        "warmup_ratio": 0.03,
+        "deepspeed": deepspeed_config if os.path.exists(deepspeed_config) else None,
+        "report_to": ["wandb"],
+        "remove_unused_columns": False,
+        "dataloader_num_workers": 4,
+        "gradient_checkpointing": True,
+        "ddp_backend": "nccl" if torch.cuda.is_available() else None,
+        "dataloader_pin_memory": False,
+        "ddp_find_unused_parameters": False,
+    }
+
+    # Add max_steps if specified
+    if args.max_steps and args.max_steps > 0:
+        training_args_dict["max_steps"] = args.max_steps
+
+    training_args = TrainingArguments(**training_args_dict)   
+
     logger.info(f"Training arguments configured for {args.instance_type}")
     
     # Initialize custom callback
@@ -364,6 +553,42 @@ def main():
     
     # Start training
     start_time = time.time()
+
+    #Debug logs
+    # 🔧 Force DeepSpeed initialization 
+    logger.info("=== DeepSpeed Initialization Debug ===")
+
+    # Check if we're in distributed mode
+    if torch.distributed.is_available() and torch.distributed.is_initialized():
+        logger.info(f"✓ Distributed initialized - rank: {torch.distributed.get_rank()}")
+    else:
+        logger.info("⚠ Distributed not initialized")
+
+    # Force accelerator initialization
+    if hasattr(trainer, 'accelerator'):
+        logger.info(f"Accelerator: {trainer.accelerator}")
+        
+        # Try to access DeepSpeed engine before training
+        if hasattr(trainer.accelerator, 'deepspeed_engine_wrapped'):
+            engine = trainer.accelerator.deepspeed_engine_wrapped
+            if engine is None:
+                logger.error("✗ DeepSpeed engine is None - trying to reinitialize...")
+                
+                # Try to force re-initialization
+                try:
+                    trainer.accelerator.prepare_model(model)
+                    logger.info("Attempted to re-prepare model")
+                except Exception as e:
+                    logger.error(f"Re-preparation failed: {e}")
+            else:
+                logger.info(f"✓ DeepSpeed engine: {type(engine)}")
+        else:
+            logger.error("✗ No deepspeed_engine_wrapped attribute")
+    else:
+        logger.error("✗ No accelerator found")
+
+    logger.info("=" * 50)
+
     try:
         trainer.train()
         training_successful = True

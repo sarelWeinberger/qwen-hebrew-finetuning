@@ -8,103 +8,29 @@
     "min_loss_scale": 1
   },
   "zero_optimization": {
-    "stage": 2,
-    "allgather_partitions": true,
-    "allgather_bucket_size": 1000000000,
-    "overlap_comm": true,
-    "reduce_scatter": true,
-    "reduce_bucket_size": 1000000000,
-    "contiguous_gradients": true,
-    "round_robin_gradients": true
-  },
-  "gradient_accumulation_steps": 1,
-  "gradient_clipping": 1.0,
-  "steps_per_print": 10,
-  "train_micro_batch_size_per_gpu": 8,
-  "wall_clock_breakdown": false,
-  "performance_optimization": {
-    "enabled": true,
-    "max_performance": true,
-    "minimal_offloading": true,
-    "network_optimized": true
-  },
-  "memory_optimization": {
-    "enabled": false,
-    "cpu_offload": false,
-    "contiguous_gradients": true,
-    "overlap_comm": true
-  },
-  "communication": {
-    "allreduce_partitions": true,
-    "allreduce_bucket_size": 1000000000,
-    "reduce_scatter": true,
-    "reduce_bucket_size": 1000000000,
-    "overlap_comm": true,
-    "use_multi_stream_comm": true,
-    "fp16_allreduce": true,
-    "prescale_gradients": false,
-    "sparse_gradients": false
-  },
-  "scheduler": {
-    "type": "WarmupLR",
-    "params": {
-      "warmup_min_lr": 0,
-      "warmup_max_lr": 1e-5,
-      "warmup_num_steps": 100
-    }
-  },
-  "h100_optimizations": {
-    "transformer_engine": true,
-    "flash_attention_2": true,
-    "tensor_parallel": true,
-    "sequence_parallel": false,
-    "pipeline_parallel": true
-  },
-  "activation_checkpointing": {
-    "partition_activations": false,
-    "cpu_checkpointing": false,
-    "contiguous_memory_optimization": true,
-    "number_checkpoints": 0,
-    "synchronize_checkpoint_boundary": false,
-    "profile": false
-  },
-  "distributed_training": {
-    "enabled": true,
-    "backend": "nccl",
-    "bucket_cap_mb": 25,
-    "find_unused_parameters": false,
-    "gradient_as_bucket_view": true
-  },
-  "efa_optimization": {
-    "enabled": true,
-    "rdma_enabled": true,
-    "gdr_enabled": true,
-    "adaptive_routing": true,
-    "multi_rail": true
-  },
-  "collective_communication": {
-    "allreduce_algorithm": "ring",
-    "allgather_algorithm": "ring",
-    "reduce_scatter_algorithm": "ring",
-    "broadcast_algorithm": "tree",
-    "barrier_algorithm": "tree"
-  },
-  "network_optimization": {
-    "compression": {
-      "enabled": false,
-      "compression_type": "none"
+    "stage": 3,
+    "offload_optimizer": {
+      "device": "cpu",
+      "pin_memory": true
     },
-    "hierarchical_allreduce": {
-      "enabled": true,
-      "bucket_size": 1000000000
+    "offload_param": {
+      "device": "cpu",
+      "pin_memory": true
     },
-    "overlap_communication": true,
-    "pipeline_communication": true
+    "overlap_comm": true,
+    "contiguous_gradients": true,
+    "sub_group_size": 1000000000.0,
+    "reduce_bucket_size": "auto",
+    "stage3_prefetch_bucket_size": "auto",
+    "stage3_param_persistence_threshold": "auto",
+    "stage3_max_live_parameters": 1000000000.0,
+    "stage3_max_reuse_distance": 1000000000.0,
+    "gather_16bit_weights_on_model_save": true
   },
-  "multi_node": {
-    "enabled": true,
-    "cross_node_comm_backend": "nccl",
-    "intra_node_comm_backend": "nccl",
-    "elastic": false
-  }
+  "gradient_accumulation_steps": "auto", 
+  "gradient_clipping": "auto",  
+  "train_micro_batch_size_per_gpu": "auto",
+  "train_batch_size": "auto",     
+  "steps_per_print": 100,
+  "wall_clock_breakdown": false
 }

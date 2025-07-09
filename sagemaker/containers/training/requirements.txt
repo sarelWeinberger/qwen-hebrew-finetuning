@@ -1,30 +1,38 @@
-# Core ML dependencies
+# Core ML packages
 torch>=2.1.0
-transformers>=4.35.0
-datasets>=2.14.0
-accelerate>=0.24.0
+transformers>=4.37.0
+accelerate>=0.26.0
+datasets>=2.16.0
+
+# DeepSpeed and optimization
 deepspeed>=0.12.0
+peft>=0.7.0
 
-# SageMaker and AWS
-sagemaker>=2.190.0
-boto3>=1.34.0
-botocore>=1.34.0
-
-# Monitoring and logging
+# Training and logging
 wandb>=0.16.0
 tensorboard>=2.15.0
 
 # Data processing
+pandas>=2.1.0
 numpy>=1.24.0
-pandas>=2.0.0
 scikit-learn>=1.3.0
-tqdm>=4.66.0
 
-# Utilities
-requests>=2.31.0
+# AWS and S3
+boto3>=1.34.0
+sagemaker>=2.200.0
+
+# Text processing
+sentencepiece>=0.1.99
+protobuf>=4.25.0
+
+# System utilities
+tqdm>=4.66.0
 packaging>=23.0
-pyyaml>=6.0
 psutil>=5.9.0
 
-# Hebrew text processing
-python-Levenshtein>=0.21.0
+# Optional: Hebrew text processing
+hebrew-tokenizer>=2.3.0
+
+# Development tools (optional)
+jupyter>=1.0.0
+ipywidgets>=8.1.0
