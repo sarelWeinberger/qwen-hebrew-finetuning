@@ -96,3 +96,13 @@ ARC_FORMAT_V4_V5 = """<response_format>
 </response_format>
 
 Provide the Hebrew translation immediately after these instructions, without any preamble or additional context."""
+
+
+# Multiple translation prompts
+ARC_INSTRUCT_MULTI_V1 = """Your task is to translate the given English question and possible answers into possible Hebrew translations. Follow these guidelines:
+
+1. Only translate the question and answer options provided. Do not add any additional text or instructions.
+2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
+3. Maintain the same formatting and style as the original English version.
+4. Provide {X} possible translations for the question and each one of the answers.
+5. Provide the Hebrew translation immediately after these instructions, without any preamble or additional context."""

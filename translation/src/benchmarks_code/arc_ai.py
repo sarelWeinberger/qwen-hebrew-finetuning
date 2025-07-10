@@ -1,4 +1,4 @@
-from datasets import load_dataset, Dataset
+from datasets import load_dataset
 
 MAP_LABELS = {
     'A': 'א',

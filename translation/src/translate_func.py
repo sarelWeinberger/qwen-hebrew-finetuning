@@ -28,12 +28,15 @@ def claude_translation(bedrock_client, datasets, instruct, few_shots, sample_for
     Translate all given datasets using one of the claude famaliy models.
     """
     # The final prompt for the models
-    final_prompt = instruct + '\n\n' + few_shots + '\n\n' + sample_format + '\n\n'
+    final_prompt = few_shots + '\n\n' + sample_format + '\n\n'
+    # final_prompt = instruct + '\n\n' + few_shots + '\n\n' + sample_format + '\n\n'
     hebrew_dataset = {}
+    text_output = {}
     # Run on the different splits in the dataset
     for key in datasets:
         print(f'Translating {key}...')
         hebrew_dataset[key] = []
+        text_output[key] = []
         # Run on all the split's samples
         for sample in tqdm(datasets[key], total=datasets[key].num_rows):
             # from sample to dict
@@ -44,19 +47,43 @@ def claude_translation(bedrock_client, datasets, instruct, few_shots, sample_for
             query = final_prompt + BASE_PROMPT.format(X=samples_query, Y='')
 
             # Call claude
-            output = call_claude_bedrock(bedrock_client, query)
+            output = call_claude_bedrock(bedrock_client, query, system_prompt=instruct)
 
             # Parse the model's output
-            pattern = r"<([^>]+)>(.*?)</\1>"
+            pattern = r"<(?!response_format\b)([^>]+)>(.*?)</\1>"
             matches = re.findall(pattern, output, re.DOTALL)
+            # In case 'matches' contain two (or more) pairs with the same 'key', the
+            # last value is the one that will be stored
+            # In matches the order of the pairs is according to the appearance in 'output'
             result = {key: value.strip() for key, value in matches}
+            if len(set(dct.keys()) - set(result.keys())) > 0:
+                print(dct.keys())
+                print(result.keys())
+                print()
+                print(output)
+                print('NONONONONONO')
+                return hebrew_dataset, text_output
 
             # Create New sample
             new_sample = dict_to_sample(sample, result)
             hebrew_dataset[key].append(new_sample)
+            text_output[key].append(output)
+            # print(output)
+            # print()
 
         hebrew_dataset[key] = Dataset.from_list(hebrew_dataset[key])
-    return hebrew_dataset
+    return hebrew_dataset, text_output
+    
+    
+def get_gemini_thoughts_summary(response):
+    thinking_summary = []
+    for part in response.candidates[0].content.parts:
+        if not part.text:
+            continue
+        if part.thought:
+            thinking_summary.append(part.text)
+    thinking_summary = '\n\n'.join(thinking_summary)
+    return thinking_summary
 
 
 def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_dict, dict_to_sample, if_pro=False, think_bud=-1):
@@ -66,6 +93,7 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
     # The final prompt for the models
     final_prompt = few_shots + '\n\n'
     hebrew_dataset = {}
+    text_output = {}
     if if_pro:
         quota_min = 5
     else:
@@ -79,6 +107,7 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
 
         print(f'Translating {key}...')
         hebrew_dataset[key] = []
+        text_output[key] = []
         # Run on all the split's samples
         for cnt, sample in enumerate(tqdm(datasets[key], total=datasets[key].num_rows), start=1):
             # from sample to dict
@@ -98,11 +127,13 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
                     sleep(10)
 
             # Parse the model's output
+            thinking_summary = get_gemini_thoughts_summary(output)
             result = output.parsed
 
             # Create New sample
             new_sample = dict_to_sample(sample, result)
             hebrew_dataset[key].append(new_sample)
+            text_output[key].append(thinking_summary)
 
             if cnt % quota_min == 0:
                 passed = time() - start_time
@@ -113,7 +144,7 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
                 start_time = time()
 
         hebrew_dataset[key] = Dataset.from_list(hebrew_dataset[key])
-    return hebrew_dataset
+    return hebrew_dataset, text_output
 
 
 def options_to_prompt(original, hebrew):
@@ -121,50 +152,50 @@ def options_to_prompt(original, hebrew):
     return '\n'.join([f'<{k}>{original[k]} | {hebrew[k]}</{k}>' for k in original])
 
 
-def gemini_multi_translation(google_client, datasets, instruct, few_shots, sample_to_dict, dict_to_sample, length=3, think_bud=-1):
-    """
-    Translate all given datasets using one of the Gemini famaliy models.
-    Ask Gemini to give a number of different options, and choose the best one.
-    """
-    assert length > 1, 'Numer of options must be greater then 1.'
-    # The final prompt for the models
-    final_prompt = few_shots + '\n\n'
-    hebrew_dataset = {}
-    # Run on the different splits in the dataset
-    for key in datasets:
-        fields = sample_to_dict(datasets[key][0]).keys()
-        config = all_list_gemini_config(fields, instruct.format(X=length), length, think_bud=think_bud)
-        choose_config = all_string_gemini_config(fields, CHOOSE_INSTRUCT)
+# def gemini_multi_translation(google_client, datasets, instruct, few_shots, sample_to_dict, dict_to_sample, length=3, think_bud=-1):
+#     """
+#     Translate all given datasets using one of the Gemini famaliy models.
+#     Ask Gemini to give a number of different options, and choose the best one.
+#     """
+#     assert length > 1, 'Numer of options must be greater then 1.'
+#     # The final prompt for the models
+#     final_prompt = few_shots + '\n\n'
+#     hebrew_dataset = {}
+#     # Run on the different splits in the dataset
+#     for key in datasets:
+#         fields = sample_to_dict(datasets[key][0]).keys()
+#         config = all_list_gemini_config(fields, instruct.format(X=length), length, think_bud=think_bud)
+#         choose_config = all_string_gemini_config(fields, CHOOSE_INSTRUCT)
 
-        print(f'Translating {key}...')
-        hebrew_dataset[key] = []
-        # Run on all the split's samples
-        for sample in tqdm(datasets[key], total=datasets[key].num_rows):
-            # from sample to dict
-            dct = sample_to_dict(sample)
+#         print(f'Translating {key}...')
+#         hebrew_dataset[key] = []
+#         # Run on all the split's samples
+#         for sample in tqdm(datasets[key], total=datasets[key].num_rows):
+#             # from sample to dict
+#             dct = sample_to_dict(sample)
 
-            # Enter into prompt
-            samples_query = dict_to_prompt(dct)
-            query = final_prompt + BASE_PROMPT.format(X=samples_query, Y='')
+#             # Enter into prompt
+#             samples_query = dict_to_prompt(dct)
+#             query = final_prompt + BASE_PROMPT.format(X=samples_query, Y='')
 
-            # Call gemini
-            output = call_gemini(google_client, query, config)
+#             # Call gemini
+#             output = call_gemini(google_client, query, config)
 
-            # Parse the model's output
-            result = output.parsed
-            # return dct, result 
+#             # Parse the model's output
+#             result = output.parsed
+#             # return dct, result 
 
-            # Choose best option
-            multi_query = options_to_prompt(dct, result)
-            output = call_gemini(google_client, multi_query, choose_config)
-            result = output.parsed
+#             # Choose best option
+#             multi_query = options_to_prompt(dct, result)
+#             output = call_gemini(google_client, multi_query, choose_config)
+#             result = output.parsed
 
-            # Create New sample
-            new_sample = dict_to_sample(sample, result)
-            hebrew_dataset[key].append(new_sample)
+#             # Create New sample
+#             new_sample = dict_to_sample(sample, result)
+#             hebrew_dataset[key].append(new_sample)
 
-        hebrew_dataset[key] = Dataset.from_list(hebrew_dataset[key])
-    return hebrew_dataset
+#         hebrew_dataset[key] = Dataset.from_list(hebrew_dataset[key])
+#     return hebrew_dataset
 
 
 def gemini_claude_best_translation(

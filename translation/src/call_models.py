@@ -18,7 +18,7 @@ def bedrock_connect(acceess_id, secret_key):
 
 
 # Claude call
-def call_claude_bedrock(bedrock_client, message, system_prompt=None, max_tokens=1_000):
+def call_claude_bedrock(bedrock_client, message, system_prompt=None, max_tokens=10_000):
     """
     Call Claude through AWS Bedrock
     """
@@ -82,6 +82,7 @@ def create_gemini_config(str_lst, system_instruction=None, output_type=None, enu
         temperature=0,
         topK=1,
         thinking_config=types.ThinkingConfig(
+            include_thoughts=True,
             thinking_budget=think_bud,
         ),
         system_instruction=system_instruction,
@@ -118,6 +119,7 @@ def all_list_gemini_config(str_lst, system_instruction=None, length=3):
         temperature=0,
         topK=1,
         thinking_config=types.ThinkingConfig(
+            include_thoughts=True,
             thinking_budget=-1,
         ),
         system_instruction=system_instruction,
