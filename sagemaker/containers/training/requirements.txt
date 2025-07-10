@@ -1,38 +1,20 @@
-# Core ML packages
 torch>=2.1.0
-transformers>=4.37.0
+transformers>=4.35.0
 accelerate>=0.26.0
-datasets>=2.16.0
-
-# DeepSpeed and optimization
 deepspeed>=0.12.0
-peft>=0.7.0
+datasets>=2.14.0
+wandb>=0.15.0
+boto3>=1.28.0
 
-# Training and logging
-wandb>=0.16.0
-tensorboard>=2.15.0
+# DeepSpeed dependencies
+mpi4py>=3.1.0
+ninja>=1.10.0
+packaging>=21.0
 
-# Data processing
-pandas>=2.1.0
-numpy>=1.24.0
-scikit-learn>=1.3.0
+# Additional dependencies for distributed training
+psutil>=5.8.0
+py-cpuinfo>=9.0.0
+pynvml>=11.4.0
 
-# AWS and S3
-boto3>=1.34.0
-sagemaker>=2.200.0
-
-# Text processing
-sentencepiece>=0.1.99
-protobuf>=4.25.0
-
-# System utilities
-tqdm>=4.66.0
-packaging>=23.0
-psutil>=5.9.0
-
-# Optional: Hebrew text processing
-hebrew-tokenizer>=2.3.0
-
-# Development tools (optional)
-jupyter>=1.0.0
-ipywidgets>=8.1.0
+# For tokenization and data processing
+tokenizers>=0.15.0

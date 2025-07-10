@@ -39,7 +39,7 @@ class SageMakerBenchmarkRunner:
         
     def get_training_image_uri(self) -> str:
         """Get the ECR training image URI"""
-        return f"{self.account_id}.dkr.ecr.{self.region}.amazonaws.com/qwen-hebrew-training:latest"
+        return f"{self.account_id}.dkr.ecr.{self.region}.amazonaws.com/qwen-hebrew-finetuning:latest"
     
     def run_benchmark(self, instance_types: List[str], dataset_path: str, epochs: int = 1, max_steps: int = None) -> List[Dict]:
         """Run training jobs on all specified instance types"""
