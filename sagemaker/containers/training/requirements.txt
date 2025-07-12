@@ -1,20 +1,23 @@
 torch>=2.1.0
 transformers>=4.35.0
 accelerate>=0.26.0
-deepspeed>=0.12.0
 datasets>=2.14.0
 wandb>=0.15.0
 boto3>=1.28.0
+numpy>=1.24.0
 
-# DeepSpeed dependencies
-mpi4py>=3.1.0
-ninja>=1.10.0
+# Remove DeepSpeed - we're not using it anymore
+# deepspeed>=0.12.0  # REMOVED
+# mpi4py>=3.1.0      # REMOVED  
+# ninja>=1.10.0      # REMOVED
+
+# Keep essential dependencies
 packaging>=21.0
-
-# Additional dependencies for distributed training
-psutil>=5.8.0
-py-cpuinfo>=9.0.0
-pynvml>=11.4.0
-
-# For tokenization and data processing
+psutil>=5.9.0
 tokenizers>=0.15.0
+
+# Add safetensors for better model loading
+safetensors>=0.3.0
+
+# Add flash-attention if available (optional)
+# flash-attn>=2.0.0  # Uncomment if you want flash attention
