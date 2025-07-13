@@ -5,7 +5,7 @@
 # Configuration
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 REGION=$(aws configure list | grep region | awk '{print $2}')
-REPOSITORY_NAME="qwen-hebrew-training"
+REPOSITORY_NAME="qwen-hebrew-finetuning"
 IMAGE_TAG="latest"
 
 # Full image name

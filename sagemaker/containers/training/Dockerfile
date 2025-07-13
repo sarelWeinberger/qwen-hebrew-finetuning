@@ -3,6 +3,11 @@ FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel
 # Prevent interactive prompts during installation
 ENV DEBIAN_FRONTEND=noninteractive
 
+# NVIDIA runtime environment
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV NVIDIA_REQUIRE_CUDA="cuda>=11.0"
+
 # Layer 1: System dependencies (משתנה רק לעתים רחוקות)
 # כל החבילות של המערכת ופייטון בסיסי
 RUN apt-get update && apt-get install -y \
