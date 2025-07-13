@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 SageMaker Training Script for Qwen Hebrew Fine-tuning
-AWS Optimized version with DeepSpeed and proper multi-GPU setup
-Based on Amazon Q recommendations
+Complete final version with all optimizations and fixes applied
 """
 
 import os
@@ -126,25 +125,65 @@ def parse_args():
     
     return parser.parse_args()
 
+def setup_distributed_training():
+    """Setup distributed training environment for SageMaker"""
+    
+    # Check if we're in a distributed environment
+    world_size = int(os.environ.get('WORLD_SIZE', '1'))
+    rank = int(os.environ.get('RANK', '0'))
+    local_rank = int(os.environ.get('LOCAL_RANK', '0'))
+    
+    logger.info(f"Distributed setup - World size: {world_size}, Rank: {rank}, Local rank: {local_rank}")
+    
+    # Set up environment variables if not set by SageMaker
+    if 'RANK' not in os.environ:
+        os.environ['RANK'] = '0'
+    if 'WORLD_SIZE' not in os.environ:
+        os.environ['WORLD_SIZE'] = '1'
+    if 'LOCAL_RANK' not in os.environ:
+        os.environ['LOCAL_RANK'] = '0'
+    if 'MASTER_ADDR' not in os.environ:
+        os.environ['MASTER_ADDR'] = 'localhost'
+    if 'MASTER_PORT' not in os.environ:
+        os.environ['MASTER_PORT'] = '12355'
+    
+    # Log the environment variables
+    logger.info(f"Environment setup:")
+    logger.info(f"  RANK: {os.environ.get('RANK')}")
+    logger.info(f"  WORLD_SIZE: {os.environ.get('WORLD_SIZE')}")
+    logger.info(f"  LOCAL_RANK: {os.environ.get('LOCAL_RANK')}")
+    logger.info(f"  MASTER_ADDR: {os.environ.get('MASTER_ADDR')}")
+    logger.info(f"  MASTER_PORT: {os.environ.get('MASTER_PORT')}")
+    
+    return {
+        'world_size': int(os.environ['WORLD_SIZE']),
+        'rank': int(os.environ['RANK']),
+        'local_rank': int(os.environ['LOCAL_RANK'])
+    }
+
 def load_instance_config(instance_type):
-    """Load instance-specific configuration with memory optimizations"""
+    """Load instance-specific configuration with optimized settings for 30B model"""
     
     default_configs = {
         'ml.p4d.24xlarge': {
             "batch_size_per_gpu": 1,
-            "gradient_accumulation_steps": 32,
+            "gradient_accumulation_steps": 4,
+            "deepspeed_config": "configs/deepspeed/p4d_deepspeed_config.json",
             "gpu_count": 8,
             "gpu_type": "A100",
             "gpu_memory": "40GB",
-            "estimated_hourly_cost": 32.77
+            "estimated_hourly_cost": 32.77,
+            "zero_stage": 3
         },
         'ml.p4de.24xlarge': {
             "batch_size_per_gpu": 1,
-            "gradient_accumulation_steps": 16,  # Conservative for 30B model
+            "gradient_accumulation_steps": 2,
+            "deepspeed_config": "configs/deepspeed/p4de_deepspeed_config.json",
             "gpu_count": 8,
             "gpu_type": "A100",
             "gpu_memory": "80GB",
-            "estimated_hourly_cost": 40.96
+            "estimated_hourly_cost": 40.96,
+            "zero_stage": 3
         },
         'ml.p5.48xlarge': {
             "batch_size_per_gpu": 1,
@@ -152,7 +191,8 @@ def load_instance_config(instance_type):
             "gpu_count": 8,
             "gpu_type": "H100",
             "gpu_memory": "80GB",
-            "estimated_hourly_cost": 98.32
+            "estimated_hourly_cost": 98.32,
+            "zero_stage": 3
         }
     }
     
@@ -160,11 +200,15 @@ def load_instance_config(instance_type):
         logger.info(f"Using built-in configuration for {instance_type}")
         return default_configs[instance_type]
     else:
-        logger.warning(f"Unknown instance type {instance_type}, using default P4de config")
+        logger.warning(f"Unknown instance type {instance_type}, using default P4DE config")
         return default_configs['ml.p4de.24xlarge']
 
-def create_deepspeed_config(instance_config):
+def create_deepspeed_config(instance_config, distributed_info):
     """Create DeepSpeed configuration optimized for 30B model"""
+    
+    # Use ZeRO Stage 3 for large models
+    zero_stage = instance_config.get("zero_stage", 3)
+    
     config = {
         "fp16": {
             "enabled": True,
@@ -175,15 +219,7 @@ def create_deepspeed_config(instance_config):
             "min_loss_scale": 1
         },
         "zero_optimization": {
-            "stage": 3,  # Stage 3 for large models like 30B
-            "offload_optimizer": {
-                "device": "cpu",
-                "pin_memory": True
-            },
-            "offload_param": {
-                "device": "cpu",
-                "pin_memory": True
-            },
+            "stage": zero_stage,
             "overlap_comm": True,
             "contiguous_gradients": True,
             "sub_group_size": 1e9,
@@ -212,111 +248,41 @@ def create_deepspeed_config(instance_config):
             }
         },
         "train_micro_batch_size_per_gpu": instance_config.get("batch_size_per_gpu", 1),
-        "gradient_accumulation_steps": instance_config.get("gradient_accumulation_steps", 16),
+        "gradient_accumulation_steps": instance_config.get("gradient_accumulation_steps", 1),
         "gradient_clipping": 1.0,
-        "steps_per_print": 10,
-        "wall_clock_breakdown": False,  # Disable for performance
-        "dump_state": False
+        "wall_clock_breakdown": False,
+        "memory_breakdown": False
     }
     
+    # Additional optimizations for large models
+    if zero_stage == 3:
+        config["zero_optimization"]["offload_optimizer"] = {
+            "device": "cpu",
+            "pin_memory": True
+        }
+        config["zero_optimization"]["offload_param"] = {
+            "device": "cpu",
+            "pin_memory": True
+        }
+    
     # Save the config
-    os.makedirs("/tmp", exist_ok=True)
-    config_path = "/tmp/deepspeed_config.json"
+    os.makedirs("configs/deepspeed", exist_ok=True)
+    config_path = f"configs/deepspeed/optimized_deepspeed_config_stage{zero_stage}.json"
     with open(config_path, 'w') as f:
         json.dump(config, f, indent=2)
     
+    logger.info(f"Created DeepSpeed config with ZeRO Stage {zero_stage}")
     return config_path, config
 
-def setup_distributed():
-    """Setup distributed training properly for SageMaker"""
-    
-    if dist.is_initialized():
-        logger.info("Distributed training already initialized")
-        return True
-    
-    local_rank = int(os.environ.get('LOCAL_RANK', '0'))
-    
-    # SageMaker environment
-    if 'SM_HOSTS' in os.environ:
-        hosts = json.loads(os.environ['SM_HOSTS'])
-        current_host = os.environ['SM_CURRENT_HOST']
-        host_rank = hosts.index(current_host)
-        num_gpus = int(os.environ.get('SM_NUM_GPUS', '8'))
-        
-        # Single node setup (typical for SageMaker)
-        master_addr = "127.0.0.1"
-        master_port = "29500"
-        world_size = num_gpus
-        rank = local_rank
-        
-        # Multi-node setup (if multiple hosts)
-        if len(hosts) > 1:
-            master_addr = hosts[0]
-            world_size = len(hosts) * num_gpus
-            rank = host_rank * num_gpus + local_rank
-    else:
-        # Fallback for local development
-        master_addr = "127.0.0.1"
-        master_port = "29500"
-        world_size = torch.cuda.device_count() if torch.cuda.is_available() else 1
-        rank = local_rank
-    
-    # Set environment variables
-    os.environ['MASTER_ADDR'] = master_addr
-    os.environ['MASTER_PORT'] = master_port
-    os.environ['WORLD_SIZE'] = str(world_size)
-    os.environ['RANK'] = str(rank)
-    os.environ['LOCAL_RANK'] = str(local_rank)
-    
-    # NCCL settings for better performance
-    os.environ['NCCL_TIMEOUT'] = '1800'  # 30 minutes
-    os.environ['NCCL_DEBUG'] = 'WARN'
-    
-    logger.info(f"Distributed setup:")
-    logger.info(f"  MASTER_ADDR: {master_addr}")
-    logger.info(f"  MASTER_PORT: {master_port}")
-    logger.info(f"  WORLD_SIZE: {world_size}")
-    logger.info(f"  RANK: {rank}")
-    logger.info(f"  LOCAL_RANK: {local_rank}")
-    
-    # Set CUDA device
-    if torch.cuda.is_available():
-        torch.cuda.set_device(local_rank)
-        logger.info(f"Set CUDA device to: {local_rank}")
-    
-    # Initialize distributed training
-    try:
-        logger.info("Initializing distributed training...")
-        
-        dist.init_process_group(
-            backend='nccl',
-            init_method=f'tcp://{master_addr}:{master_port}',
-            world_size=world_size,
-            rank=rank,
-            timeout=timedelta(seconds=1800)  # 30 minutes timeout
-        )
-        
-        logger.info(f"✅ Distributed training initialized successfully")
-        logger.info(f"  World size: {dist.get_world_size()}")
-        logger.info(f"  Rank: {dist.get_rank()}")
-        
-        return True
-        
-    except Exception as e:
-        logger.warning(f"⚠️ Failed to initialize distributed training: {e}")
-        logger.warning("Falling back to single GPU training...")
-        return False
-
-def setup_wandb(args, instance_config):
+def setup_wandb(args, instance_config, distributed_info):
     """Initialize Weights & Biases with comprehensive configuration"""
+    
     # Only initialize W&B on rank 0
-    if dist.is_initialized() and dist.get_rank() != 0:
+    if distributed_info['rank'] != 0:
+        logger.info(f"Rank {distributed_info['rank']}: Skipping W&B initialization")
         return None
     
-    if not dist.is_initialized() and int(os.environ.get('LOCAL_RANK', '0')) != 0:
-        return None
-    
-    run_name = args.wandb_run_name or f"qwen-deepspeed-{args.instance_type}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    run_name = args.wandb_run_name or f"qwen-hebrew-{args.instance_type}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     
     # Calculate estimated cost
     hourly_cost = instance_config.get('estimated_hourly_cost', 40.96)
@@ -341,15 +307,12 @@ def setup_wandb(args, instance_config):
             "max_seq_length": args.max_seq_length,
             "seed": args.seed,
             "batch_size_per_gpu": instance_config.get("batch_size_per_gpu", 1),
-            "gradient_accumulation_steps": instance_config.get("gradient_accumulation_steps", 16),
-            
-            # DeepSpeed configuration
-            "deepspeed_stage": 3,
-            "cpu_offload": True,
+            "gradient_accumulation_steps": instance_config.get("gradient_accumulation_steps", 1),
+            "zero_stage": instance_config.get("zero_stage", 3),
             
             # Distributed training info
-            "world_size": dist.get_world_size() if dist.is_initialized() else 1,
-            "distributed_training": dist.is_initialized(),
+            "world_size": distributed_info['world_size'],
+            "rank": distributed_info['rank'],
             
             # SageMaker information
             "sagemaker_job": True,
@@ -448,29 +411,71 @@ def load_and_prepare_dataset(data_path, tokenizer, max_seq_length):
     logger.info(f"Dataset tokenized. Train samples: {len(tokenized_dataset)}")
     return tokenized_dataset
 
-def deepspeed_training(model, tokenized_dataset, tokenizer, args, instance_config, metrics_callback):
-    """DeepSpeed training loop with proper multi-GPU support"""
+def manual_deepspeed_training(model, tokenized_dataset, tokenizer, args, instance_config, metrics_callback, distributed_info):
+    """Manual DeepSpeed training loop with proper device handling"""
     
-    logger.info("=== Starting DeepSpeed Training ===")
+    logger.info("=== Starting Manual DeepSpeed Training with Device Management ===")
+    logger.info(f"Distributed info: {distributed_info}")
+    
+    # Set device for this process
+    device = torch.device(f"cuda:{distributed_info['local_rank']}")
+    logger.info(f"Process rank {distributed_info['rank']} using device: {device}")
+    
+    # Clear GPU cache before starting
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        if distributed_info['rank'] == 0:  # Only log from rank 0
+            for i in range(torch.cuda.device_count()):
+                logger.info(f"GPU {i} memory before training: {torch.cuda.memory_allocated(i) / (1024**3):.2f} GB")
     
     # Create DeepSpeed config
-    deepspeed_config_path, ds_config = create_deepspeed_config(instance_config)
-    logger.info(f"DeepSpeed config created with ZeRO Stage 3 + CPU offload")
+    deepspeed_config_path, ds_config = create_deepspeed_config(instance_config, distributed_info)
+    logger.info(f"DeepSpeed config created: {list(ds_config.keys())}")
     
-    # Initialize DeepSpeed
+    # Initialize DeepSpeed with proper distributed setup
     try:
+        # Check if distributed is already initialized (SageMaker might do this)
+        if not torch.distributed.is_initialized():
+            logger.info("Initializing distributed training...")
+            torch.distributed.init_process_group(
+                backend="nccl",
+                init_method="env://",
+                world_size=distributed_info['world_size'],
+                rank=distributed_info['rank']
+            )
+            logger.info("✅ Distributed training initialized")
+        else:
+            logger.info("✅ Distributed training already initialized")
+        
+        # Set local rank for current process
+        torch.cuda.set_device(distributed_info['local_rank'])
+        
+        # Initialize DeepSpeed with the model
         model_engine, optimizer, _, lr_scheduler = deepspeed.initialize(
             model=model,
             config=ds_config,
-            dist_init_required=False  # We already initialized distributed
+            dist_init_required=False  # We already initialized
         )
+        
         logger.info(f"✅ DeepSpeed engine created successfully")
-        logger.info(f"Model device: {next(model_engine.parameters()).device}")
-        logger.info(f"DeepSpeed world size: {model_engine.world_size}")
-        logger.info(f"DeepSpeed local rank: {model_engine.local_rank}")
+        logger.info(f"DeepSpeed ZeRO stage: {ds_config['zero_optimization']['stage']}")
+        
+        # Log memory usage after DeepSpeed initialization (only from rank 0)
+        if torch.cuda.is_available() and distributed_info['rank'] == 0:
+            for i in range(torch.cuda.device_count()):
+                allocated = torch.cuda.memory_allocated(i) / (1024**3)
+                reserved = torch.cuda.memory_reserved(i) / (1024**3)
+                logger.info(f"GPU {i} after DeepSpeed init - Allocated: {allocated:.2f} GB, Reserved: {reserved:.2f} GB")
         
     except Exception as e:
         logger.error(f"❌ DeepSpeed initialization failed: {e}")
+        # Log detailed GPU memory info for debugging
+        if torch.cuda.is_available():
+            for i in range(torch.cuda.device_count()):
+                logger.error(f"GPU {i} memory info:")
+                logger.error(f"  Allocated: {torch.cuda.memory_allocated(i) / (1024**3):.2f} GB")
+                logger.error(f"  Reserved: {torch.cuda.memory_reserved(i) / (1024**3):.2f} GB")
+                logger.error(f"  Total: {torch.cuda.get_device_properties(i).total_memory / (1024**3):.2f} GB")
         raise
     
     # Create data collator and dataloader
@@ -479,30 +484,30 @@ def deepspeed_training(model, tokenized_dataset, tokenizer, args, instance_confi
         mlm=False
     )
     
-    # Use DistributedSampler for multi-GPU
-    if model_engine.world_size > 1:
-        sampler = DistributedSampler(
-            tokenized_dataset,
-            num_replicas=model_engine.world_size,
-            rank=model_engine.global_rank,
-            shuffle=True
-        )
-        logger.info(f"Using DistributedSampler with {model_engine.world_size} replicas")
-    else:
-        sampler = None
-        logger.info("Using regular DataLoader (single GPU)")
+    from torch.utils.data import DataLoader
+    from torch.utils.data.distributed import DistributedSampler
+    
+    # Use DistributedSampler for multi-GPU training
+    sampler = DistributedSampler(
+        tokenized_dataset,
+        num_replicas=distributed_info['world_size'],
+        rank=distributed_info['rank'],
+        shuffle=True
+    ) if distributed_info['world_size'] > 1 else None
     
     dataloader = DataLoader(
         tokenized_dataset,
         batch_size=instance_config.get("batch_size_per_gpu", 1),
         collate_fn=data_collator,
         sampler=sampler,
-        shuffle=(sampler is None),
+        shuffle=(sampler is None),  # Only shuffle if no sampler
         num_workers=2,
         pin_memory=True
     )
     
     logger.info(f"DataLoader created with {len(dataloader)} batches")
+    if sampler:
+        logger.info(f"Using DistributedSampler for rank {distributed_info['rank']}")
     
     # Training loop
     model_engine.train()
@@ -510,12 +515,12 @@ def deepspeed_training(model, tokenized_dataset, tokenizer, args, instance_confi
     
     # Create mock TrainingArguments for metrics
     class MockArgs:
-        def __init__(self, instance_config, world_size):
+        def __init__(self, instance_config, args, distributed_info):
             self.per_device_train_batch_size = instance_config.get("batch_size_per_gpu", 1)
-            self.gradient_accumulation_steps = instance_config.get("gradient_accumulation_steps", 16)
-            self.world_size = world_size
+            self.gradient_accumulation_steps = instance_config.get("gradient_accumulation_steps", 1)
+            self.world_size = distributed_info['world_size']
     
-    mock_args = MockArgs(instance_config, model_engine.world_size)
+    mock_args = MockArgs(instance_config, args, distributed_info)
     
     logger.info(f"Starting training for {args.epochs} epochs...")
     logger.info(f"World size: {model_engine.world_size}")
@@ -523,51 +528,88 @@ def deepspeed_training(model, tokenized_dataset, tokenizer, args, instance_confi
     logger.info(f"Effective batch size: {mock_args.per_device_train_batch_size * mock_args.world_size * mock_args.gradient_accumulation_steps}")
     
     for epoch in range(args.epochs):
-        logger.info(f"=== Epoch {epoch + 1}/{args.epochs} ===")
+        if distributed_info['rank'] == 0:
+            logger.info(f"=== Epoch {epoch + 1}/{args.epochs} ===")
         
         # Set epoch for DistributedSampler
-        if sampler is not None:
+        if sampler:
             sampler.set_epoch(epoch)
         
         for step, batch in enumerate(dataloader):
             # Check max_steps
             if args.max_steps and global_step >= args.max_steps:
-                logger.info(f"Reached max_steps ({args.max_steps}), stopping training")
+                if distributed_info['rank'] == 0:
+                    logger.info(f"Reached max_steps ({args.max_steps}), stopping training")
                 break
             
-            # Move batch to device (DeepSpeed handles this automatically)
-            batch = {k: v.to(model_engine.device) for k, v in batch.items()}
-            
-            # Forward pass
-            outputs = model_engine(**batch)
-            loss = outputs.loss
-            
-            # Backward and step
-            model_engine.backward(loss)
-            model_engine.step()
-            
-            # Metrics and logging (only on rank 0)
-            if (global_step % 10 == 0) and (model_engine.global_rank == 0):
-                logger.info(f"Epoch {epoch + 1}, Step {global_step}, Loss: {loss.item():.4f}")
+            try:
+                # CRITICAL FIX: Direct device movement for each tensor
+                if distributed_info['rank'] == 0 and global_step < 2:
+                    logger.info("BEFORE moving to device:")
+                    for key, value in batch.items():
+                        if isinstance(value, torch.Tensor):
+                            logger.info(f"  {key}: {value.device} (shape: {value.shape})")
                 
-                # Log GPU memory usage
-                if torch.cuda.is_available():
-                    for i in range(torch.cuda.device_count()):
-                        allocated = torch.cuda.memory_allocated(i) / 1024**3
-                        if allocated > 0.1:
-                            logger.info(f"  GPU {i}: {allocated:.1f}GB")
+                # Move each tensor explicitly to the device
+                for key in batch:
+                    if isinstance(batch[key], torch.Tensor):
+                        batch[key] = batch[key].to(device, non_blocking=True)
                 
-                # Callback for metrics
-                if metrics_callback:
+                if distributed_info['rank'] == 0 and global_step < 2:
+                    logger.info("AFTER moving to device:")
+                    for key, value in batch.items():
+                        if isinstance(value, torch.Tensor):
+                            logger.info(f"  {key}: {value.device} (shape: {value.shape})")
+                
+                # Forward pass
+                outputs = model_engine(**batch)
+                loss = outputs.loss
+                
+                # Backward and step
+                model_engine.backward(loss)
+                model_engine.step()
+                
+                # Metrics and logging (only from rank 0)
+                if distributed_info['rank'] == 0 and global_step % 10 == 0:
+                    logger.info(f"✅ Epoch {epoch + 1}, Step {global_step}, Loss: {loss.item():.4f}")
+                    
+                    # Log memory usage periodically
+                    if torch.cuda.is_available() and global_step % 100 == 0:
+                        for i in range(torch.cuda.device_count()):
+                            allocated = torch.cuda.memory_allocated(i) / (1024**3)
+                            logger.info(f"GPU {i} memory at step {global_step}: {allocated:.2f} GB")
+                
+                # Callback for metrics (only from rank 0)
+                if distributed_info['rank'] == 0:
                     metrics_callback.on_step_end(global_step, loss.item(), model_engine, mock_args)
-            
-            global_step += 1
+                
+                global_step += 1
+                
+            except torch.cuda.OutOfMemoryError as e:
+                logger.error(f"CUDA OOM at step {global_step} on rank {distributed_info['rank']}: {e}")
+                torch.cuda.empty_cache()
+                raise
+            except RuntimeError as e:
+                if "device" in str(e).lower():
+                    logger.error(f"Device error at step {global_step}: {e}")
+                    logger.error(f"Current device: {device}")
+                    if hasattr(model_engine, 'module'):
+                        model_device = next(model_engine.module.parameters()).device
+                    else:
+                        model_device = next(model_engine.parameters()).device
+                    logger.error(f"Model device: {model_device}")
+                    for key, value in batch.items():
+                        if isinstance(value, torch.Tensor):
+                            logger.error(f"Batch '{key}' device: {value.device}")
+                raise
         
         # Check if we should stop after epoch
         if args.max_steps and global_step >= args.max_steps:
             break
     
-    logger.info(f"✅ Training completed! Total steps: {global_step}")
+    if distributed_info['rank'] == 0:
+        logger.info(f"✅ Training completed! Total steps: {global_step}")
+    
     return model_engine, global_step
 
 def main():
@@ -577,43 +619,39 @@ def main():
         logger.error(f"This script only supports 'train' command, got: {args.command}")
         return
     
+    # Set memory management environment variables
+    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:512'
+    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+    
+    # Setup distributed training
+    distributed_info = setup_distributed_training()
+    
     set_seed(args.seed)
     
-    # Setup distributed training first
-    distributed_success = setup_distributed()
-    
-    # Get rank info
-    local_rank = int(os.environ.get('LOCAL_RANK', '0'))
-    global_rank = dist.get_rank() if dist.is_initialized() else 0
-    world_size = dist.get_world_size() if dist.is_initialized() else 1
-    
-    logger.info(f"🚀 Starting SageMaker DeepSpeed training on {args.instance_type}")
-    logger.info(f"Local rank: {local_rank}, Global rank: {global_rank}, World size: {world_size}")
-    logger.info(f"Distributed training: {'✅ Success' if distributed_success else '❌ Failed, using single GPU'}")
-    logger.info(f"Dataset path: {args.train}")
-    logger.info(f"Number of GPUs: {args.num_gpus}")
-    logger.info(f"Current host: {args.current_host}")
-    logger.info(f"Max sequence length: {args.max_seq_length}")
+    logger.info(f"🚀 Starting SageMaker training on {args.instance_type}")
+    logger.info(f"📁 Dataset path: {args.train}")
+    logger.info(f"🔧 Number of GPUs: {args.num_gpus}")
+    logger.info(f"🖥️  Current host: {args.current_host}")
+    logger.info(f"💾 CUDA memory management: max_split_size_mb=512")
+    logger.info(f"🌐 Distributed training: {distributed_info}")
     
     # Load instance-specific configuration
     instance_config = load_instance_config(args.instance_type)
-    logger.info(f"Instance config: {instance_config}")
+    logger.info(f"⚙️  Instance config: {instance_config}")
     
     # Setup W&B (only on rank 0)
-    run_name = setup_wandb(args, instance_config)
+    run_name = setup_wandb(args, instance_config, distributed_info)
     
     # Load tokenizer
-    logger.info(f"Loading tokenizer: {args.model_name}")
-    tokenizer = AutoTokenizer.from_pretrained(
-        args.model_name, 
-        trust_remote_code=True,
-        use_fast=True
-    )
+    logger.info(f"🔤 Loading tokenizer: {args.model_name}")
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    # Load model with memory optimizations
-    logger.info(f"Loading model: {args.model_name}")
+    # Load model with optimized settings for large models
+    logger.info(f"🤖 Loading model: {args.model_name}")
+    
+    # DO NOT move model to GPU manually - let DeepSpeed handle it
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
         torch_dtype=torch.float16,
@@ -623,12 +661,13 @@ def main():
         device_map=None  # Let DeepSpeed handle device placement
     )
     
-    # Enable gradient checkpointing
-    model.gradient_checkpointing_enable()
+    logger.info(f"📱 Model loaded on CPU. Available GPUs: {torch.cuda.device_count()}")
     
-    logger.info(f"Model loaded. Parameter count: {model.num_parameters():,}")
-
-    # Load dataset (each rank loads independently)
+    # Enable gradient checkpointing for memory efficiency
+    model.gradient_checkpointing_enable()
+    logger.info("✅ Gradient checkpointing enabled")
+    
+    # Load and prepare dataset
     tokenized_dataset = load_and_prepare_dataset(
         data_path=args.train,
         tokenizer=tokenizer, 
@@ -648,21 +687,21 @@ def main():
     training_successful = False
 
     try:
-        # DeepSpeed training
-        model_engine, total_steps = deepspeed_training(
+        # Manual DeepSpeed training with device handling
+        logger.info("🎯 Starting training with all optimizations applied")
+        model_engine, total_steps = manual_deepspeed_training(
             model=model,
             tokenized_dataset=tokenized_dataset,
             tokenizer=tokenizer,
             args=args,
             instance_config=instance_config,
-            metrics_callback=metrics_callback
+            metrics_callback=metrics_callback,
+            distributed_info=distributed_info
         )
         training_successful = True
         
     except Exception as e:
-        logger.error(f"Training failed: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"❌ Training failed: {e}")
         training_successful = False
         
         # Log failure to W&B
@@ -674,22 +713,22 @@ def main():
         end_time = time.time()
         total_time = end_time - start_time
         
-        # Log final metrics (only on rank 0)
-        if global_rank == 0 and run_name:
+        # Log final metrics (only from rank 0)
+        if distributed_info['rank'] == 0:
             final_metrics = {
                 "training/total_time_seconds": total_time,
                 "training/total_time_hours": total_time / 3600,
                 "training/training_successful": training_successful,
-                "training/cost_estimate": instance_config.get('estimated_hourly_cost', 40.96) * (total_time / 3600),
-                "training/world_size": world_size
+                "training/cost_estimate": instance_config.get('estimated_hourly_cost', 32.77) * (total_time / 3600)
             }
-            wandb.log(final_metrics)
+            if run_name:  # Only if W&B was initialized
+                wandb.log(final_metrics)
             
-            logger.info(f"Training completed in {total_time/3600:.2f} hours")
+            logger.info(f"⏱️  Training completed in {total_time/3600:.2f} hours")
     
-    # Save model (only on rank 0)
-    if training_successful and global_rank == 0:
-        logger.info(f"Saving model to {args.model_dir}")
+    # Save model (only from rank 0)
+    if training_successful and distributed_info['rank'] == 0:
+        logger.info(f"💾 Saving model to {args.model_dir}")
         
         # Save the underlying model (not the DeepSpeed engine)
         if hasattr(model_engine, 'module'):
@@ -713,21 +752,15 @@ def main():
                 "estimated_cost": instance_config.get('estimated_hourly_cost', 40.96) * (total_time / 3600),
                 "training_successful": training_successful,
                 "total_steps": total_steps,
-                "world_size": world_size,
-                "distributed_training": distributed_success
+                "distributed_info": distributed_info
             }, f, indent=2)
         
-        logger.info(f"Training metrics saved to {metrics_file}")
+        logger.info(f"📊 Training metrics saved to {metrics_file}")
     
-    # Wait for all processes to complete
-    if dist.is_initialized():
-        dist.barrier()
-    
-    # Finish W&B run (only on rank 0)
-    if global_rank == 0 and run_name:
+    # Finish W&B run (only from rank 0)
+    if distributed_info['rank'] == 0 and run_name:
         wandb.finish()
-    
-    logger.info("🎯 Training completed successfully!")
+        logger.info("🎉 Training completed successfully!")
 
 if __name__ == "__main__":
     main()
