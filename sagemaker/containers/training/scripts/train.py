@@ -563,8 +563,8 @@ def manual_deepspeed_training(model, tokenized_dataset, tokenizer, args, instanc
                 
                 # Forward pass
                 outputs = model_engine(**batch)
-                loss = outputs.loss
-                
+                loss = outputs.loss / mock_args.gradient_accumulation_steps              
+
                 # Backward and step
                 model_engine.backward(loss)
                 model_engine.step()
@@ -676,7 +676,7 @@ def main():
     
     # Initialize metrics callback (only on rank 0)
     metrics_callback = None
-    if global_rank == 0:
+    if distributed_info['rank'] == 0:
         metrics_callback = SageMakerMetricsCallback(
             instance_type=args.instance_type,
             max_seq_length=args.max_seq_length
@@ -705,7 +705,7 @@ def main():
         training_successful = False
         
         # Log failure to W&B
-        if global_rank == 0 and run_name:
+        if distributed_info['rank'] == 0 and run_name:
             wandb.log({"training/training_failed": True, "training/error": str(e)})
         raise
     
