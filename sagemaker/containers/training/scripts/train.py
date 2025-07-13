@@ -1,27 +1,30 @@
 #!/usr/bin/env python3
 """
 SageMaker Training Script for Qwen Hebrew Fine-tuning
-Optimized DataParallel with Heavy Memory Optimizations
+AWS Optimized version with DeepSpeed and proper multi-GPU setup
+Based on Amazon Q recommendations
 """
 
 import os
 import json
 import argparse
 import torch
+import torch.distributed as dist
 import wandb
 import time
 import logging
+import signal
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     DataCollatorForLanguageModeling,
-    set_seed,
-    AutoConfig
+    set_seed
 )
-from datasets import load_dataset
-from datetime import datetime
+from datasets import load_from_disk, load_dataset
+import deepspeed
+from datetime import datetime, timedelta
 from torch.utils.data import DataLoader
-import gc
+from torch.utils.data.distributed import DistributedSampler
 
 # Setup logging
 logging.basicConfig(
@@ -30,186 +33,392 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+class SageMakerMetricsCallback:
+    """Custom callback for SageMaker metrics collection and W&B logging."""
+    
+    def __init__(self, instance_type, max_seq_length=512):
+        self.instance_type = instance_type
+        self.max_seq_length = max_seq_length
+        self.total_tokens = 0
+        self.steps = 0
+        self.start_time = time.time()
+        self.step_times = []
+        
+    def on_step_end(self, step, loss, model_engine, args):
+        """Track performance metrics for each step."""
+        current_time = time.time()
+        step_time = current_time - getattr(self, 'last_step_time', current_time)
+        self.last_step_time = current_time
+        self.step_times.append(step_time)
+        
+        # Calculate tokens processed in this step
+        total_batch_size = args.per_device_train_batch_size * args.world_size
+        if args.gradient_accumulation_steps > 0:
+            total_batch_size *= args.gradient_accumulation_steps
+            
+        step_tokens = total_batch_size * self.max_seq_length
+        self.total_tokens += step_tokens
+        self.steps += 1
+        
+        # Calculate throughput
+        if len(self.step_times) > 0:
+            avg_step_time = sum(self.step_times[-10:]) / min(len(self.step_times), 10)
+            tokens_per_second = step_tokens / avg_step_time if avg_step_time > 0 else 0
+        else:
+            tokens_per_second = 0
+        
+        # Log metrics to W&B
+        metrics = {
+            "training/tokens": self.total_tokens,
+            "training/step_num": self.steps,
+            "training/tokens_per_second": tokens_per_second,
+            "training/step_time": step_time,
+            "training/instance_type": self.instance_type,
+            "training/global_step": step,
+            "training/loss": loss
+        }
+        
+        # Add GPU metrics if available
+        if torch.cuda.is_available():
+            for i in range(torch.cuda.device_count()):
+                metrics[f"gpu_{i}/memory_allocated_gb"] = torch.cuda.memory_allocated(i) / (1024**3)
+                metrics[f"gpu_{i}/memory_reserved_gb"] = torch.cuda.memory_reserved(i) / (1024**3)
+        
+        wandb.log(metrics, step=step)
+
 def parse_args():
-    parser = argparse.ArgumentParser(description="SageMaker Qwen Hebrew Fine-tuning - Optimized DataParallel")
+    parser = argparse.ArgumentParser(description="SageMaker Qwen Hebrew Fine-tuning")
     
-    parser.add_argument('command', choices=['train'], help='Command to run')
+    parser.add_argument('command', choices=['train', 'serve'], help='Command to run (train or serve)')
     
-    # SageMaker paths
+    # SageMaker specific arguments
     parser.add_argument('--model-dir', type=str, default=os.environ.get('SM_MODEL_DIR', '/opt/ml/model'))
-    parser.add_argument('--train', type=str, default=os.environ.get('SM_CHANNEL_TRAINING', '/opt/ml/input/data/training'))
-    parser.add_argument('--output-data-dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', '/opt/ml/output/data'))
     
-    # Instance info
+    train_channel = os.environ.get('SM_CHANNEL_TRAINING', '/opt/ml/input/data/training')
+    if train_channel and not train_channel.startswith('/'):
+        train_path = f'/opt/ml/input/data/{train_channel}'
+    else:
+        train_path = train_channel
+    
+    parser.add_argument('--train', type=str, default=train_path)
+    parser.add_argument('--output-data-dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', '/opt/ml/output/data'))
     parser.add_argument('--num-gpus', type=int, default=int(os.environ.get('SM_NUM_GPUS', '8')))
+    parser.add_argument('--current-host', type=str, default=os.environ.get('SM_CURRENT_HOST', 'algo-1'))
+    parser.add_argument('--hosts', type=str, default=os.environ.get('SM_HOSTS', '["algo-1"]'))
+    
+    # Instance type detection
     parser.add_argument('--instance-type', type=str, default=os.environ.get('SM_CURRENT_INSTANCE_TYPE', 'ml.p4de.24xlarge'))
     
-    # Training parameters
+    # Training arguments
     parser.add_argument('--model-name', type=str, default='Qwen/Qwen3-30B-A3B-Base')
     parser.add_argument('--epochs', type=int, default=3)
-    parser.add_argument('--max-steps', type=int, default=1000)
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--max-seq-length', type=int, default=512)  # Reduced for memory efficiency
     
-    # AGGRESSIVE memory optimization - TESTED VALUES
-    parser.add_argument('--max-seq-length', type=int, default=512)  # Tested and works
-    parser.add_argument('--gradient-accumulation-steps', type=int, default=64)  # Tested and works
-    parser.add_argument('--batch-size', type=int, default=1)  # Minimal for memory
-    
-    parser.add_argument('--learning-rate', type=float, default=1e-5)
-    parser.add_argument('--weight-decay', type=float, default=0.01)
-    parser.add_argument('--warmup-steps', type=int, default=100)
-    
-    # Memory management - TESTED CONFIGURATION
-    parser.add_argument('--cpu-offload', action='store_true', default=True, help='Offload optimizer to CPU - TESTED')
-    parser.add_argument('--mixed-precision', action='store_true', default=False, help='Use mixed precision - DISABLED (conflicts with CPU offload)')
-    
-    # W&B
-    parser.add_argument('--wandb-project', type=str, default='qwen-hebrew-optimized')
+    # W&B arguments
+    parser.add_argument('--wandb-project', type=str, default='qwen-hebrew-deepspeed')
+    parser.add_argument('--wandb-entity', type=str, default=None)
     parser.add_argument('--wandb-run-name', type=str, default=None)
+    
+    # Performance testing
+    parser.add_argument('--benchmark-mode', action='store_true', help='Run in benchmark mode with performance metrics')
+    parser.add_argument('--max-steps', type=int, default=1000, help='Maximum training steps')
     
     return parser.parse_args()
 
-def setup_wandb(args):
-    """Setup W&B logging"""
-    run_name = args.wandb_run_name or f"optimized-{args.instance_type}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+def load_instance_config(instance_type):
+    """Load instance-specific configuration with memory optimizations"""
+    
+    default_configs = {
+        'ml.p4d.24xlarge': {
+            "batch_size_per_gpu": 1,
+            "gradient_accumulation_steps": 32,
+            "gpu_count": 8,
+            "gpu_type": "A100",
+            "gpu_memory": "40GB",
+            "estimated_hourly_cost": 32.77
+        },
+        'ml.p4de.24xlarge': {
+            "batch_size_per_gpu": 1,
+            "gradient_accumulation_steps": 16,  # Conservative for 30B model
+            "gpu_count": 8,
+            "gpu_type": "A100",
+            "gpu_memory": "80GB",
+            "estimated_hourly_cost": 40.96
+        },
+        'ml.p5.48xlarge': {
+            "batch_size_per_gpu": 1,
+            "gradient_accumulation_steps": 8,
+            "gpu_count": 8,
+            "gpu_type": "H100",
+            "gpu_memory": "80GB",
+            "estimated_hourly_cost": 98.32
+        }
+    }
+    
+    if instance_type in default_configs:
+        logger.info(f"Using built-in configuration for {instance_type}")
+        return default_configs[instance_type]
+    else:
+        logger.warning(f"Unknown instance type {instance_type}, using default P4de config")
+        return default_configs['ml.p4de.24xlarge']
+
+def create_deepspeed_config(instance_config):
+    """Create DeepSpeed configuration optimized for 30B model"""
+    config = {
+        "fp16": {
+            "enabled": True,
+            "loss_scale": 0,
+            "loss_scale_window": 1000,
+            "initial_scale_power": 16,
+            "hysteresis": 2,
+            "min_loss_scale": 1
+        },
+        "zero_optimization": {
+            "stage": 3,  # Stage 3 for large models like 30B
+            "offload_optimizer": {
+                "device": "cpu",
+                "pin_memory": True
+            },
+            "offload_param": {
+                "device": "cpu",
+                "pin_memory": True
+            },
+            "overlap_comm": True,
+            "contiguous_gradients": True,
+            "sub_group_size": 1e9,
+            "reduce_bucket_size": "auto",
+            "stage3_prefetch_bucket_size": "auto",
+            "stage3_param_persistence_threshold": "auto",
+            "stage3_max_live_parameters": 1e9,
+            "stage3_max_reuse_distance": 1e9,
+            "stage3_gather_16bit_weights_on_model_save": True
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "params": {
+                "lr": 1e-5,
+                "betas": [0.9, 0.999],
+                "eps": 1e-8,
+                "weight_decay": 0.01
+            }
+        },
+        "scheduler": {
+            "type": "WarmupLR",
+            "params": {
+                "warmup_min_lr": 0,
+                "warmup_max_lr": 1e-5,
+                "warmup_num_steps": 100
+            }
+        },
+        "train_micro_batch_size_per_gpu": instance_config.get("batch_size_per_gpu", 1),
+        "gradient_accumulation_steps": instance_config.get("gradient_accumulation_steps", 16),
+        "gradient_clipping": 1.0,
+        "steps_per_print": 10,
+        "wall_clock_breakdown": False,  # Disable for performance
+        "dump_state": False
+    }
+    
+    # Save the config
+    os.makedirs("/tmp", exist_ok=True)
+    config_path = "/tmp/deepspeed_config.json"
+    with open(config_path, 'w') as f:
+        json.dump(config, f, indent=2)
+    
+    return config_path, config
+
+def setup_distributed():
+    """Setup distributed training properly for SageMaker"""
+    
+    if dist.is_initialized():
+        logger.info("Distributed training already initialized")
+        return True
+    
+    local_rank = int(os.environ.get('LOCAL_RANK', '0'))
+    
+    # SageMaker environment
+    if 'SM_HOSTS' in os.environ:
+        hosts = json.loads(os.environ['SM_HOSTS'])
+        current_host = os.environ['SM_CURRENT_HOST']
+        host_rank = hosts.index(current_host)
+        num_gpus = int(os.environ.get('SM_NUM_GPUS', '8'))
+        
+        # Single node setup (typical for SageMaker)
+        master_addr = "127.0.0.1"
+        master_port = "29500"
+        world_size = num_gpus
+        rank = local_rank
+        
+        # Multi-node setup (if multiple hosts)
+        if len(hosts) > 1:
+            master_addr = hosts[0]
+            world_size = len(hosts) * num_gpus
+            rank = host_rank * num_gpus + local_rank
+    else:
+        # Fallback for local development
+        master_addr = "127.0.0.1"
+        master_port = "29500"
+        world_size = torch.cuda.device_count() if torch.cuda.is_available() else 1
+        rank = local_rank
+    
+    # Set environment variables
+    os.environ['MASTER_ADDR'] = master_addr
+    os.environ['MASTER_PORT'] = master_port
+    os.environ['WORLD_SIZE'] = str(world_size)
+    os.environ['RANK'] = str(rank)
+    os.environ['LOCAL_RANK'] = str(local_rank)
+    
+    # NCCL settings for better performance
+    os.environ['NCCL_TIMEOUT'] = '1800'  # 30 minutes
+    os.environ['NCCL_DEBUG'] = 'WARN'
+    
+    logger.info(f"Distributed setup:")
+    logger.info(f"  MASTER_ADDR: {master_addr}")
+    logger.info(f"  MASTER_PORT: {master_port}")
+    logger.info(f"  WORLD_SIZE: {world_size}")
+    logger.info(f"  RANK: {rank}")
+    logger.info(f"  LOCAL_RANK: {local_rank}")
+    
+    # Set CUDA device
+    if torch.cuda.is_available():
+        torch.cuda.set_device(local_rank)
+        logger.info(f"Set CUDA device to: {local_rank}")
+    
+    # Initialize distributed training
+    try:
+        logger.info("Initializing distributed training...")
+        
+        dist.init_process_group(
+            backend='nccl',
+            init_method=f'tcp://{master_addr}:{master_port}',
+            world_size=world_size,
+            rank=rank,
+            timeout=timedelta(seconds=1800)  # 30 minutes timeout
+        )
+        
+        logger.info(f"✅ Distributed training initialized successfully")
+        logger.info(f"  World size: {dist.get_world_size()}")
+        logger.info(f"  Rank: {dist.get_rank()}")
+        
+        return True
+        
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to initialize distributed training: {e}")
+        logger.warning("Falling back to single GPU training...")
+        return False
+
+def setup_wandb(args, instance_config):
+    """Initialize Weights & Biases with comprehensive configuration"""
+    # Only initialize W&B on rank 0
+    if dist.is_initialized() and dist.get_rank() != 0:
+        return None
+    
+    if not dist.is_initialized() and int(os.environ.get('LOCAL_RANK', '0')) != 0:
+        return None
+    
+    run_name = args.wandb_run_name or f"qwen-deepspeed-{args.instance_type}-{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    
+    # Calculate estimated cost
+    hourly_cost = instance_config.get('estimated_hourly_cost', 40.96)
+    estimated_total_cost = hourly_cost * args.epochs * 8
     
     wandb.init(
         project=args.wandb_project,
+        entity=args.wandb_entity,
         name=run_name,
         config={
+            # Instance information
             "instance_type": args.instance_type,
+            "gpu_count": instance_config.get("gpu_count", 8),
+            "gpu_type": instance_config.get("gpu_type", "A100"),
+            "gpu_memory": instance_config.get("gpu_memory", "80GB"),
+            "estimated_hourly_cost": hourly_cost,
+            "estimated_total_cost": estimated_total_cost,
+            
+            # Training configuration
             "model_name": args.model_name,
             "epochs": args.epochs,
             "max_seq_length": args.max_seq_length,
-            "gradient_accumulation_steps": args.gradient_accumulation_steps,
-            "learning_rate": args.learning_rate,
-            "batch_size": args.batch_size,
-            "approach": "optimized_dataparallel",
+            "seed": args.seed,
+            "batch_size_per_gpu": instance_config.get("batch_size_per_gpu", 1),
+            "gradient_accumulation_steps": instance_config.get("gradient_accumulation_steps", 16),
+            
+            # DeepSpeed configuration
+            "deepspeed_stage": 3,
+            "cpu_offload": True,
+            
+            # Distributed training info
+            "world_size": dist.get_world_size() if dist.is_initialized() else 1,
+            "distributed_training": dist.is_initialized(),
+            
+            # SageMaker information
+            "sagemaker_job": True,
+            "current_host": args.current_host,
             "num_gpus": args.num_gpus,
-            "cpu_offload": args.cpu_offload,
-            "mixed_precision": args.mixed_precision
+            "benchmark_mode": args.benchmark_mode,
+            
+            # Timestamp
+            "start_time": datetime.now().isoformat()
         }
     )
     
-    logger.info(f"W&B initialized: {run_name}")
+    logger.info(f"Initialized W&B run: {run_name}")
     return run_name
 
-def aggressive_memory_cleanup():
-    """Aggressive memory cleanup"""
-    if torch.cuda.is_available():
-        try:
-            torch.cuda.init()
-            torch.cuda.empty_cache()
-            torch.cuda.ipc_collect()
-            for i in range(torch.cuda.device_count()):
-                torch.cuda.reset_peak_memory_stats(i)
-        except Exception as e:
-            logger.warning(f"Memory cleanup warning: {e}")
-    gc.collect()
-
-def load_model_optimized(model_name, num_gpus, cpu_offload=True, mixed_precision=True):
-    """Load model with maximum memory optimization"""
-    logger.info(f"Loading model with aggressive optimization: {model_name}")
-    
-    # Check CUDA
-    if not torch.cuda.is_available():
-        raise RuntimeError("CUDA is not available")
-    
-    torch.cuda.init()
-    logger.info(f"CUDA initialized with {torch.cuda.device_count()} GPUs")
-    
-    # Set memory management
-    if mixed_precision:
-        torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.allow_tf32 = True
-        torch.backends.cuda.matmul.allow_tf32 = True
-        logger.info("✅ Mixed precision optimizations enabled")
-    
-    # Clean memory aggressively
-    aggressive_memory_cleanup()
-    
-    # Load tokenizer
-    logger.info("Loading tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    logger.info("✅ Tokenizer loaded")
-    
-    # Load model with maximum optimization
-    logger.info("Loading model on CPU with maximum optimization...")
-    start_time = time.time()
-    
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype=torch.float16,
-        trust_remote_code=True,
-        use_cache=False,
-        low_cpu_mem_usage=True,
-        device_map=None,  # Keep on CPU initially
-        # attn_implementation="flash_attention_2" if hasattr(torch.nn, 'MultiheadAttention') else None  # REMOVED - causes import error
-    )
-    
-    load_time = time.time() - start_time
-    logger.info(f"✅ Model loaded on CPU in {load_time:.1f}s")
-    logger.info(f"Model parameters: {model.num_parameters():,}")
-    
-    # Enable ALL memory optimizations
-    if hasattr(model, 'gradient_checkpointing_enable'):
-        model.gradient_checkpointing_enable()
-        logger.info("✅ Gradient checkpointing enabled")
-    
-    # Move to GPU with memory monitoring
-    logger.info("Moving model to GPU with memory monitoring...")
-    
-    # Set memory fraction to prevent OOM
-    for i in range(num_gpus):
-        torch.cuda.set_per_process_memory_fraction(0.85, device=i)  # Use only 85% per GPU
-    
-    # Move to primary GPU
-    model = model.cuda(0)
-    
-    # Check memory after model load
-    gpu0_memory = torch.cuda.memory_allocated(0) / 1024**3
-    gpu0_total = torch.cuda.get_device_properties(0).total_memory / 1024**3
-    logger.info(f"GPU 0 memory after model load: {gpu0_memory:.1f}GB / {gpu0_total:.1f}GB")
-    
-    # Only use DataParallel if model fits and we have multiple GPUs
-    if num_gpus > 1 and gpu0_memory < (gpu0_total * 0.5):  # Only if model uses <50% of GPU
-        logger.info(f"Model fits in memory, enabling DataParallel for {num_gpus} GPUs...")
-        model = torch.nn.DataParallel(model)
-        logger.info("✅ DataParallel enabled")
-        
-        # Check memory distribution
-        for i in range(num_gpus):
-            allocated = torch.cuda.memory_allocated(i) / 1024**3
-            total = torch.cuda.get_device_properties(i).total_memory / 1024**3
-            if i == 0 or allocated > 0.1:
-                logger.info(f"GPU {i}: {allocated:.1f}GB / {total:.1f}GB")
-    else:
-        logger.warning(f"Model too large for DataParallel, using single GPU")
-        logger.warning(f"Model uses {gpu0_memory:.1f}GB / {gpu0_total:.1f}GB ({gpu0_memory/gpu0_total*100:.1f}%)")
-    
-    return model, tokenizer
-
-def load_dataset_optimized(data_path, tokenizer, max_seq_length):
-    """Load dataset with memory optimization"""
+def load_and_prepare_dataset(data_path, tokenizer, max_seq_length):
+    """Load and prepare dataset for training"""
     logger.info(f"Loading dataset from {data_path}")
     
     if not os.path.exists(data_path):
-        raise FileNotFoundError(f"Dataset path not found: {data_path}")
+        logger.error(f"Dataset path does not exist: {data_path}")
+        alternative_paths = [
+            '/opt/ml/input/data/training',
+            '/opt/ml/input/data/train',
+            '/opt/ml/input/data/'
+        ]
+        
+        for alt_path in alternative_paths:
+            if os.path.exists(alt_path):
+                logger.info(f"Found alternative path: {alt_path}")
+                data_path = alt_path
+                break
+        else:
+            raise FileNotFoundError(f"No valid dataset path found. Tried: {[data_path] + alternative_paths}")
     
-    files = os.listdir(data_path)
-    json_files = [f for f in files if f.endswith('.json') or f.endswith('.jsonl')]
+    try:
+        files = os.listdir(data_path)
+        logger.info(f"Files in {data_path}: {files[:10]}")
+    except Exception as e:
+        logger.warning(f"Could not list files in {data_path}: {e}")
     
-    if not json_files:
-        raise ValueError("No JSON files found in dataset path")
+    try:
+        # Try loading as a saved dataset first
+        if os.path.exists(os.path.join(data_path, 'dataset_info.json')):
+            dataset = load_from_disk(data_path)
+            logger.info("Loaded dataset from disk (Hugging Face format)")
+        else:
+            files = os.listdir(data_path)
+            json_files = [f for f in files if f.endswith('.json') or f.endswith('.jsonl')]
+            parquet_files = [f for f in files if f.endswith('.parquet')]
+            
+            if json_files:
+                logger.info(f"Found JSON files: {json_files[:5]}")
+                json_path = os.path.join(data_path, "*.json*")
+                dataset = load_dataset("json", data_files=json_path)
+                logger.info("Loaded dataset from JSON files")
+            elif parquet_files:
+                logger.info(f"Found Parquet files: {parquet_files[:5]}")
+                parquet_path = os.path.join(data_path, "*.parquet")
+                dataset = load_dataset("parquet", data_files=parquet_path)
+                logger.info("Loaded dataset from Parquet files")
+            else:
+                raise ValueError(f"No supported dataset files found in {data_path}. Files: {files}")
+                
+    except Exception as e:
+        logger.error(f"Failed to load dataset: {e}")
+        raise
     
-    logger.info(f"Found {len(json_files)} JSON files")
-    
-    json_path = os.path.join(data_path, "*.json*")
-    dataset = load_dataset("json", data_files=json_path)['train']
-    logger.info(f"Dataset loaded: {len(dataset)} samples")
-    
+    # Tokenization function
     def tokenize_function(examples):
         return tokenizer(
             examples["text"],
@@ -219,252 +428,235 @@ def load_dataset_optimized(data_path, tokenizer, max_seq_length):
             return_tensors="pt"
         )
     
+    # Tokenize dataset
     logger.info("Tokenizing dataset...")
-    tokenized_dataset = dataset.map(
+    
+    if isinstance(dataset, dict) and "train" in dataset:
+        train_dataset = dataset["train"]
+    else:
+        train_dataset = dataset
+    
+    # Process in smaller chunks to save memory
+    tokenized_dataset = train_dataset.map(
         tokenize_function,
         batched=True,
-        batch_size=50,  # Smaller batch for memory
-        num_proc=2,     # Fewer processes
-        remove_columns=dataset.column_names,
-        desc="Tokenizing"
+        batch_size=100,
+        num_proc=4,
+        remove_columns=train_dataset.column_names
     )
     
-    logger.info(f"✅ Dataset tokenized: {len(tokenized_dataset)} samples")
+    logger.info(f"Dataset tokenized. Train samples: {len(tokenized_dataset)}")
     return tokenized_dataset
 
-class CPUOffloadOptimizer:
-    """Optimizer that offloads states to CPU"""
-    def __init__(self, optimizer, model):
-        self.optimizer = optimizer
-        self.model = model
-        self.cpu_states = {}
-        
-    def step(self):
-        # Move optimizer states to GPU temporarily
-        for group in self.optimizer.param_groups:
-            for p in group['params']:
-                if p.grad is not None:
-                    param_state = self.optimizer.state[p]
-                    for key, value in param_state.items():
-                        if isinstance(value, torch.Tensor) and value.device.type == 'cpu':
-                            param_state[key] = value.cuda(p.device)
-        
-        # Step optimizer
-        self.optimizer.step()
-        
-        # Move states back to CPU
-        for group in self.optimizer.param_groups:
-            for p in group['params']:
-                param_state = self.optimizer.state[p]
-                for key, value in param_state.items():
-                    if isinstance(value, torch.Tensor) and value.device.type == 'cuda':
-                        param_state[key] = value.cpu()
+def deepspeed_training(model, tokenized_dataset, tokenizer, args, instance_config, metrics_callback):
+    """DeepSpeed training loop with proper multi-GPU support"""
     
-    def zero_grad(self):
-        self.optimizer.zero_grad()
-
-def training_loop(model, tokenizer, dataset, args):
-    """Optimized training loop with aggressive memory management"""
-    logger.info("=== Starting Optimized Training ===")
+    logger.info("=== Starting DeepSpeed Training ===")
     
-    # Setup data loading with minimal memory usage
-    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
-    dataloader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        collate_fn=data_collator,
-        shuffle=True,
-        num_workers=0,
-        pin_memory=False
+    # Create DeepSpeed config
+    deepspeed_config_path, ds_config = create_deepspeed_config(instance_config)
+    logger.info(f"DeepSpeed config created with ZeRO Stage 3 + CPU offload")
+    
+    # Initialize DeepSpeed
+    try:
+        model_engine, optimizer, _, lr_scheduler = deepspeed.initialize(
+            model=model,
+            config=ds_config,
+            dist_init_required=False  # We already initialized distributed
+        )
+        logger.info(f"✅ DeepSpeed engine created successfully")
+        logger.info(f"Model device: {next(model_engine.parameters()).device}")
+        logger.info(f"DeepSpeed world size: {model_engine.world_size}")
+        logger.info(f"DeepSpeed local rank: {model_engine.local_rank}")
+        
+    except Exception as e:
+        logger.error(f"❌ DeepSpeed initialization failed: {e}")
+        raise
+    
+    # Create data collator and dataloader
+    data_collator = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer,
+        mlm=False
     )
     
-    # Setup optimizer with CPU offloading
-    base_optimizer = torch.optim.AdamW(
-        model.parameters(), 
-        lr=args.learning_rate, 
-        weight_decay=args.weight_decay
-    )
-    
-    if args.cpu_offload:
-        optimizer = CPUOffloadOptimizer(base_optimizer, model)
-        logger.info("✅ Optimizer with CPU offloading enabled")
+    # Use DistributedSampler for multi-GPU
+    if model_engine.world_size > 1:
+        sampler = DistributedSampler(
+            tokenized_dataset,
+            num_replicas=model_engine.world_size,
+            rank=model_engine.global_rank,
+            shuffle=True
+        )
+        logger.info(f"Using DistributedSampler with {model_engine.world_size} replicas")
     else:
-        optimizer = base_optimizer
-        logger.info("✅ Standard optimizer")
+        sampler = None
+        logger.info("Using regular DataLoader (single GPU)")
     
-    # Enable autocast for mixed precision  
-    # scaler = torch.cuda.amp.GradScaler() if args.mixed_precision else None
-    # Disabled mixed precision for now due to FP16 + CPU offload conflicts
+    dataloader = DataLoader(
+        tokenized_dataset,
+        batch_size=instance_config.get("batch_size_per_gpu", 1),
+        collate_fn=data_collator,
+        sampler=sampler,
+        shuffle=(sampler is None),
+        num_workers=2,
+        pin_memory=True
+    )
     
-    model.train()
+    logger.info(f"DataLoader created with {len(dataloader)} batches")
     
-    logger.info(f"Training configuration:")
-    logger.info(f"  Model: {args.model_name}")
-    logger.info(f"  Approach: Optimized DataParallel")
-    logger.info(f"  GPUs: {args.num_gpus}")
-    logger.info(f"  Batch size: {args.batch_size}")
-    logger.info(f"  Gradient accumulation: {args.gradient_accumulation_steps}")
-    logger.info(f"  Sequence length: {args.max_seq_length}")
-    logger.info(f"  Effective batch size: {args.batch_size * args.num_gpus * args.gradient_accumulation_steps}")
-    logger.info(f"  CPU offload: {args.cpu_offload}")
-    logger.info(f"  Mixed precision: {args.mixed_precision}")
-    
+    # Training loop
+    model_engine.train()
     global_step = 0
-    start_time = time.time()
-    total_loss = 0.0
+    
+    # Create mock TrainingArguments for metrics
+    class MockArgs:
+        def __init__(self, instance_config, world_size):
+            self.per_device_train_batch_size = instance_config.get("batch_size_per_gpu", 1)
+            self.gradient_accumulation_steps = instance_config.get("gradient_accumulation_steps", 16)
+            self.world_size = world_size
+    
+    mock_args = MockArgs(instance_config, model_engine.world_size)
+    
+    logger.info(f"Starting training for {args.epochs} epochs...")
+    logger.info(f"World size: {model_engine.world_size}")
+    logger.info(f"Gradient accumulation steps: {mock_args.gradient_accumulation_steps}")
+    logger.info(f"Effective batch size: {mock_args.per_device_train_batch_size * mock_args.world_size * mock_args.gradient_accumulation_steps}")
     
     for epoch in range(args.epochs):
         logger.info(f"=== Epoch {epoch + 1}/{args.epochs} ===")
         
-        accumulated_loss = 0.0
+        # Set epoch for DistributedSampler
+        if sampler is not None:
+            sampler.set_epoch(epoch)
         
-        for batch_idx, batch in enumerate(dataloader):
+        for step, batch in enumerate(dataloader):
+            # Check max_steps
             if args.max_steps and global_step >= args.max_steps:
-                logger.info(f"Reached max_steps: {args.max_steps}")
+                logger.info(f"Reached max_steps ({args.max_steps}), stopping training")
                 break
             
-            try:
-                # Move batch to GPU
-                batch = {k: v.cuda() for k, v in batch.items()}
+            # Move batch to device (DeepSpeed handles this automatically)
+            batch = {k: v.to(model_engine.device) for k, v in batch.items()}
+            
+            # Forward pass
+            outputs = model_engine(**batch)
+            loss = outputs.loss
+            
+            # Backward and step
+            model_engine.backward(loss)
+            model_engine.step()
+            
+            # Metrics and logging (only on rank 0)
+            if (global_step % 10 == 0) and (model_engine.global_rank == 0):
+                logger.info(f"Epoch {epoch + 1}, Step {global_step}, Loss: {loss.item():.4f}")
                 
-                # Forward pass (no mixed precision for now)
-                outputs = model(**batch)
-                loss = outputs.loss / args.gradient_accumulation_steps
-                
-                # Backward pass  
-                loss.backward()
-                
-                accumulated_loss += loss.item()
-                
-                # Optimizer step after accumulation
-                if (batch_idx + 1) % args.gradient_accumulation_steps == 0:
-                    # Check for NaN gradients
-                    total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-                    
-                    if torch.isnan(total_norm) or torch.isinf(total_norm):
-                        logger.warning(f"NaN/Inf gradients detected at step {global_step}, skipping")
-                        optimizer.zero_grad()
-                        continue
-                    
-                    optimizer.step()
-                    optimizer.zero_grad()
-                    
-                    final_loss = accumulated_loss * args.gradient_accumulation_steps
-                    total_loss += final_loss
-                    
-                    # Check for NaN loss
-                    if torch.isnan(torch.tensor(final_loss)):
-                        logger.warning(f"NaN loss detected at step {global_step}")
-                    
-                    # Aggressive memory cleanup every few steps
-                    if global_step % 5 == 0:
-                        torch.cuda.empty_cache()
-                    
-                    # Logging
-                    if global_step % 10 == 0:
-                        elapsed = time.time() - start_time
-                        avg_loss = total_loss / (global_step + 1)
-                        
-                        logger.info(f"Step {global_step}: Loss = {final_loss:.4f}, Avg = {avg_loss:.4f}")
-                        logger.info(f"  Time: {elapsed:.1f}s")
-                        
-                        # Memory monitoring
-                        max_memory = 0
-                        for i in range(args.num_gpus):
-                            allocated = torch.cuda.memory_allocated(i) / 1024**3
-                            if allocated > 0.5:
-                                logger.info(f"  GPU {i}: {allocated:.1f}GB")
-                                max_memory = max(max_memory, allocated)
-                        
-                        # W&B logging
-                        wandb.log({
-                            "training/loss": final_loss,
-                            "training/avg_loss": avg_loss,
-                            "training/step": global_step,
-                            "training/max_gpu_memory": max_memory
-                        }, step=global_step)
-                    
-                    accumulated_loss = 0.0
-                    global_step += 1
-                    
-            except RuntimeError as e:
-                if "out of memory" in str(e):
-                    logger.error(f"CUDA OOM at step {global_step}")
-                    
-                    # Memory analysis
-                    for i in range(args.num_gpus):
+                # Log GPU memory usage
+                if torch.cuda.is_available():
+                    for i in range(torch.cuda.device_count()):
                         allocated = torch.cuda.memory_allocated(i) / 1024**3
-                        reserved = torch.cuda.memory_reserved(i) / 1024**3
-                        total = torch.cuda.get_device_properties(i).total_memory / 1024**3
-                        logger.error(f"GPU {i}: {allocated:.1f}GB alloc, {reserved:.1f}GB reserved, {total:.1f}GB total")
-                    
-                    logger.error("Try these optimizations:")
-                    logger.error("  --max-seq-length 128")
-                    logger.error("  --gradient-accumulation-steps 256")
-                    logger.error("  --cpu-offload")
-                    
-                    # Emergency cleanup
-                    aggressive_memory_cleanup()
-                    raise
-                else:
-                    logger.error(f"Runtime error: {e}")
-                    raise
+                        if allocated > 0.1:
+                            logger.info(f"  GPU {i}: {allocated:.1f}GB")
+                
+                # Callback for metrics
+                if metrics_callback:
+                    metrics_callback.on_step_end(global_step, loss.item(), model_engine, mock_args)
+            
+            global_step += 1
         
+        # Check if we should stop after epoch
         if args.max_steps and global_step >= args.max_steps:
             break
     
-    total_time = time.time() - start_time
-    avg_loss = total_loss / max(global_step, 1)
-    
-    logger.info(f"✅ Training completed!")
-    logger.info(f"  Total time: {total_time:.1f}s ({total_time/3600:.2f}h)")
-    logger.info(f"  Total steps: {global_step}")
-    logger.info(f"  Average loss: {avg_loss:.4f}")
-    
-    return global_step, avg_loss
+    logger.info(f"✅ Training completed! Total steps: {global_step}")
+    return model_engine, global_step
 
 def main():
     args = parse_args()
+    
+    if args.command != 'train':
+        logger.error(f"This script only supports 'train' command, got: {args.command}")
+        return
+    
     set_seed(args.seed)
     
-    logger.info("🚀 Starting Qwen Hebrew Fine-tuning - Optimized Approach")
-    logger.info(f"Instance: {args.instance_type}")
-    logger.info(f"GPUs available: {args.num_gpus}")
-    logger.info(f"Model: {args.model_name}")
-    logger.info(f"Memory optimizations: CPU offload={args.cpu_offload}, Mixed precision={args.mixed_precision}")
+    # Setup distributed training first
+    distributed_success = setup_distributed()
     
-    # Setup W&B
-    run_name = setup_wandb(args)
+    # Get rank info
+    local_rank = int(os.environ.get('LOCAL_RANK', '0'))
+    global_rank = dist.get_rank() if dist.is_initialized() else 0
+    world_size = dist.get_world_size() if dist.is_initialized() else 1
     
-    # Load model with optimizations
-    try:
-        model, tokenizer = load_model_optimized(
-            args.model_name, 
-            args.num_gpus,
-            args.cpu_offload,
-            args.mixed_precision
+    logger.info(f"🚀 Starting SageMaker DeepSpeed training on {args.instance_type}")
+    logger.info(f"Local rank: {local_rank}, Global rank: {global_rank}, World size: {world_size}")
+    logger.info(f"Distributed training: {'✅ Success' if distributed_success else '❌ Failed, using single GPU'}")
+    logger.info(f"Dataset path: {args.train}")
+    logger.info(f"Number of GPUs: {args.num_gpus}")
+    logger.info(f"Current host: {args.current_host}")
+    logger.info(f"Max sequence length: {args.max_seq_length}")
+    
+    # Load instance-specific configuration
+    instance_config = load_instance_config(args.instance_type)
+    logger.info(f"Instance config: {instance_config}")
+    
+    # Setup W&B (only on rank 0)
+    run_name = setup_wandb(args, instance_config)
+    
+    # Load tokenizer
+    logger.info(f"Loading tokenizer: {args.model_name}")
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model_name, 
+        trust_remote_code=True,
+        use_fast=True
+    )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    # Load model with memory optimizations
+    logger.info(f"Loading model: {args.model_name}")
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_name,
+        torch_dtype=torch.float16,
+        trust_remote_code=True,
+        use_cache=False,
+        low_cpu_mem_usage=True,
+        device_map=None  # Let DeepSpeed handle device placement
+    )
+    
+    # Enable gradient checkpointing
+    model.gradient_checkpointing_enable()
+    
+    logger.info(f"Model loaded. Parameter count: {model.num_parameters():,}")
+
+    # Load dataset (each rank loads independently)
+    tokenized_dataset = load_and_prepare_dataset(
+        data_path=args.train,
+        tokenizer=tokenizer, 
+        max_seq_length=args.max_seq_length
+    )
+    
+    # Initialize metrics callback (only on rank 0)
+    metrics_callback = None
+    if global_rank == 0:
+        metrics_callback = SageMakerMetricsCallback(
+            instance_type=args.instance_type,
+            max_seq_length=args.max_seq_length
         )
-        logger.info("✅ Model loaded with optimizations")
-    except Exception as e:
-        logger.error(f"Model loading failed: {e}")
-        wandb.log({"training/model_loading_failed": True})
-        wandb.finish()
-        raise
-    
-    # Load dataset
-    try:
-        tokenized_dataset = load_dataset_optimized(args.train, tokenizer, args.max_seq_length)
-    except Exception as e:
-        logger.error(f"Dataset loading failed: {e}")
-        wandb.log({"training/dataset_loading_failed": True})
-        wandb.finish()
-        raise
     
     # Start training
+    start_time = time.time()
     training_successful = False
-    
+
     try:
-        total_steps, avg_loss = training_loop(model, tokenizer, tokenized_dataset, args)
+        # DeepSpeed training
+        model_engine, total_steps = deepspeed_training(
+            model=model,
+            tokenized_dataset=tokenized_dataset,
+            tokenizer=tokenizer,
+            args=args,
+            instance_config=instance_config,
+            metrics_callback=metrics_callback
+        )
         training_successful = True
         
     except Exception as e:
@@ -473,25 +665,69 @@ def main():
         traceback.print_exc()
         training_successful = False
         
-        wandb.log({
-            "training/training_failed": True,
-            "training/error_message": str(e)
-        })
+        # Log failure to W&B
+        if global_rank == 0 and run_name:
+            wandb.log({"training/training_failed": True, "training/error": str(e)})
         raise
     
-    # Save model if successful
-    if training_successful:
+    finally:
+        end_time = time.time()
+        total_time = end_time - start_time
+        
+        # Log final metrics (only on rank 0)
+        if global_rank == 0 and run_name:
+            final_metrics = {
+                "training/total_time_seconds": total_time,
+                "training/total_time_hours": total_time / 3600,
+                "training/training_successful": training_successful,
+                "training/cost_estimate": instance_config.get('estimated_hourly_cost', 40.96) * (total_time / 3600),
+                "training/world_size": world_size
+            }
+            wandb.log(final_metrics)
+            
+            logger.info(f"Training completed in {total_time/3600:.2f} hours")
+    
+    # Save model (only on rank 0)
+    if training_successful and global_rank == 0:
         logger.info(f"Saving model to {args.model_dir}")
         
-        model_to_save = model.module if hasattr(model, 'module') else model
+        # Save the underlying model (not the DeepSpeed engine)
+        if hasattr(model_engine, 'module'):
+            model_to_save = model_engine.module
+        else:
+            model_to_save = model_engine
+            
         model_to_save.save_pretrained(args.model_dir)
         tokenizer.save_pretrained(args.model_dir)
+        
+        # Save training metrics
+        metrics_file = os.path.join(args.output_data_dir, "training_metrics.json")
+        os.makedirs(args.output_data_dir, exist_ok=True)
+        
+        with open(metrics_file, 'w') as f:
+            json.dump({
+                "instance_type": args.instance_type,
+                "total_time_hours": total_time / 3600,
+                "total_tokens": metrics_callback.total_tokens if metrics_callback else 0,
+                "avg_tokens_per_second": (metrics_callback.total_tokens / total_time) if metrics_callback and total_time > 0 else 0,
+                "estimated_cost": instance_config.get('estimated_hourly_cost', 40.96) * (total_time / 3600),
+                "training_successful": training_successful,
+                "total_steps": total_steps,
+                "world_size": world_size,
+                "distributed_training": distributed_success
+            }, f, indent=2)
+        
+        logger.info(f"Training metrics saved to {metrics_file}")
     
-    wandb.finish()
+    # Wait for all processes to complete
+    if dist.is_initialized():
+        dist.barrier()
     
-    logger.info("🎯 TRAINING SUMMARY:")
-    logger.info(f"  Approach: Optimized DataParallel")
-    logger.info(f"  Training: {'✅ Success' if training_successful else '❌ Failed'}")
+    # Finish W&B run (only on rank 0)
+    if global_rank == 0 and run_name:
+        wandb.finish()
+    
+    logger.info("🎯 Training completed successfully!")
 
 if __name__ == "__main__":
     main()
