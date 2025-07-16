@@ -6,7 +6,7 @@ from utils.cleaner_constants import SOURCES, CLEANUP_RULES
 import argparse
 
 
-def create_registry_regex_only():
+def create_registry(debug_mode):
     """
     """
 
@@ -236,11 +236,11 @@ def create_registry_regex_only():
     return registry
 
 
-def run_all_samples():
+def run_all_samples(debug_mode=False):
     """
     Run the sample cleaning pipeline for all sources using only RegExCleaner.
     """
-    registry = create_registry_regex_only(debug_mode=debug_mode)
+    registry = create_registry(debug_mode=debug_mode)
     for source_name, components in registry.items():
         print(f"\nProcessing sample for source: {source_name}")
         try:
@@ -257,11 +257,11 @@ def run_all_samples():
             print(f"Error processing sample for {source_name}: {str(e)}")
 
 
-def run_full_cleaning():
+def run_full_cleaning(debug_mode=False):
     """
     Run the full cleaning pipeline for all sources using only RegExCleaner.
     """
-    registry = create_registry_regex_only()
+    registry = create_registry(debug_mode=debug_mode)
     for source_name, components in registry.items():
         print(f"\nProcessing full cleaning for source: {source_name}")
         try:
