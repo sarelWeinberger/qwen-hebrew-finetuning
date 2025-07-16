@@ -17,14 +17,14 @@ from utils.cleaner_constants import CLEANUP_RULES
 
 def calculate_levenshtein_components(str1: str, str2: str) -> Tuple[int, int, int]:
     """
-    Calculate the individual components of Levenshtein distance: deletions, insertions, and substitutions.
+    Calculate the individual components of Levenshtein distance: deletions, insertions.
     
     Args:
         str1: First string
         str2: Second string
         
     Returns:
-        Tuple of (deletions, insertions, substitutions)
+        Tuple of (deletions, insertions)
     """
     if not str1 and not str2:
         return 0, 0, 0
@@ -38,9 +38,8 @@ def calculate_levenshtein_components(str1: str, str2: str) -> Tuple[int, int, in
     
     deletions = sum(1 for op in ops if op[0] == 'delete')
     insertions = sum(1 for op in ops if op[0] == 'insert')
-    substitutions = sum(1 for op in ops if op[0] == 'replace')
     
-    return deletions, insertions, substitutions
+    return deletions, insertions
 
 
 def normalize_levenshtein_components(str1: str, str2: str) -> Tuple[float, float, float]:
@@ -52,7 +51,7 @@ def normalize_levenshtein_components(str1: str, str2: str) -> Tuple[float, float
         str2: Second string
         
     Returns:
-        Tuple of normalized (deletions, insertions, substitutions) (0-1 each)
+        Tuple of normalized (deletions, insertions) (0-1 each)
     """
     if not str1 and not str2:
         return 0.0, 0.0, 0.0
@@ -65,13 +64,13 @@ def normalize_levenshtein_components(str1: str, str2: str) -> Tuple[float, float
     if max_len == 0:
         return 0.0, 0.0, 0.0
     
-    deletions, insertions, substitutions = calculate_levenshtein_components(str1, str2)
+    deletions, insertions = calculate_levenshtein_components(str1, str2)
     
     norm_deletions = deletions / max_len
     norm_insertions = insertions / max_len
-    norm_substitutions = substitutions / max_len
+
     
-    return norm_deletions, norm_insertions, norm_substitutions
+    return norm_deletions, norm_insertions
 
 
 def normalize_levenshtein_distance(str1: str, str2: str) -> float:
@@ -225,14 +224,12 @@ def calculate_levenshtein_metrics(df: pd.DataFrame, cleaned_dfs: Dict[str, pd.Da
                                 for orig, manual in zip(df['original_text'], df['manual_clean'])
                                 if not (pd.isna(orig) or pd.isna(manual))]
     if orig_to_manual_components:
-        avg_deletions, avg_insertions, avg_substitutions = zip(*orig_to_manual_components)
+        avg_deletions, avg_insertions = zip(*orig_to_manual_components)
         metrics['levenshtein_deletions_original_to_manual'] = round(np.mean(avg_deletions), 3)
         metrics['levenshtein_insertions_original_to_manual'] = round(np.mean(avg_insertions), 3)
-        metrics['levenshtein_substitutions_original_to_manual'] = round(np.mean(avg_substitutions), 3)
     else:
         metrics['levenshtein_deletions_original_to_manual'] = 0.0
         metrics['levenshtein_insertions_original_to_manual'] = 0.0
-        metrics['levenshtein_substitutions_original_to_manual'] = 0.0
     
     # Cumulative: duplicate_remover, then duplicate_and_regex
     step_names = list(cleaned_dfs.keys())
@@ -252,27 +249,23 @@ def calculate_levenshtein_metrics(df: pd.DataFrame, cleaned_dfs: Dict[str, pd.Da
         if i == 0:
             metrics[f'levenshtein_dist_{step_name}_to_manual'] = round(np.mean(step_to_manual), 3) if step_to_manual else 0.0
             if step_to_manual_components:
-                avg_deletions, avg_insertions, avg_substitutions = zip(*step_to_manual_components)
+                avg_deletions, avg_insertions = zip(*step_to_manual_components)
                 metrics[f'levenshtein_deletions_{step_name}_to_manual'] = round(np.mean(avg_deletions), 3)
                 metrics[f'levenshtein_insertions_{step_name}_to_manual'] = round(np.mean(avg_insertions), 3)
-                metrics[f'levenshtein_substitutions_{step_name}_to_manual'] = round(np.mean(avg_substitutions), 3)
             else:
                 metrics[f'levenshtein_deletions_{step_name}_to_manual'] = 0.0
                 metrics[f'levenshtein_insertions_{step_name}_to_manual'] = 0.0
-                metrics[f'levenshtein_substitutions_{step_name}_to_manual'] = 0.0
         else:
             # Cumulative name for all up to this step
             cum_name = '_and_'.join(step_names[:i+1])
             metrics[f'levenshtein_dist_{cum_name}_to_manual'] = round(np.mean(step_to_manual), 3) if step_to_manual else 0.0
             if step_to_manual_components:
-                avg_deletions, avg_insertions, avg_substitutions = zip(*step_to_manual_components)
+                avg_deletions, avg_insertions = zip(*step_to_manual_components)
                 metrics[f'levenshtein_deletions_{cum_name}_to_manual'] = round(np.mean(avg_deletions), 3)
                 metrics[f'levenshtein_insertions_{cum_name}_to_manual'] = round(np.mean(avg_insertions), 3)
-                metrics[f'levenshtein_substitutions_{cum_name}_to_manual'] = round(np.mean(avg_substitutions), 3)
             else:
                 metrics[f'levenshtein_deletions_{cum_name}_to_manual'] = 0.0
                 metrics[f'levenshtein_insertions_{cum_name}_to_manual'] = 0.0
-                metrics[f'levenshtein_substitutions_{cum_name}_to_manual'] = 0.0
         prev_df = cleaned_df
     return metrics
 
@@ -312,14 +305,13 @@ def calculate_metrics_for_precleaned_file(df: pd.DataFrame) -> Dict[str, float]:
                                 for orig, manual in zip(df['original_text'], df['manual_clean'])
                                 if not (pd.isna(orig) or pd.isna(manual))]
     if orig_to_manual_components:
-        avg_deletions, avg_insertions, avg_substitutions = zip(*orig_to_manual_components)
+        avg_deletions, avg_insertions = zip(*orig_to_manual_components)
         metrics['levenshtein_deletions_original_to_manual'] = round(np.mean(avg_deletions), 3)
         metrics['levenshtein_insertions_original_to_manual'] = round(np.mean(avg_insertions), 3)
-        metrics['levenshtein_substitutions_original_to_manual'] = round(np.mean(avg_substitutions), 3)
     else:
         metrics['levenshtein_deletions_original_to_manual'] = 0.0
         metrics['levenshtein_insertions_original_to_manual'] = 0.0
-        metrics['levenshtein_substitutions_original_to_manual'] = 0.0
+
     
     # Distance from cleaned text to manual
     cleaned_to_manual = [normalize_levenshtein_distance(str(cleaned), str(manual))
@@ -332,15 +324,12 @@ def calculate_metrics_for_precleaned_file(df: pd.DataFrame) -> Dict[str, float]:
                                    for cleaned, manual in zip(df[cleaned_text_col], df['manual_clean'])
                                    if not (pd.isna(cleaned) or pd.isna(manual))]
     if cleaned_to_manual_components:
-        avg_deletions, avg_insertions, avg_substitutions = zip(*cleaned_to_manual_components)
+        avg_deletions, avg_insertions = zip(*cleaned_to_manual_components)
         metrics[f'levenshtein_deletions_{cleaned_text_col}_to_manual'] = round(np.mean(avg_deletions), 3)
         metrics[f'levenshtein_insertions_{cleaned_text_col}_to_manual'] = round(np.mean(avg_insertions), 3)
-        metrics[f'levenshtein_substitutions_{cleaned_text_col}_to_manual'] = round(np.mean(avg_substitutions), 3)
     else:
         metrics[f'levenshtein_deletions_{cleaned_text_col}_to_manual'] = 0.0
-        metrics[f'levenshtein_insertions_{cleaned_text_col}_to_manual'] = 0.0
-        metrics[f'levenshtein_substitutions_{cleaned_text_col}_to_manual'] = 0.0
-    
+        metrics[f'levenshtein_insertions_{cleaned_text_col}_to_manual'] = 0.0    
     return metrics
 
 
@@ -442,22 +431,21 @@ def demonstrate_improved_metrics():
     ]
     
     print(f"\n--- METRICS COMPARISON ---")
-    print(f"{'Approach':<25} {'Distance':<10} {'Deletions':<10} {'Insertions':<10} {'Substitutions':<10}")
+    print(f"{'Approach':<25} {'Distance':<10} {'Deletions':<10} {'Insertions':<10}")
     print("-" * 75)
     
     for name, cleaned in approaches:
         # Calculate components
-        deletions, insertions, substitutions = calculate_levenshtein_components(cleaned, gold)
-        distance = deletions + insertions + substitutions
+        deletions, insertions = calculate_levenshtein_components(cleaned, gold)
+        distance = deletions + insertions
         
         # Normalize by max length
         max_len = max(len(cleaned), len(gold))
         norm_distance = distance / max_len if max_len > 0 else 0
         norm_deletions = deletions / max_len if max_len > 0 else 0
         norm_insertions = insertions / max_len if max_len > 0 else 0
-        norm_substitutions = substitutions / max_len if max_len > 0 else 0
         
-        print(f"{name:<25} {norm_distance:<10.3f} {norm_deletions:<10.3f} {norm_insertions:<10.3f} {norm_substitutions:<10.3f}")
+        print(f"{name:<25} {norm_distance:<10.3f} {norm_deletions:<10.3f} {norm_insertions:<10.3f}")
     
     print(f"\n--- INTERPRETATION ---")
     print("• Script A: High insertions (HTML tags remain) - under-cleaning")
@@ -562,19 +550,10 @@ def main():
             avg_val = summary_df[col].mean()
             print(f"{col}: {avg_val:.4f}")
     
-    # Substitution metrics
-    substitution_cols = [col for col in summary_df.columns if col.startswith('levenshtein_substitutions_')]
-    if substitution_cols:
-        print(f"\n--- Substitution Metrics ---")
-        for col in substitution_cols:
-            avg_val = summary_df[col].mean()
-            print(f"{col}: {avg_val:.4f}")
-    
     # Print interpretation guide
     print(f"\n=== INTERPRETATION GUIDE ===")
     print("• Deletions (Under-cleaning): Lower values are better - indicates less content was removed")
     print("• Insertions (Over-cleaning): Lower values are better - indicates less content was added")
-    print("• Substitutions: Lower values are better - indicates fewer character replacements")
     print("• Overall Distance: Lower values are better - indicates closer match to manual cleaning")
 
 
