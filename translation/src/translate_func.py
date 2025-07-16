@@ -2,7 +2,7 @@ from src.call_models import call_claude_bedrock
 from src.call_models import call_gemini, all_string_gemini_config, all_list_gemini_config
 from datasets import Dataset
 import re
-from tqdm.notebook import tqdm
+from tqdm.auto import tqdm
 from time import time, sleep
 
 # The base prompt of the English-Hebrew
@@ -73,20 +73,34 @@ def claude_translation(bedrock_client, datasets, instruct, few_shots, sample_for
 
         hebrew_dataset[key] = Dataset.from_list(hebrew_dataset[key])
     return hebrew_dataset, text_output
-    
-    
+
+
 def get_gemini_thoughts_summary(response):
     thinking_summary = []
-    for part in response.candidates[0].content.parts:
-        if not part.text:
-            continue
-        if part.thought:
-            thinking_summary.append(part.text)
-    thinking_summary = '\n\n'.join(thinking_summary)
-    return thinking_summary
+
+    # Safeguard: check if 'candidates' exists and is valid
+    if not hasattr(response, 'candidates') or not response.candidates:
+        return ""
+
+    candidate = response.candidates[0]
+
+    if not hasattr(candidate, 'content') or not candidate.content:
+        return ""
+
+    if not hasattr(candidate.content, 'parts') or not candidate.content.parts:
+        return ""
+
+    for part in candidate.content.parts:
+        # Defensive check: ensure part has 'text'
+        if hasattr(part, 'text') and part.text:
+            if hasattr(part, 'thought') and part.thought:
+                thinking_summary.append(part.text)
+
+    return '\n\n'.join(thinking_summary)
 
 
-def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_dict, dict_to_sample, if_pro=False, think_bud=-1):
+def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_dict, dict_to_sample, if_pro=False,
+                       think_bud=-1):
     """
     Translate all given datasets using one of the Gemini famaliy models.
     """
@@ -98,7 +112,7 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
         quota_min = 5
     else:
         quota_min = 10
-        
+
     # Run on the different splits in the dataset
     start_time = time()
     for key in datasets:
@@ -130,10 +144,40 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
             thinking_summary = get_gemini_thoughts_summary(output)
             result = output.parsed
 
-            # Create New sample
-            new_sample = dict_to_sample(sample, result)
-            hebrew_dataset[key].append(new_sample)
-            text_output[key].append(thinking_summary)
+            # Create New sample - ADD ERROR HANDLING HERE
+            try:
+                if result is None:
+                    # Handle case where parsing failed
+                    print(f"Warning: Failed to parse response for sample {cnt}, skipping...")
+
+                    # Create a fallback sample with original data and failure indicator
+                    new_sample = sample.copy()
+                    # Add a field to indicate translation failure
+                    if 'translation_status' not in new_sample:
+                        new_sample['translation_status'] = 'Failed to translate!'
+
+                    hebrew_dataset[key].append(new_sample)
+                    text_output[key].append("Failed to translate!")
+                    continue
+
+                new_sample = dict_to_sample(sample, result)
+                # Mark as successfully translated
+                if 'translation_status' not in new_sample:
+                    new_sample['translation_status'] = 'Success'
+
+                hebrew_dataset[key].append(new_sample)
+                text_output[key].append(thinking_summary)
+
+            except Exception as e:
+                # Handle any other errors in dict_to_sample
+                print(f"Error processing sample {cnt}: {e}")
+
+                # Create a fallback sample
+                new_sample = sample.copy()
+                new_sample['translation_status'] = 'Failed to translate!'
+
+                hebrew_dataset[key].append(new_sample)
+                text_output[key].append("Failed to translate!")
 
             if cnt % quota_min == 0:
                 passed = time() - start_time
@@ -145,7 +189,6 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
 
         hebrew_dataset[key] = Dataset.from_list(hebrew_dataset[key])
     return hebrew_dataset, text_output
-
 
 def options_to_prompt(original, hebrew):
     # return '\n'.join([f'<{k}>{original[k]} | [' + ', '.join(hebrew[k]) + f']</{k}>' for k in original])

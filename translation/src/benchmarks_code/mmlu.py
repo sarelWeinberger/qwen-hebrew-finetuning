@@ -24,14 +24,32 @@ def get_mmlu_datasets():
 def mmlu_sample_to_dict(sample):
     return {
         'question': sample['question'],
-        'option 1': sample['choices'][0],
-        'option 2': sample['choices'][1],
-        'option 3': sample['choices'][2],
-        'option 4': sample['choices'][3],
+        'choice_a': sample['choices'][0],
+        'choice_b': sample['choices'][1],
+        'choice_c': sample['choices'][2],
+        'choice_d': sample['choices'][3],
     }
+
 
 def mmlu_dict_to_sample(sample, dct):
     sample['question'] = dct['question']
-    sample['choices'] = [dct[f'option {i}'] for i in range(1, 5)]
-    sample['answer'] = MAP_LABELS[str(sample['answer'])]
+    sample['choices'] = [
+        dct['choice_a'],
+        dct['choice_b'],
+        dct['choice_c'],
+        dct['choice_d']
+    ]
+
+    # Convert index (0–3) to letter
+    index_to_letter = {0: 'A', 1: 'B', 2: 'C', 3: 'D'}
+    if isinstance(sample['answer'], int):
+        letter = index_to_letter[sample['answer']]
+    elif str(sample['answer']) in index_to_letter:
+        letter = index_to_letter[int(sample['answer'])]
+    elif str(sample['answer']) in MAP_LABELS:
+        letter = str(sample['answer'])
+    else:
+        raise ValueError(f"Unexpected answer format: {sample['answer']}")
+
+    sample['answer'] = MAP_LABELS[letter]
     return sample
