@@ -19,6 +19,9 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+*.zip
+sagemaker/sandbox/
+aws/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -76,3 +79,7 @@ Thumbs.db
 
 # logging
 *.log
+
+./region_availability*.*
+
+.gitignore
