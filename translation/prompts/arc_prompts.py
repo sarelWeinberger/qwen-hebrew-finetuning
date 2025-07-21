@@ -27,6 +27,17 @@ Follow these guidelines:
 4. Write the translations in a clear and concise style suitable for grade school-level science questions.
 </instruction>"""
 
+ARC_INSTRUCT_V2_CLAUDE_REFINE = """<instruction>
+Your task is to translate the given English question and possible answers into Hebrew. First write a possible translation and then improve it. 
+Follow these guidelines:
+
+1. Translate only the question and answer options provided. Do not add any additional text.
+2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
+3. Maintain the same formatting as the original English version.
+4. Write the translations in a clear and concise style suitable for grade school-level science questions.
+5. Make sure to use the correct Hebrew terminology for scientific terms.
+</instruction>"""
+
 ARC_INSTRUCT_V1_CLAUDE_MULTI = """<instruction>
 Your task is to translate the given English question and possible answers into Hebrew. First, write three different translations for each field, and then choose the best translation of each field. Follow these guidelines:
 
@@ -41,6 +52,14 @@ ARC_INSTRUCT_V1_GEMINI = """Your task is to translate the given English question
 2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
 3. Maintain the same formatting as the original English version.
 4. Write the translations in a clear and concise style suitable for grade school-level science questions."""
+
+ARC_INSTRUCT_V2_GEMINI = """Your task is to translate the given English question and possible answers into Hebrew. Follow these guidelines:
+
+1. Translate only the question and answer options provided. Do not add any additional text or instructions.
+2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
+3. Maintain the same formatting as the original English version.
+4. Write the translations in a clear and concise style suitable for grade school-level science questions.
+5. Make sure to use the correct Hebrew terminology for scientific terms. Look it up in 'Wikipedia' if needed."""
 
 ARC_INSTRUCT_V1_GEMINI_MULTI = """Your task is to translate the given English question and possible answers into Hebrew. First, write three different translations for each field, and then choose the best translation of each field. Follow these guidelines:
 

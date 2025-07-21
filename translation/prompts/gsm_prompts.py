@@ -25,6 +25,17 @@ Follow these guidelines for the final translation:
 3. Write the translations in a style suitable for grade school-level math questions.
 </instruction>"""
 
+GSM_INSTRUCT_CLAUDE_REFINE_V2 = """<instruction>
+Your task is to translate the given English question and possible answers into Hebrew. First write a possible translation, then improve it. 
+Follow these guidelines for the final translation:
+
+1. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
+2. Maintain the same formatting as the original English version, keep the same numbers as the original.
+3. Write the translations in a style suitable for grade school-level math questions.
+4. Adjust entities from American context into Israeli context, including names, currency, measuremnt units and etc. For example: map "USD" to "שקלים".
+5. Adjust American scenarios into Israeli scenarios to make it more natural.
+</instruction>"""
+
 GSM_INSTRUCT_CLAUDE_MULTI_V1 = """
 """
 
@@ -34,6 +45,15 @@ GSM_INSTRUCT_GEMINI_V1 = """Your task is to translate the given English question
 2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
 3. Maintain the same formatting as the original English version.
 4. Write the translations in a style suitable for grade school-level math questions."""
+
+GSM_INSTRUCT_GEMINI_V2 = """Your task is to translate the given English question and answer into Hebrew. Follow these guidelines:
+
+1. Translate only the question and answer options provided. Do not add any additional text or instructions.
+2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
+3. Maintain the same formatting as the original English version.
+4. Write the translations in a style suitable for grade school-level math questions.
+5. Adjust entities from American context into Israeli context, including names, currency, measuremnt units and etc. For example: map "USD" to "שקלים".
+6. Adjust American scenarios into Israeli scenarios to make it more natural."""
 
 GSM_INSTRUCT_GEMINI_MULTI_V1 = """
 """
@@ -86,8 +106,6 @@ English:
 <answer>Weng earns 12/60 = $<<12/60=0.2>>0.2 per minute.
 Working 50 minutes, she earned 0.2 x 50 = $<<0.2*50=10>>10.
 #### 10</answer>
-
-
 
 Hebrew:
 <question>וונג מרוויחה 12$ לשעה כבייביסיטרית. אתמול, היא עבדה רק 50 דקות כבייביסיטרית. כמה היא הרוויחה?</question>

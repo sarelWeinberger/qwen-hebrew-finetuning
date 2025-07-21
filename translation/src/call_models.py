@@ -7,6 +7,8 @@ CLAUDE_MODEL = "arn:aws:bedrock:us-east-1:670967753077:inference-profile/us.anth
 GEMINI_MODEL_PRO = "gemini-2.5-pro"
 GEMINI_MODEL_FLASH = "gemini-2.5-flash"
 
+GEMMA_MODEL = "gemma-3-27b-it"
+
 
 def bedrock_connect(acceess_id, secret_key):
     return boto3.client(
@@ -74,13 +76,25 @@ def call_gemini(google_client, message, config=None, if_pro=False):
     return response
 
 
-def create_gemini_config(str_lst, system_instruction=None, output_type=None, enum=None, think_bud=-1):
+def call_gemma(google_client, message):
+    response = google_client.models.generate_content(
+        model=GEMMA_MODEL,
+        contents=message,
+        config=types.GenerateContentConfig(
+            temperature=1,
+            # topK=1,
+        ),
+    )
+    return response
+
+
+def create_gemini_config(str_lst, system_instruction=None, output_type=None, enum=None, think_bud=-1, temp=0):
     if output_type is None:
         output_type = types.Type.STRING
 
     return types.GenerateContentConfig(
-        temperature=0,
-        topK=1,
+        temperature=temp,
+        # topK=1,
         thinking_config=types.ThinkingConfig(
             include_thoughts=True,
             thinking_budget=think_bud,
@@ -101,8 +115,14 @@ def create_gemini_config(str_lst, system_instruction=None, output_type=None, enu
     )
 
 
-def all_string_gemini_config(str_lst, system_instruction=None, enum=None, think_bud=-1):
-    return create_gemini_config(str_lst, system_instruction=system_instruction, enum=enum, think_bud=think_bud)
+def all_string_gemini_config(str_lst, system_instruction=None, enum=None, think_bud=-1, temp=0):
+    return create_gemini_config(
+        str_lst,
+        system_instruction=system_instruction,
+        enum=enum,
+        think_bud=think_bud,
+        temp=temp,
+    )
 
 
 def all_int_gemini_config(str_lst, system_instruction=None, think_bud=-1):
