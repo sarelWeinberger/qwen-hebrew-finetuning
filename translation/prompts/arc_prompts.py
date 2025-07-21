@@ -70,11 +70,11 @@ English:
 <option 3>palms covered with oil</option 3>
 <option 4>palms covered with lotion</option 4>
 Hebrew:
-<question>ג'ורג' רוצה לחמם את ידיו במהירות על ידי שפשופן. איזה משטח עור ייצר את החום הרב ביותר?</question>
+<question>ג'ורג' רוצה לחמם את ידיו במהירות על ידי שפשוף שלהן. איזה משטח עור ייצר את החום הרב ביותר?</question>
 <option 1>כפות ידיים יבשות</option 1>
 <option 2>כפות ידיים רטובות</option 2>
 <option 3>כפות ידיים מכוסות בשמן</option 3>
-<option 4>כפות ידיים מכוסות בקרם</option 4>
+<option 4>כפות ידיים מכוסות בקרם גוף</option 4>
 </example>
 
 <example>
@@ -85,7 +85,7 @@ English:
 <option 3>The refrigerator door is a good conductor.</option 3>
 <option 4>The refrigerator door has electric wires in it.</option 4>
 Hebrew:
-<question>איזה מההיגדים הבאים מסביר בצורה הטובה ביותר מדוע מגנטים בדרך כלל נדבקים לדלת המקרר?</question>
+<question>איזו מהאמירות הבאות מסבירה בצורה הטובה ביותר מדוע מגנטים בדרך כלל נצמדים לדלת המקרר?</question>
 <option 1>דלת המקרר חלקה.</option 1>
 <option 2>דלת המקרר מכילה ברזל.</option 2>
 <option 3>דלת המקרר מוליכה טוב.</option 3>
@@ -100,8 +100,8 @@ English:
 <option 3>deposition of river sediments.</option 3>
 <option 4>solution of carbonate minerals.</option 4>
 Hebrew:
-<question>קפל שנצפה בשכבות של סלע משקע נוצר ככל הנראה כתוצאה מ</question>
-<option 1>התקררות של מגמה זורמת.</option 1>
+<question>קמט שנצפה בשכבות של סלע משקע נוצר ככל הנראה כתוצאה מ:</question>
+<option 1>התקררות של מאגמה זורמת.</option 1>
 <option 2>התכנסות של לוחות קרום כדור הארץ.</option 2>
 <option 3>שקיעה של משקעי נהר.</option 3>
 <option 4>המסה של מינרלים פחמתיים.</option 4>
@@ -115,9 +115,9 @@ English:
 <option 3>rise of mammals that preyed upon plants and animals</option 3>
 <option 4>impact of an asteroid created dust that blocked the sunlight</option 4>
 Hebrew:
-<question>איזה מההסברים הבאים מציעים מדענים כהסבר העדכני ביותר לכך שצמחים ובעלי חיים רבים נכחדו בסוף עידן המזוזואיקון?</question>
-<option 1>מחלה עולמית</option 1>
-<option 2>בניית הרים גלובלית</option 2>
+<question>איזה מהבאים מדענים מציעים כהסבר העדכני ביותר לכך שצמחים ובעלי חיים רבים נכחדו בסוף עידן המזוזואיקון?</question>
+<option 1>מחלה כלל עולמית</option 1>
+<option 2>היווצרות הרים עולמית</option 2>
 <option 3>עליית יונקים שטרפו צמחים ובעלי חיים</option 3>
 <option 4>פגיעת אסטרואיד יצרה אבק שחסם את אור השמש</option 4>
 </example>
@@ -130,7 +130,7 @@ English:
 <option 3>north</option 3>
 <option 4>south</option 4>
 Hebrew:
-<question>סירה מושפעת מזרם נהר הזורם צפונה ומרוח הנושבת על מפרשיה. הסירה נעה לכיוון צפון-מזרח. באיזה כיוון הרוח ככל הנראה מפעילה כוח על מפרשי הסירה?</question>
+<question>סירה מושפעת מזרם נהר הזורם צפונה ומרוח הנושבת על המפרשים שלה. הסירה נעה לכיוון צפון-מזרח. באיזה כיוון הרוח ככל הנראה מפעילה כוח על מפרשי הסירה?</question>
 <option 1>מערב</option 1>
 <option 2>מזרח</option 2>
 <option 3>צפון</option 3>

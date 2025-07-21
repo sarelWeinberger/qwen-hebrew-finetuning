@@ -97,11 +97,11 @@ English:
 <choice_d>The second and third pharyngeal arches</choice_d>
 Hebrew:
 <subject>אנטומיה</subject>
-<question>מהו המקור העובריוני של עצם הלשון?</question>
-<choice_a>הקשת הלוענית הראשונה</choice_a>
-<choice_b>הקשת הלוענית הראשונה והשנייה</choice_b>
-<choice_c>הקשת הלוענית השנייה</choice_c>
-<choice_d>הקשת הלוענית השנייה והשלישית</choice_d>
+<question>מהו המקור האמבריולוגי של עצם הלשון?</question>
+<choice_a>קשת הלוע הראשונה</choice_a>
+<choice_b>קשתות הלוע הראשונה והשנייה</choice_b>
+<choice_c>קשת הלוע השנייה</choice_c>
+<choice_d>קשתות הלוע השנייה והשלישית</choice_d>
 </example>
 
 <example>
@@ -114,7 +114,7 @@ English:
 <choice_d>6</choice_d>
 Hebrew:
 <subject>אלגברה מופשטת</subject>
-<question>מצא את המעלה של הרחבת השדה Q(sqrt(2), sqrt(3), sqrt(18)) מעל Q.</question>
+<question>מצאו את המעלה עבור הרחבת השדה הנתונה Q(sqrt(2), sqrt(3), sqrt(18)) מעל Q.</question>
 <choice_a>0</choice_a>
 <choice_b>4</choice_b>
 <choice_c>2</choice_c>
@@ -130,12 +130,12 @@ English:
 <choice_c>Covalent bonds</choice_c>
 <choice_d>Van der Waals forces</choice_d>
 Hebrew:
-<subject>ביולוגיה תיכון</subject>
-<question>איזה מהבאים אחראי לכוחות הלכידות של מולקולות המים?</question>
+<subject>ביולוגיה ברמת תיכון</subject>
+<question>איזה מהבאים אחראי ללכידות מולקולות המים?</question>
 <choice_a>קשרים יוניים</choice_a>
 <choice_b>קשרי מימן</choice_b>
 <choice_c>קשרים קוולנטיים</choice_c>
-<choice_d>כוחות ואן דר וואלס</choice_d>
+<choice_d>כוחות ואן דר ואלס</choice_d>
 </example>
 
 <example>
@@ -148,9 +148,9 @@ English:
 <choice_d>personal happiness</choice_d>
 Hebrew:
 <subject>פילוסופיה</subject>
-<question>לפי קאנט, הערך המוסרי של פעולה תלוי ב</question>
-<choice_a>תוצאותיה</choice_a>
-<choice_b>המוטיבציה שמאחוריה</choice_b>
+<question>:לפי קאנט, הערך המוסרי של פעולה תלוי ב</question>
+<choice_a>ההשלכות שלה</choice_a>
+<choice_b>המניע שמאחוריה</choice_b>
 <choice_c>מוסכמות חברתיות</choice_c>
 <choice_d>אושר אישי</choice_d>
 </example>
@@ -169,6 +169,6 @@ Hebrew:
 <choice_a>סוס טרויאני</choice_a>
 <choice_b>וירוס</choice_b>
 <choice_c>תוכנת ריגול</choice_c>
-<choice_d>תוכנה פרסומית</choice_d>
+<choice_d>תוכנת פרסומות</choice_d>
 </example>
 </fewshot_examples>"""
