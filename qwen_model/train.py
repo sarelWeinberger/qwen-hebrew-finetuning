@@ -215,7 +215,7 @@ def train():
     print("Loading model...")
     model = AutoModelForCausalLM.from_pretrained(
         config["model_name_or_path"],
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
         trust_remote_code=True,
         use_cache=False,  # Disable KV cache for training
         device_map=None,  # Ensure all parameters are on CPU initially
