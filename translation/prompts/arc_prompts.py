@@ -88,6 +88,8 @@ First translation attempt:
 <option 3>First attempt translated answer option 3</option 3>
 <option 4>First attempt translated answer option 4</option 4>
 
+<explain>Explanation text.</explain>
+
 Improved translation:
 <question>Final translated question</question>
 <option 1>Final translated answer option 1</option 1>

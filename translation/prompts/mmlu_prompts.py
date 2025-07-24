@@ -89,6 +89,8 @@ First translation attempt:
 <choice_c>First attempt translated option C</choice_c>
 <choice_d>First attempt translated option D</choice_d>
 
+<explain>Explanation text.</explain>
+
 Improved translation:
 <question>Final translated question</question>
 <choice_a>Final translated option A</choice_a>

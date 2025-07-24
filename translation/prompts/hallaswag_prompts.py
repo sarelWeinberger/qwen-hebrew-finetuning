@@ -74,6 +74,30 @@ HELLASWAG_FORMAT = """<response_format>
 <ending 4>Translated ending option 4</ending 4>
 </response_format>"""
 
+HELLASWAG_FORMAT_REFINE = """<response_format>
+First translation attempt:
+<activity_label>First translated activity label</activity_label>
+<ctx_a>First translated context part A</ctx_a>
+<ctx_b>First translated context part B</ctx_b>
+<ctx>First translated full context</ctx>
+<ending 1>First translated ending option 1</ending 1>
+<ending 2>First translated ending option 2</ending 2>
+<ending 3>First translated ending option 3</ending 3>
+<ending 4>First translated ending option 4</ending 4>
+
+<explain>Explanation text.</explain>
+
+Improved translation:
+<activity_label>Final translated activity label</activity_label>
+<ctx_a>Final translated context part A</ctx_a>
+<ctx_b>Final translated context part B</ctx_b>
+<ctx>Final translated full context</ctx>
+<ending 1>Final translated ending option 1</ending 1>
+<ending 2>Final translated ending option 2</ending 2>
+<ending 3>Final translated ending option 3</ending 3>
+<ending 4>Final translated ending option 4</ending 4>
+</response_format>"""
+
 
 # The few-shots samples
 HELLASWAG_FEW_SHOTS = """<fewshot_examples>
