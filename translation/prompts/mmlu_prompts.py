@@ -1,9 +1,6 @@
 """
 This file contains variables with prompts to be used when translating the 'MMLU' benchmark:
 https://huggingface.co/datasets/cais/mmlu
-
-This file contains only the chosen prompts to be used.
-The file 'old_mmlu_prompts.py' contains old version prompts that we have tested.
 """
 
 
@@ -23,7 +20,7 @@ Your task is to translate the given English multiple-choice question, subject, a
 </instruction>"""
 
 MMLU_INSTRUCT_V1_CLAUDE_REFINE = """<instruction>
-Your task is to translate the given English multiple-choice question, subject, and answer options into Hebrew. First write a possible translation and then improve it.
+Your task is to translate the given English multiple-choice question, subject, and answer options into Hebrew. First write a possible translation, then explain how to improve it and write the final translation.
 Follow these guidelines:
 
 1. Translate only the question, subject, and answer choices provided. Do not add any additional text.
@@ -82,6 +79,22 @@ MMLU_FORMAT = """<response_format>
 <choice_b>Translated option B</choice_b>
 <choice_c>Translated option C</choice_c>
 <choice_d>Translated option D</choice_d>
+</response_format>"""
+
+MMLU_FORMAT_REFINE = """<response_format>
+First translation attempt:
+<question>First attempt translated question</question>
+<choice_a>First attempt translated option A</choice_a>
+<choice_b>First attempt translated option B</choice_b>
+<choice_c>First attempt translated option C</choice_c>
+<choice_d>First attempt translated option D</choice_d>
+
+Improved translation:
+<question>Final translated question</question>
+<choice_a>Final translated option A</choice_a>
+<choice_b>Final translated option B</choice_b>
+<choice_c>Final translated option C</choice_c>
+<choice_d>Final translated option D</choice_d>
 </response_format>"""
 
 
@@ -172,3 +185,4 @@ Hebrew:
 <choice_d>תוכנת פרסומות</choice_d>
 </example>
 </fewshot_examples>"""
+

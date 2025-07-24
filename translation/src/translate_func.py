@@ -20,7 +20,8 @@ CHOOSE_MODEL_INSTRUCT = """Your task is to choose the best translation from Engl
 
 
 def dict_to_prompt(dct):
-    return '\n'.join([f'<{k}>{dct[k]}</{k}>' for k in dct])
+    # Don't add the 'translation_status' value to the string...
+    return '\n'.join([f'<{k}>{dct[k]}</{k}>' for k in dct if k != 'translation_status'])
 
 
 def claude_translation(bedrock_client, datasets, instruct, few_shots, sample_format, sample_to_dict, dict_to_sample):
@@ -138,7 +139,9 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
                     output = call_gemini(google_client, query, config, if_pro=if_pro)
                     do_it = False
                 except:
+                    print('\r' + ' ' * 50 + '\rSleeping in the While.... ', end='')
                     sleep(10)
+                    print('Done!', end='')
 
             # Parse the model's output
             thinking_summary = get_gemini_thoughts_summary(output)

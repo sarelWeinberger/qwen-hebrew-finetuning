@@ -28,14 +28,15 @@ Follow these guidelines:
 </instruction>"""
 
 ARC_INSTRUCT_V2_CLAUDE_REFINE = """<instruction>
-Your task is to translate the given English question and possible answers into Hebrew. First write a possible translation and then improve it. 
+Your task is to translate the given English question and possible answers into Hebrew. First write a possible translation, then explain how to improve it and write the final translation.
 Follow these guidelines:
 
 1. Translate only the question and answer options provided. Do not add any additional text.
 2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
 3. Maintain the same formatting as the original English version.
 4. Write the translations in a clear and concise style suitable for grade school-level science questions.
-5. Make sure to use the correct Hebrew terminology for scientific terms.
+5. Terminology accuracy: Make sure to use the correct Hebrew terminology for scientific terms.
+6. Keep the "plausibility" of all answers, so that wrong answers will stay relevant.
 </instruction>"""
 
 ARC_INSTRUCT_V1_CLAUDE_MULTI = """<instruction>
@@ -59,7 +60,8 @@ ARC_INSTRUCT_V2_GEMINI = """Your task is to translate the given English question
 2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
 3. Maintain the same formatting as the original English version.
 4. Write the translations in a clear and concise style suitable for grade school-level science questions.
-5. Make sure to use the correct Hebrew terminology for scientific terms. Look it up in 'Wikipedia' if needed."""
+5. Terminology accuracy: Make sure to use the correct Hebrew terminology for scientific terms.
+6. Keep the "plausibility" of all answers, so that wrong answers will stay relevant."""
 
 ARC_INSTRUCT_V1_GEMINI_MULTI = """Your task is to translate the given English question and possible answers into Hebrew. First, write three different translations for each field, and then choose the best translation of each field. Follow these guidelines:
 
@@ -78,6 +80,22 @@ ARC_FORMAT = """<response_format>
 <option 4>Translated answer option 4</option 4>
 </response_format>"""
 
+ARC_FORMAT_REFINE = """<response_format>
+First translation attempt:
+<question>First attempt translated question</question>
+<option 1>First attempt translated answer option 1</option 1>
+<option 2>First attempt translated answer option 2</option 2>
+<option 3>First attempt translated answer option 3</option 3>
+<option 4>First attempt translated answer option 4</option 4>
+
+Improved translation:
+<question>Final translated question</question>
+<option 1>Final translated answer option 1</option 1>
+<option 2>Final translated answer option 2</option 2>
+<option 3>Final translated answer option 3</option 3>
+<option 4>Final translated answer option 4</option 4>
+</response_format>"""
+
 
 # The few-shots samples
 ARC_FEW_SHOTS = """<fewshot_examples>
@@ -89,7 +107,7 @@ English:
 <option 3>palms covered with oil</option 3>
 <option 4>palms covered with lotion</option 4>
 Hebrew:
-<question>ג'ורג' רוצה לחמם את ידיו במהירות על ידי שפשוף שלהן. איזה משטח עור ייצר את החום הרב ביותר?</question>
+<question>ג'ורג' רוצה לחמם את ידיו במהירות על ידי שפשוף הידיים. איזה משטח עור ייצר את החום הרב ביותר?</question>
 <option 1>כפות ידיים יבשות</option 1>
 <option 2>כפות ידיים רטובות</option 2>
 <option 3>כפות ידיים מכוסות בשמן</option 3>
@@ -107,7 +125,7 @@ Hebrew:
 <question>איזו מהאמירות הבאות מסבירה בצורה הטובה ביותר מדוע מגנטים בדרך כלל נצמדים לדלת המקרר?</question>
 <option 1>דלת המקרר חלקה.</option 1>
 <option 2>דלת המקרר מכילה ברזל.</option 2>
-<option 3>דלת המקרר מוליכה טוב.</option 3>
+<option 3>דלת המקרר היא מוליך טוב.</option 3>
 <option 4>דלת המקרר מכילה חוטי חשמל.</option 4>
 </example>
 

@@ -59,8 +59,8 @@ def call_claude_bedrock(bedrock_client, message, system_prompt=None, max_tokens=
 
 
 # Gemini call
-def google_connect(key):
-    return genai.Client(api_key=key)
+def google_connect(key, project_id=None):
+    return genai.Client(api_key=key, project=project_id)
 
 
 def call_gemini(google_client, message, config=None, if_pro=False):

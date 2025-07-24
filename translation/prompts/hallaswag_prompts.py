@@ -1,9 +1,6 @@
 """
 This file contains variables with prompts to be used when translating the 'HellaSwag' benchmark:
 https://huggingface.co/datasets/hellaswag
-
-This file contains only the chosen prompts to be used.
-The file 'old_hellaswag_prompts.py' contains old version prompts that we have tested.
 """
 
 
@@ -21,7 +18,7 @@ Your task is to translate the given English context, activity label, and possibl
 </instruction>"""
 
 HELLASWAG_INSTRUCT_V1_CLAUDE_REFINE = """<instruction>
-Your task is to translate the given English context, activity label, and possible endings into Hebrew. First write a possible translation and then improve it. 
+Your task is to translate the given English context, activity label, and possible endings into Hebrew. First write a possible translation, then explain how to improve it and write the final translation.
 Follow these guidelines:
 
 1. Translate only the context, activity label, and ending options provided. Do not add any additional text.
@@ -95,7 +92,7 @@ Hebrew:
 <ctx_a>גבר יושב ברכב. הוא מתניע את הרכב ומתחיל לנסוע. הרכב מכוסה בקרח, אז הוא</ctx_a>
 <ctx_b>יוצא ו</ctx_b>
 <ctx>גבר יושב ברכב. הוא מתניע את הרכב ומתחיל לנסוע. הרכב מכוסה בקרח, אז הוא יוצא ו</ctx>
-<ending 1>מתחיל להסיר את הקרח מהשמשה הקדמית באמצעות מגרד.</ending 1>
+<ending 1>מתחיל להסיר את הקרח מהשמשה הקדמית באמצעות שפכטל.</ending 1>
 <ending 2>מתחיל לרקוד על המדרכה.</ending 2>
 <ending 3>מתחיל לבשל ארוחת בוקר על מכסה המנוע של הרכב.</ending 3>
 <ending 4>לובש את בגד הים שלו.</ending 4>
@@ -119,7 +116,7 @@ Hebrew:
 <ending 1>למרוח חמאת בוטנים על פרוסות הלחם.</ending 1>
 <ending 2>לצבוע את קירות המטבח.</ending 2>
 <ending 3>לתרגל נגינה בפסנתר.</ending 3>
-<ending 4>לשטוף את הרכב שלה בשביל הגישה לחניה.</ending 4>
+<ending 4>לשטוף את הרכב שלה בשביל החניה.</ending 4>
 </example>
 
 <example>

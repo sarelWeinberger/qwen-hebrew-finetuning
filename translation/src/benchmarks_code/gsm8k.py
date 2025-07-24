@@ -5,8 +5,8 @@ def get_gsm8k_datasets():
     datasets = {}
     # GSM8K 
     # train - 7473 samples | test - 1319 samples
-    datasets['gsm8k_train'] = load_dataset("gsm8k", 'main', split='train')
-    # datasets['gsm8k_test'] = load_dataset("gsm8k", 'main', split='test')
+    # datasets['gsm8k_train'] = load_dataset("gsm8k", 'main', split='train')
+    datasets['gsm8k_test'] = load_dataset("gsm8k", 'main', split='test')
     return datasets
 
 
