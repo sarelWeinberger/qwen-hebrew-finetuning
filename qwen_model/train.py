@@ -45,7 +45,7 @@ def parse_args():
     parser.add_argument(
         "--wandb_project",
         type=str,
-        default="qwen-hebrew-finetuning",
+        default="qwen-30b-dataset-quality-benchmark",
         help="Weights & Biases project name"
     )
     parser.add_argument(
@@ -57,7 +57,7 @@ def parse_args():
     parser.add_argument(
         "--wandb_entity",
         type=str,
-        default=None,
+        default="llm_train_mafat",
         help="Weights & Biases entity name"
     )
     return parser.parse_args()
@@ -70,10 +70,36 @@ class WandbMetricsCallback(TrainerCallback):
         self.total_tokens = 0
         self.max_seq_length = max_seq_length
         self.steps = 0
+        self.step_start_time = None
+    
+    def _should_log(self):
+        """Only log from rank 0 to avoid duplicate logs."""
+        return int(os.environ.get('LOCAL_RANK', '0')) == 0 and wandb.run is not None
+    
+    def on_step_begin(self, args, state, control, **kwargs):
+        """Report when we enter a new step."""
+        self.step_start_time = time.time()
+        
+        print(f"\n🚀 STEP {state.global_step + 1} STARTED at {time.strftime('%H:%M:%S')}")
+        print(f"   Progress: {((state.global_step + 1) / state.max_steps * 100):.1f}%")
+        
+        # Log step start to W&B
+        if self._should_log():
+            wandb.log({
+                "step_status/step_started": state.global_step + 1,
+                "step_status/progress_percent": (state.global_step + 1) / state.max_steps * 100,
+                "step_status/max_steps": state.max_steps,
+                "training/current_step": state.global_step + 1
+            }, step=state.global_step)
     
     def on_step_end(self, args, state, control, **kwargs):
-        """Track steps for token counting."""
+        """Track steps for token counting and report step completion."""
         self.steps += 1
+        
+        # Calculate step duration
+        step_duration = time.time() - self.step_start_time if self.step_start_time else 0
+        
+        print(f"✅ STEP {state.global_step} COMPLETED in {step_duration:.1f} seconds at {time.strftime('%H:%M:%S')}")
         
         # Calculate tokens processed in this step
         # Total batch size = per_device_batch_size * num_devices * gradient_accumulation_steps
@@ -85,51 +111,105 @@ class WandbMetricsCallback(TrainerCallback):
         self.total_tokens += step_tokens
         
         # Log metrics for every step
-        wandb.log({
-            "training/tokens": self.total_tokens,
-            "training/step_num": self.steps,
-            "training/batch_num": state.global_step,
-            "training/epoch_num": state.epoch if hasattr(state, "epoch") else 0
-        }, step=state.global_step)
+        if self._should_log():
+            wandb.log({
+                "training/tokens": self.total_tokens,
+                "training/step_num": self.steps,
+                "training/batch_num": state.global_step,
+                "training/epoch_num": state.epoch if hasattr(state, "epoch") else 0,
+                "step_status/step_completed": state.global_step,
+                "step_status/step_duration_seconds": step_duration,
+                "training/tokens_per_second": step_tokens / step_duration if step_duration > 0 else 0
+            }, step=state.global_step)
     
     def on_log(self, args, state, control, logs=None, **kwargs):
-        """Log metrics to W&B on each logging step."""
-        if logs is None:
+        """Log metrics to W&B on each logging step with multiple loss panel formats."""
+        if logs is None or not self._should_log():
             return
         
-        # Log loss
+        # Log loss with multiple naming conventions to ensure it appears in loss panel
         if "loss" in logs:
-            wandb.log({"training/loss": logs["loss"]}, step=state.global_step)
+            current_loss = logs["loss"]
+            perplexity = np.exp(current_loss)
+            
+            print(f"📊 LOSS LOGGED - Step {state.global_step}: Loss = {current_loss:.6f}, Perplexity = {perplexity:.2f}")
+            
+            # Log loss with ALL possible naming conventions for maximum compatibility
+            wandb.log({
+                # Standard loss names (most important for loss panel)
+                "loss": current_loss,
+                "train_loss": current_loss,
+                "training_loss": current_loss,
+                
+                # W&B standard naming conventions
+                "train/loss": current_loss,
+                "training/loss": current_loss,
+                "epoch/loss": current_loss,
+                
+                # Additional metrics
+                "training/perplexity": perplexity,
+                "train/perplexity": perplexity,
+                "perplexity": perplexity,
+                
+                # Step information
+                "training/global_step": state.global_step,
+                "training/epoch": getattr(state, 'epoch', 0)
+            }, step=state.global_step)
+            
+            # Also update the run summary for immediate visibility
+            wandb.run.summary.update({
+                "current_loss": current_loss,
+                "current_perplexity": perplexity,
+                "latest_step_with_loss": state.global_step
+            })
+        
+        # Log learning rate if available
+        if "learning_rate" in logs:
+            lr = logs["learning_rate"]
+            wandb.log({
+                "learning_rate": lr,
+                "train/learning_rate": lr,
+                "training/learning_rate": lr
+            }, step=state.global_step)
         
         # Calculate and log number of tokens processed
         if "train_runtime" in logs:
             # At the end of training, log final token count and statistics
+            tokens_per_second = self.total_tokens / logs["train_runtime"]
+            
             wandb.log({
                 "training/total_tokens": self.total_tokens,
-                "training/tokens_per_second": self.total_tokens / logs["train_runtime"],
-                "training/final_step": self.steps
+                "training/tokens_per_second": tokens_per_second,
+                "training/final_step": self.steps,
+                "training/total_runtime": logs["train_runtime"]
             }, step=state.global_step)
+            
+            # Update summary with final statistics
+            wandb.run.summary.update({
+                "final_total_tokens": self.total_tokens,
+                "final_tokens_per_second": tokens_per_second,
+                "final_total_steps": self.steps
+            })
             
             # Print token statistics for easy reference
             print(f"\n=== Training Token Statistics ===")
             print(f"Total tokens processed: {self.total_tokens:,}")
-            print(f"Tokens per second: {self.total_tokens / logs['train_runtime']:.2f}")
+            print(f"Tokens per second: {tokens_per_second:.2f}")
             print(f"Total steps: {self.steps}")
             print(f"Sequence length: {self.max_seq_length}")
             print(f"Batch size per step: {args.per_device_train_batch_size * args.world_size}")
             print(f"===================================\n")
         
-        # Log perplexity (derived from loss)
-        if "loss" in logs:
-            perplexity = np.exp(logs["loss"])
-            wandb.log({"training/perplexity": perplexity}, step=state.global_step)
-            
-            # For language models, we can use perplexity as a proxy for accuracy
-            # Lower perplexity = higher accuracy
-            accuracy_proxy = max(0, 100 * (1 - (perplexity / 100)))
-            accuracy_proxy = min(accuracy_proxy, 100)  # Cap at 100%
-            wandb.log({"training/accuracy_proxy": accuracy_proxy}, step=state.global_step)
-
+        # Log any other metrics that might be present
+        for key, value in logs.items():
+            if key not in ["loss", "learning_rate", "train_runtime"] and isinstance(value, (int, float)):
+                if self._should_log():
+                    wandb.log({
+                        key: value,
+                        f"train/{key}": value,
+                        f"training/{key}": value
+                    }, step=state.global_step)
+                    
 def create_deepspeed_config():
     """Create a basic DeepSpeed configuration for ZeRO-3"""
     config = {
