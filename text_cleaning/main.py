@@ -203,12 +203,41 @@ def create_registry(debug_mode):
         #         save_cleaned_data=False
         #     )
         # },
-        'YifatDataBatch2-Round4': {
+        # 'YifatDataBatch2-Round4': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/Yifat4+5/csv_output',
+        #         source_name='YifatDataBatch2-Round4',
+        #         output_prefix='processed_and_cleaned/YifatDataBatch2-Round4',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         debug_mode=debug_mode,
+        #         save_cleaned_data=False
+        #     )
+        # },
+        # 'YifatDataBatch3-Round5': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/Yifat4+5/csv_output',
+        #         source_name='YifatDataBatch3-Round5',
+        #         output_prefix='test_spacefix/YifatDataBatch2-Round5',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': SpaceFixCleaner() 
+        #     # 'cleaner': RegExCleaner(
+        #     #     patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #     #     debug_mode=debug_mode,
+        #     #     save_cleaned_data=False
+        #     # )
+        # },
+        'OcrTau': {
             'fetcher': S3SourceFetcher(
                 bucket_name='israllm-datasets',
-                prefix='raw-datasets/Yifat4+5/csv_output',
-                source_name='YifatDataBatch2-Round4',
-                output_prefix='processed_and_cleaned/YifatDataBatch2-Round4',
+                prefix='tau_clean/',
+                source_name='HQwOcr_Markdown_Tables_batch1.jsonl',
+                output_prefix = 'processed_and_cleaned/TauOCR',
                 output_bucket_name='gepeta-datasets'
             ),
             'cleaner': RegExCleaner(
@@ -216,22 +245,7 @@ def create_registry(debug_mode):
                 debug_mode=debug_mode,
                 save_cleaned_data=False
             )
-        },
-        'YifatDataBatch3-Round5': {
-            'fetcher': S3SourceFetcher(
-                bucket_name='israllm-datasets',
-                prefix='raw-datasets/Yifat4+5/csv_output',
-                source_name='YifatDataBatch3-Round5',
-                output_prefix='processed_and_cleaned/YifatDataBatch2-Round5',
-                output_bucket_name='gepeta-datasets'
-            ),
-            'cleaner': RegExCleaner(
-                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-                debug_mode=debug_mode,
-                save_cleaned_data=False
-            )
-        },
-
+        }
     }
     return registry
 

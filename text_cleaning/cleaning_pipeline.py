@@ -22,9 +22,6 @@ class CleaningPipeline:
             # Process single file
             df = self.fetcher.fetch_single_file(file_path)
             if not df.empty:
-                # Extract file name for sample naming
-                file_name = Path(file_path).stem
-                
                 # Clean the data (this will handle sample saving if enabled)
                 df = self.cleaner.clean(df)
                 
