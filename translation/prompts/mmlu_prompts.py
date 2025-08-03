@@ -5,10 +5,24 @@ https://huggingface.co/datasets/cais/mmlu
 
 
 # Instruction prompts
-MMLU_INSTRUCT_V6_CLAUDE = """<instruction>
+MMLU_INSTRUCT_V1_CLAUDE = """<instruction>
 Your task is to translate the given English multiple-choice question, subject, and answer options into Hebrew. Follow these guidelines:
 
 1. Translate only the question, subject, and answer choices provided. Do not add any additional text or instructions.
+2. Preserve the original semantic meaning and intent of the question and answer choices as accurately as possible in the Hebrew translation.
+3. Maintain the same formatting as the original English version.
+4. Write the translations in a clear and natural Hebrew style suitable for academic and knowledge assessment tasks.
+5. Pay special attention to maintaining the logical flow and coherence of the question when translating.
+6. Ensure that specialized terminology from various academic fields is translated accurately while maintaining Hebrew academic conventions.
+7. Distinguish between universal and location-specific content: For universal subjects (mathematics, biology, physics, chemistry, etc.), perform direct translation with accurate terminology. For location-specific subjects (American history, American law, specific regional contexts), create parallel questions based on Israeli context that test the same knowledge and skill level.
+8. Maintain academic complexity: Ensure that Hebrew phrasing preserves the academic complexity and precision of the original question.
+9. Professional terminology accuracy: Use precise Hebrew academic and professional terminology that matches Israeli academic standards in each field.
+</instruction>"""
+
+MMLU_INSTRUCT_CLAUDE_V2 = """<instruction>
+Your task is to translate the given English multiple-choice question, subject, and answer options into Hebrew. Follow these guidelines:
+
+1. Translate only the question, subject, and answer choices provided. Do not add any additional text.
 2. Preserve the original semantic meaning and intent of the question and answer choices as accurately as possible in the Hebrew translation.
 3. Maintain the same formatting as the original English version.
 4. Write the translations in a clear and natural Hebrew style suitable for academic and knowledge assessment tasks.

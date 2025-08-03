@@ -17,6 +17,17 @@ Your task is to translate the given English question and possible answers into H
 4. Write the translations in a clear and concise style suitable for grade school-level science questions.
 </instruction>"""
 
+ARC_INSTRUCT_V7_CLAUDE = """<instruction>
+Your task is to translate the given English question and possible answers into Hebrew. Follow these guidelines:
+
+1. Translate only the question and answer options provided. Do not add any additional text.
+2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
+3. Maintain the same formatting as the original English version.
+4. Write the translations in a clear and concise style suitable for grade school-level science questions.
+5. Terminology accuracy: Make sure to use the correct Hebrew terminology for scientific terms.
+6. Keep the "plausibility" of all answers, so that wrong answers will stay relevant.
+</instruction>"""
+
 ARC_INSTRUCT_V1_CLAUDE_REFINE = """<instruction>
 Your task is to translate the given English question and possible answers into Hebrew. First write a possible translation and then improve it. 
 Follow these guidelines:

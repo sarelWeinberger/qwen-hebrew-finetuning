@@ -1,0 +1,73 @@
+# =================================================================
+# MQM-HE-Lite: Configuration File v1.0
+# =================================================================
+# This file serves as the single source of truth for the
+# English-Hebrew translation quality evaluation project.
+
+# Main section defining the error taxonomy and severities.
+# This part is often ingested by annotation tools.
+MQM_HE_Lite:
+  # Severities define the penalty weight for each error type.
+  # The exponential weights (1, 5, 25) ensure critical errors
+  # have a much larger impact on the final score.
+  severities:
+    minor: 1
+    major: 5
+    critical: 25
+
+  # The core taxonomy of error types, structured hierarchically.
+  # These names will appear in the annotator's dropdown menus.
+  categories:
+    Adequacy:
+      - Mistranslation
+      - Omission
+      - Addition
+      - TerminologyNamedEntity
+      - CulturalReference
+    Fluency:
+      # Hebrew-specific issues are grouped under Fluency.
+      - Agreement          # Covers gender, number, person, and construct state (smichut).
+      - MorphologyFunction # Covers clitic prepositions (b/k/l/m), definite article (ha-), pronominal suffixes.
+      - WordOrderSyntax
+      - OrthographyPunct   # Covers ktiv haser/male, transliteration issues.
+    LocaleStyle:
+      - Register
+      - Conventions        # Covers local formats for dates, numbers, currency.
+
+# =================================================================
+# Project Protocol and Guidelines
+# =================================================================
+# This section defines the rules of the evaluation project.
+# It ensures all participants (annotators, adjudicators, project managers)
+# follow the same protocol.
+
+guidelines:
+  # Core rule to keep annotation simple and fast.
+  one_label_per_error: true
+
+  # Defines if annotators can see surrounding sentences.
+  # "document if available" is a common and useful setting.
+  context_allowed: "document if available"
+
+  # Parameters for the human evaluation phase.
+  calibration_pack_size: 20
+  target_sample_per_annotator: 200-300
+  annotators_per_segment: 2
+  adjudication_rate_target: "10-15%"
+  inter_annotator_agreement_metric: "Cohen's Kappa"
+  inter_annotator_agreement_target: 0.6
+
+# =================================================================
+# Automation and Tooling
+# =================================================================
+# This section specifies the automated components of the workflow.
+
+automation:
+  # Defines the metric used for pre-filtering segments.
+  prefilter_metric: "xCOMET"
+
+  # Describes how the pre-filtering metric is used to build the sample.
+  prefilter_use: "Rank all segments by score; oversample from low-score deciles."
+
+  # Optional step for tie-breaking or further ranking.
+  optional_ranker: "GPT-4"

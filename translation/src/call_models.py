@@ -3,7 +3,9 @@ import json
 from google import genai
 from google.genai import types
 
-CLAUDE_MODEL = "arn:aws:bedrock:us-east-1:670967753077:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+CLAUDE_MODEL_3 = "arn:aws:bedrock:us-east-1:670967753077:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+# CLAUDE_MODEL_4 = "arn:aws:bedrock:us-east-1:670967753077:inference-profile/us.anthropic.claude-opus-4-20250514-v1:0"
+CLAUDE_MODEL_4 = "arn:aws:bedrock:us-east-1:670967753077:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0"
 GEMINI_MODEL_PRO = "gemini-2.5-pro"
 GEMINI_MODEL_FLASH = "gemini-2.5-flash"
 
@@ -18,6 +20,58 @@ def bedrock_connect(acceess_id, secret_key):
         aws_secret_access_key=secret_key,
     )
 
+
+def call_claude_bedrock_with_thinking(bedrock_client, message, system_prompt=None, max_tokens=12_000, thinking_budget=2000, if_four=False):
+    """
+    Call Claude through AWS Bedrock with extended thinking enabled.
+    """
+    if if_four:
+        model_name = CLAUDE_MODEL_4
+    else:
+        model_name = CLAUDE_MODEL_3
+    # Prepare the request body
+    claude_params = {
+        "anthropic_version": "bedrock-2023-05-31",
+        # "top_k": 1,
+        # "temperature": 0.0,
+        "max_tokens": max_tokens,
+        "messages": [{
+            "role": "user",
+            "content": [{
+                "type": "text",
+                "text": message,
+            }]
+        }],
+        "thinking": {
+            "type": "enabled",
+            "budget_tokens": thinking_budget
+        }
+    }
+    if system_prompt:
+        claude_params['system'] = system_prompt
+    body = json.dumps(claude_params)
+
+    # Make the API call
+    response = bedrock_client.invoke_model(
+        body=body,
+        modelId=model_name,
+        contentType='application/json',
+        accept='application/json'
+    )
+
+    # Parse and return response
+    response_body = json.loads(response.get('body').read())
+    
+    # The response will now contain both "thinking" and "content" blocks.
+    # You can process the thinking steps and the final answer separately.
+    thinking_content = [item for item in response_body.get('content', []) if item.get('type') == 'thinking']
+    final_content = [item for item in response_body.get('content', []) if item.get('type') == 'text']
+
+    # For this example, we'll return the thinking process and the final text.
+    # In a real application, you might want to handle these differently.
+    output = final_content[0]['text'] if final_content else ""
+    # Return (text, thinking)
+    return output,  thinking_content[0]['thinking']
 
 # Claude call
 def call_claude_bedrock(bedrock_client, message, system_prompt=None, max_tokens=10_000):
@@ -46,8 +100,6 @@ def call_claude_bedrock(bedrock_client, message, system_prompt=None, max_tokens=
     # Make the API call
     response = bedrock_client.invoke_model(
         body=body,
-        # modelId='anthropic.claude-3-5-sonnet-20240620-v1:0',
-        # modelId='anthropic.claude-3-7-sonnet-20250219-v1:0',
         modelId=CLAUDE_MODEL,
         contentType='application/json',
         accept='application/json'

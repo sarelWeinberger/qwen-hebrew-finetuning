@@ -1,9 +1,13 @@
-from src.call_models import call_claude_bedrock
+from src.call_models import call_claude_bedrock, call_claude_bedrock_with_thinking
 from src.call_models import call_gemini, all_string_gemini_config, all_list_gemini_config
 from datasets import Dataset
 import re
 from tqdm.auto import tqdm
 from time import time, sleep
+
+import botocore.exceptions
+
+import pickle
 
 # The base prompt of the English-Hebrew
 BASE_PROMPT = "English:\n{X}\nHebrew:\n{Y}"
@@ -24,7 +28,7 @@ def dict_to_prompt(dct):
     return '\n'.join([f'<{k}>{dct[k]}</{k}>' for k in dct if k != 'translation_status'])
 
 
-def claude_translation(bedrock_client, datasets, instruct, few_shots, sample_format, sample_to_dict, dict_to_sample):
+def claude_translation(bedrock_client, datasets, instruct, few_shots, sample_format, sample_to_dict, dict_to_sample, if_four=False):
     """
     Translate all given datasets using one of the claude famaliy models.
     """
@@ -48,7 +52,16 @@ def claude_translation(bedrock_client, datasets, instruct, few_shots, sample_for
             query = final_prompt + BASE_PROMPT.format(X=samples_query, Y='')
 
             # Call claude
-            output = call_claude_bedrock(bedrock_client, query, system_prompt=instruct)
+            # print(query)
+            # print('\n\n\n\n')
+            # print(instruct)
+            # exit()
+            try:
+                # output = call_claude_bedrock(bedrock_client, query, system_prompt=instruct)
+                output, thinking = call_claude_bedrock_with_thinking(bedrock_client, query, system_prompt=instruct, if_four=if_four)
+            except botocore.exceptions.ReadTimeoutError as e:
+                print("Read timeout occurred:", e)
+                print('Droped sample number: ', len(hebrew_dataset[key]))
 
             # Parse the model's output
             pattern = r"<(?!response_format\b)([^>]+)>(.*?)</\1>"
@@ -68,9 +81,19 @@ def claude_translation(bedrock_client, datasets, instruct, few_shots, sample_for
             # Create New sample
             new_sample = dict_to_sample(sample, result)
             hebrew_dataset[key].append(new_sample)
-            text_output[key].append(output)
+            # text_output[key].append(output)
+            text_output[key].append('Thinking:\n' + thinking + '\n\nText:\n' + output)
             # print(output)
             # print()
+
+            cur_size = len(hebrew_dataset[key])
+            if cur_size % 25 == 0:
+                cp_name = f'checkpoints/claude_{key}_{cur_size}.pkl'
+                cp_name_text = f'checkpoints/claude_{key}_{cur_size}_text.pkl'
+                with open(cp_name, 'wb') as f:
+                    pickle.dump(hebrew_dataset[key], f)
+                with open(cp_name_text, 'wb') as f:
+                    pickle.dump(text_output[key], f)
 
         hebrew_dataset[key] = Dataset.from_list(hebrew_dataset[key])
     return hebrew_dataset, text_output
