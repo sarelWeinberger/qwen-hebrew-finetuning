@@ -4,15 +4,22 @@
 set -e
 
 # Check for command line arguments
-if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 <github_username> <github_token> [repository_name]"
-    echo "Example: $0 sarelWE your_token qwen-hebrew-finetuning"
+if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 <github_username> [repository_name]"
+    echo "Example: $0 sarelWE qwen-hebrew-finetuning"
+    echo "Note: GITHUB_TOKEN should be set as environment variable"
     exit 1
 fi
 
 GITHUB_USERNAME=$1
-GITHUB_TOKEN=$2
-REPO_NAME=${3:-qwen-hebrew-finetuning}  # Default repo name if not provided
+REPO_NAME=${2:-qwen-hebrew-finetuning}  # Default repo name if not provided
+
+# Check if GITHUB_TOKEN is set
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo "Error: GITHUB_TOKEN environment variable is not set"
+    echo "Please set it with: export GITHUB_TOKEN=your_token"
+    exit 1
+fi
 
 echo "Setting up git repository and pushing to GitHub..."
 
@@ -111,6 +118,10 @@ git add qwen_model/*.sh
 git add qwen_model/finetuning/*.json
 git add README.md
 git add requirements.txt
+git add pyproject.toml
+git add Makefile
+git add setup_uv_env.sh
+git add activate_env.sh
 git add .gitignore
 git add git_setup.sh
 

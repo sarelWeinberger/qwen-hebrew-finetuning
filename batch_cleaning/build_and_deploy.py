@@ -242,8 +242,12 @@ def main():
     # הגדרות - צריך לעדכן!
     REGION = "us-east-1"
     ROLE_ARN = "arn:aws:iam::YOUR_ACCOUNT:role/SageMakerExecutionRole"  # עדכן!
-    HF_TOKEN = "hf_your_token_here"  # עדכן!
+    HF_TOKEN = os.environ.get('HF_TOKEN')  # קריאה מתוך environment variable
     BUCKET_NAME = "your-s3-bucket"  # עדכן!
+    
+    if not HF_TOKEN:
+        print("Error: HF_TOKEN environment variable is not set")
+        return
 
     # טקסטים לבדיקה
     sample_texts = [

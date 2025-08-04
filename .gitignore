@@ -44,6 +44,9 @@ runs/
 .venv
 venv/
 ENV/
+.uv/
+uv.lock
+.python-version
 
 # IDE
 .idea/
