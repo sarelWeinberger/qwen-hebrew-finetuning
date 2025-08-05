@@ -1,9 +1,14 @@
 import pandas as pd
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from utils.logger import logger
+import time
 
 class BaseCleaner:
     def __init__(self):
+        """
+        Initialize the base cleaner.
+        
+        """
         self.stats = {
             'total_rows_processed': 0,
             'rows_modified': 0,
@@ -12,8 +17,10 @@ class BaseCleaner:
             'patterns_matched': {},
             'execution_time': 0
         }
+        
     
-    def clean(self, df: pd.DataFrame) -> pd.DataFrame:
+    
+    def clean(self, df: pd.DataFrame, file_name: str = "unknown") -> pd.DataFrame:
         """
         Clean the input DataFrame.
         
@@ -23,7 +30,36 @@ class BaseCleaner:
         Returns:
             Cleaned DataFrame
         """
-        raise NotImplementedError
+        start_time = time.time()
+        
+        
+        # Perform the actual cleaning (to be implemented by subclasses)
+        cleaned_df = self._clean_implementation(df)
+        
+        # Calculate statistics
+        self.stats['total_rows_processed'] = len(df)
+        self.stats['execution_time'] = time.time() - start_time
+        
+        # Calculate character changes
+        if 'text' in df.columns and 'text' in cleaned_df.columns:
+            initial_length = df['text'].str.len().sum()
+            final_length = cleaned_df['text'].str.len().sum()
+            self.stats['characters_removed'] = max(0, initial_length - final_length)
+            self.stats['characters_added'] = max(0, final_length - initial_length)
+
+        return cleaned_df
+    
+    def _clean_implementation(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Implementation of the cleaning logic. Must be overridden by subclasses.
+        
+        Args:
+            df: Input DataFrame to clean
+            
+        Returns:
+            Cleaned DataFrame
+        """
+        raise NotImplementedError("Subclasses must implement _clean_implementation")
     
     def get_stats(self) -> Dict[str, Any]:
         """
@@ -36,15 +72,5 @@ class BaseCleaner:
     
     def log_stats(self):
         """Log the cleaning statistics."""
-        logger.info(f"Cleaning statistics for {self.__class__.__name__}:")
-        logger.info(f"Total rows processed: {self.stats['total_rows_processed']}")
-        logger.info(f"Rows modified: {self.stats['rows_modified']}")
-        logger.info(f"Characters removed: {self.stats['characters_removed']}")
-        logger.info(f"Characters added: {self.stats['characters_added']}")
-        
-        if self.stats['patterns_matched']:
-            logger.info("Pattern matching statistics:")
-            for pattern, count in self.stats['patterns_matched'].items():
-                logger.info(f"  - Pattern '{pattern}': {count} matches")
-        
-        logger.info(f"Execution time: {self.stats['execution_time']:.2f} seconds")
+        logger.info(f"Done {self.__class__.__name__}")
+    

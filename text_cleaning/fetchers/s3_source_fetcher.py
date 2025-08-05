@@ -6,71 +6,341 @@ from typing import List
 from pathlib import Path
 import time
 from utils.logger import logger
+import json
+import tempfile
+import os
+import rarfile
+import gzip
 
 class S3SourceFetcher(BaseFetcher):
-    def __init__(self, bucket_name: str, prefix: str, source_name: str, output_prefix: str):
+    def __init__(self, bucket_name: str, prefix: str, source_name: str, output_prefix: str, 
+                 output_bucket_name: str):
         super().__init__(source_name)
         self.s3 = boto3.client("s3")
         self.bucket_name = bucket_name
         self.prefix = prefix.rstrip("/") + "/"
         self.output_prefix = output_prefix
-        logger.info(f"Initialized S3SourceFetcher for bucket: {bucket_name}")
-        logger.info(f"Input prefix: {self.prefix}")
-        logger.info(f"Output prefix: {self.output_prefix}")
+        self.output_bucket_name = output_bucket_name
+        logger.info(f"Initialized S3SourceFetcher")
 
     def get_files_to_process(self) -> List[str]:
         """
         Get list of S3 keys that need to be processed.
+        Excludes files that already have cleaned versions in the output directory.
+        Supports .jsonl files (direct JSONL), .rar files (containing JSONL), and .csv files.
         """
         paginator = self.s3.get_paginator('list_objects_v2')
-        csv_keys = []
+        files_keys = []
         total_size = 0
-
-        logger.info(f"Listing objects in s3://{self.bucket_name}/{self.prefix}")
+        
+        # Get list of existing cleaned files in output directory
+        existing_cleaned_files = set()
+        try:
+            output_paginator = self.s3.get_paginator('list_objects_v2')
+            for page in output_paginator.paginate(Bucket=self.output_bucket_name, Prefix=self.output_prefix):
+                for obj in page.get('Contents', []):
+                    output_key = obj['Key']
+                    # Extract the original filename from cleaned filename
+                    # cleaned filename format: original_stem_cleaned.csv
+                    output_filename = output_key.split('/')[-1]
+                    if output_filename.endswith('_cleaned.csv'):
+                        original_stem = output_filename.replace('_cleaned.csv', '')
+                        existing_cleaned_files.add(original_stem)
+        except Exception as e:
+            logger.warning(f"Could not check existing cleaned files: {str(e)}")
         
         for page in paginator.paginate(Bucket=self.bucket_name, Prefix=self.prefix):
             for obj in page.get('Contents', []):
                 key = obj['Key']
                 size = obj['Size']
-                # Fetch files that start with source_name and end with .csv
+                # Fetch files that start with source_name and end with .jsonl, .rar, or .csv
                 filename = key.split('/')[-1]
-                if filename.startswith(self.source_name) and filename.endswith('.csv'):
-                    csv_keys.append(key)
-                    total_size += size
-                    logger.debug(f"Found matching file: {key} (Size: {size} bytes)")
+                files_jsonl = filename.startswith(self.source_name) and filename.endswith('.jsonl')
+                files_rar = filename.startswith(self.source_name) and filename.endswith('.rar')
+                files_csv = filename.startswith(self.source_name) and filename.endswith('.csv')
+                files_gz = filename.startswith(self.source_name) and filename.endswith('.gz')
+                
+                if files_jsonl or files_rar or files_csv or files_gz:
+                    # Check if cleaned version already exists
+                    file_stem = Path(filename).stem
+                    if file_stem not in existing_cleaned_files:
+                        files_keys.append(key)
+                        total_size += size
+                    else:
+                        logger.info(f"Skipping {filename} - cleaned version already exists")
 
-        logger.info(f"Found {len(csv_keys)} matching files (Total size: {total_size} bytes)")
-        return csv_keys
+        return files_keys
+
+    def _read_jsonl_data_streaming(self, response_body) -> pd.DataFrame:
+        """
+        Read JSONL data line by line from S3 response body.
+        
+        Args:
+            response_body: S3 response body object
+            
+        Returns:
+            DataFrame with parsed JSONL data
+        """
+        try:
+            all_data = []
+            line_num = 0
+            
+            # Read line by line from the response body
+            for line in response_body.iter_lines():
+                line_num += 1
+                if line:  # Skip empty lines
+                    try:
+                        # Decode the line
+                        line_text = line.decode('utf-8').strip()
+                        if line_text:  # Skip empty lines after decoding
+                            data = json.loads(line_text)
+                            all_data.append(data)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Invalid JSON at line {line_num}: {e}")
+                    except Exception as e:
+                        logger.warning(f"Error processing line {line_num}: {e}")
+            
+            if not all_data:
+                logger.warning("No valid JSON data found in file")
+                return pd.DataFrame()
+            
+            # Convert to DataFrame
+            df = pd.DataFrame(all_data)
+            
+            # If the JSONL contains text data, ensure we have a 'text' column
+            if 'text' not in df.columns:
+                # Try to find a suitable text column
+                text_columns = [col for col in df.columns if 'text' in col.lower() or 'content' in col.lower()]
+                if text_columns:
+                    df['text'] = df[text_columns[0]]
+                else:
+                    # If no text column found, use the first column as text
+                    df['text'] = df.iloc[:, 0].astype(str)
+            
+            # Add word count column if not present
+            if 'n_words' not in df.columns:
+                df['n_words'] = df['text'].str.split().str.len()
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error reading JSONL data: {str(e)}")
+            return pd.DataFrame()
+
+    def _read_jsonl_data(self, file_data: bytes) -> pd.DataFrame:
+        """
+        Read JSONL data from bytes (fallback method).
+        
+        Args:
+            file_data: Raw bytes of the JSONL file
+            
+        Returns:
+            DataFrame with parsed JSONL data
+        """
+        try:
+            text = file_data.decode('utf-8')
+            all_data = []
+            
+            for line_num, line in enumerate(text.split('\n'), 1):
+                line = line.strip()
+                if line:  # Skip empty lines
+                    try:
+                        data = json.loads(line)
+                        all_data.append(data)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Invalid JSON at line {line_num}: {e}")
+                    except Exception as e:
+                        logger.warning(f"Error processing line {line_num}: {e}")
+            
+            if not all_data:
+                logger.warning("No valid JSON data found in file")
+                return pd.DataFrame()
+            
+            # Convert to DataFrame
+            df = pd.DataFrame(all_data)
+            
+            # If the JSONL contains text data, ensure we have a 'text' column
+            if 'text' not in df.columns:
+                # Try to find a suitable text column
+                text_columns = [col for col in df.columns if 'text' in col.lower() or 'content' in col.lower()]
+                if text_columns:
+                    df['text'] = df[text_columns[0]]
+                else:
+                    # If no text column found, use the first column as text
+                    df['text'] = df.iloc[:, 0].astype(str)
+            
+            # Add word count column if not present
+            if 'n_words' not in df.columns:
+                df['n_words'] = df['text'].str.split().str.len()
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error reading JSONL data: {str(e)}")
+            return pd.DataFrame()
+
+    def _extract_rar_and_read_jsonl(self, rar_data: bytes) -> pd.DataFrame:
+        """
+        Extract RAR file and read JSONL content from it.
+        
+        Args:
+            rar_data: Raw bytes of the RAR file
+            
+        Returns:
+            DataFrame with extracted JSONL data
+        """
+        try:
+            # Create a temporary directory for extraction
+            with tempfile.TemporaryDirectory() as temp_dir:
+                # Save RAR file to temporary location
+                rar_path = os.path.join(temp_dir, "temp.rar")
+                with open(rar_path, 'wb') as f:
+                    f.write(rar_data)
+                
+                # Extract RAR file
+                with rarfile.RarFile(rar_path, 'r') as rf:
+                    # Find JSONL files in the archive
+                    jsonl_files = [f for f in rf.namelist() if f.endswith('.jsonl')]
+                    
+                    if not jsonl_files:
+                        logger.warning("No JSONL files found in RAR archive")
+                        return pd.DataFrame()
+                    
+                    all_data = []
+                    
+                    for jsonl_file in jsonl_files:
+                        logger.info(f"Processing JSONL file: {jsonl_file}")
+                        
+                        # Read JSONL content
+                        with rf.open(jsonl_file) as f:
+                            for line_num, line in enumerate(f, 1):
+                                try:
+                                    line = line.decode('utf-8').strip()
+                                    if line:  # Skip empty lines
+                                        data = json.loads(line)
+                                        all_data.append(data)
+                                except json.JSONDecodeError as e:
+                                    logger.warning(f"Invalid JSON at line {line_num} in {jsonl_file}: {e}")
+                                except Exception as e:
+                                    logger.warning(f"Error processing line {line_num} in {jsonl_file}: {e}")
+                    
+                    if not all_data:
+                        logger.warning("No valid JSON data found in RAR archive")
+                        return pd.DataFrame()
+                    
+                    # Convert to DataFrame
+                    df = pd.DataFrame(all_data)
+                    
+                    # If the JSONL contains text data, ensure we have a 'text' column
+                    if 'text' not in df.columns:
+                        # Try to find a suitable text column
+                        text_columns = [col for col in df.columns if 'text' in col.lower() or 'content' in col.lower()]
+                        if text_columns:
+                            df['text'] = df[text_columns[0]]
+                        else:
+                            # If no text column found, use the first column as text
+                            df['text'] = df.iloc[:, 0].astype(str)
+                    
+                    # Add word count column if not present
+                    if 'n_words' not in df.columns:
+                        df['n_words'] = df['text'].str.split().str.len()
+                    
+                    return df
+                    
+        except Exception as e:
+            logger.error(f"Error extracting RAR file: {str(e)}")
+            return pd.DataFrame()
+
+    def _extract_gz_and_read_data(self, gz_data: bytes, original_filename: str) -> pd.DataFrame:
+        """
+        Extract GZ file and read content from it.
+        Supports JSONL, CSV, and other text formats.
+        
+        Args:
+            gz_data: Raw bytes of the GZ file
+            original_filename: Original filename to determine content type
+            
+        Returns:
+            DataFrame with extracted data
+        """
+        try:
+            # Decompress the gz data
+            decompressed_data = gzip.decompress(gz_data)
+            
+            # Determine the content type based on the original filename
+            # Remove .gz extension to get the actual file type
+            base_filename = original_filename.replace('.gz', '')
+            
+            if base_filename.endswith('.jsonl'):
+                # Handle JSONL content
+                logger.info(f"Processing GZ-compressed JSONL file: {original_filename}")
+                return self._read_jsonl_data(decompressed_data)
+            elif base_filename.endswith('.csv'):
+                # Handle CSV content
+                logger.info(f"Processing GZ-compressed CSV file: {original_filename}")
+                df = pd.read_csv(io.BytesIO(decompressed_data), header=None, names=["text", "n_words"])
+                return df
+            else:
+                # Try to detect content type by examining the first few lines
+                try:
+                    # Try as JSONL first
+                    text = decompressed_data.decode('utf-8')
+                    first_line = text.split('\n')[0].strip()
+                    json.loads(first_line)  # Test if it's valid JSON
+                    logger.info(f"Detected JSONL content in GZ file: {original_filename}")
+                    return self._read_jsonl_data(decompressed_data)
+                except (json.JSONDecodeError, IndexError):
+                    # Try as CSV
+                    try:
+                        logger.info(f"Detected CSV content in GZ file: {original_filename}")
+                        df = pd.read_csv(io.BytesIO(decompressed_data), header=None, names=["text", "n_words"])
+                        return df
+                    except Exception:
+                        # Treat as plain text
+                        logger.info(f"Treating GZ file as plain text: {original_filename}")
+                        text = decompressed_data.decode('utf-8')
+                        lines = [line.strip() for line in text.split('\n') if line.strip()]
+                        df = pd.DataFrame({'text': lines})
+                        df['n_words'] = df['text'].str.split().str.len()
+                        return df
+                        
+        except Exception as e:
+            logger.error(f"Error extracting GZ file: {str(e)}")
+            return pd.DataFrame()
 
     def fetch_single_file(self, file_path: str) -> pd.DataFrame:
         """
         Fetch data from a single S3 file.
+        Supports .jsonl files (direct JSONL), .rar files (containing JSONL), and .csv files.
+        Uses streaming for JSONL files to improve performance.
         """
-        start_time = time.time()
-        file_stats = {
-            'rows': 0,
-            'size_bytes': 0,
-            'processing_time': 0
-        }
-        
+    
         try:
-            # Get object metadata
-            head_response = self.s3.head_object(Bucket=self.bucket_name, Key=file_path)
-            file_stats['size_bytes'] = head_response['ContentLength']
-            
-            logger.info(f"Fetching s3://{self.bucket_name}/{file_path} (Size: {file_stats['size_bytes']} bytes)")
-            
             # Get object data
             response = self.s3.get_object(Bucket=self.bucket_name, Key=file_path)
-            df = pd.read_csv(io.BytesIO(response["Body"].read()), header=None, names=["text", "n_words"])
-            file_stats['rows'] = len(df)
             
-            # Update statistics
-            self.stats['total_files_processed'] += 1
-            self.stats['total_rows_fetched'] += len(df)
-            self.stats['total_bytes_read'] += file_stats['size_bytes']
-            
-            logger.info(f"Successfully fetched {len(df)} rows from s3://{self.bucket_name}/{file_path}")
+            if file_path.endswith('.jsonl'):
+                # Handle extracted JSONL files directly using streaming
+                logger.info(f"Processing JSONL file with streaming: {file_path}")
+                df = self._read_jsonl_data_streaming(response["Body"])
+            elif file_path.endswith('.rar'):
+                # Handle RAR files containing JSONL data
+                logger.info(f"Processing RAR file: {file_path}")
+                file_data = response["Body"].read()
+                df = self._extract_rar_and_read_jsonl(file_data)
+            elif file_path.endswith('.csv'):
+                # Handle CSV files
+                logger.info(f"Processing CSV file: {file_path}")
+                df = pd.read_csv(io.BytesIO(response["Body"].read()), header=None, names=["text", "n_words"])
+            elif file_path.endswith('.gz'):
+                # Handle GZ compressed files
+                logger.info(f"Processing GZ file: {file_path}")
+                file_data = response["Body"].read()
+                original_filename = file_path.split('/')[-1]
+                df = self._extract_gz_and_read_data(file_data, original_filename)
+            else:
+                logger.warning(f"Unsupported file format: {file_path}")
+                return pd.DataFrame()
 
             return df
             
@@ -79,10 +349,6 @@ class S3SourceFetcher(BaseFetcher):
             logger.error(error_msg)
             self.stats['errors'].append(error_msg)
             return pd.DataFrame()
-            
-        finally:
-            file_stats['processing_time'] = time.time() - start_time
-            self.stats['file_stats'][file_path] = file_stats
 
     def save_cleaned_data(self, df: pd.DataFrame, source_name: str, original_file_path: str):
         """
@@ -100,16 +366,12 @@ class S3SourceFetcher(BaseFetcher):
             csv_data = csv_buffer.getvalue()
             
             # Upload to S3
-            logger.info(f"Uploading {len(df)} rows to s3://{self.bucket_name}/{output_key}")
             self.s3.put_object(
-                Bucket=self.bucket_name,
+                Bucket=self.output_bucket_name,
                 Key=output_key,
                 Body=csv_data,
                 ContentType='text/csv'
             )
-            
-            logger.info(f"Successfully saved cleaned data to s3://{self.bucket_name}/{output_key}")
-            logger.info(f"Output size: {len(csv_data)} bytes")
             
         except Exception as e:
             error_msg = f"Error saving cleaned data to s3://{self.bucket_name}/{output_key}: {str(e)}"
