@@ -6,6 +6,8 @@ import os
 class SpaceFixCleaner(BaseCleaner):
     _oracle = None  # Class variable to hold the pipeline singleton
     _insertions_df = None  # Class variable to hold all insertions DataFrame
+    _tracking_enabled = False  # Class variable to enable/disable tracking
+    _tracking_data = []  # Class variable to store tracking data
 
     @classmethod
     def get_oracle(cls):
@@ -13,13 +15,36 @@ class SpaceFixCleaner(BaseCleaner):
             cls._oracle = pipeline('token-classification', model='dicta-il/dictabert-char-spacefix')
         return cls._oracle
 
-    def __init__(self):
+    def __init__(self, enable_tracking=True):
         super().__init__()
         # Do not load the pipeline here; use get_oracle when needed
         # Hebrew Unicode range: \u0590-\u05FF
         self.hebrew_pattern = re.compile(r'[\u0590-\u05FF]')
         self.sp_tag = ' '
         self.threshold = 0.9
+        self._tracking_enabled = enable_tracking
+        if enable_tracking:
+            self._tracking_data = []
+
+    def enable_tracking(self):
+        """Enable tracking of before/after data during cleaning."""
+        self._tracking_enabled = True
+        self._tracking_data = []
+
+    def disable_tracking(self):
+        """Disable tracking of before/after data during cleaning."""
+        self._tracking_enabled = False
+        self._tracking_data = []
+
+    def get_tracking_data(self):
+        """Get the collected tracking data as a DataFrame."""
+        if not self._tracking_data:
+            return pd.DataFrame()
+        return pd.DataFrame(self._tracking_data)
+
+    def clear_tracking_data(self):
+        """Clear the collected tracking data."""
+        self._tracking_data = []
 
     def _restore_spaces_with_tracking(self, text: str):
         if not isinstance(text, str) or not text.strip():
@@ -51,9 +76,40 @@ class SpaceFixCleaner(BaseCleaner):
             return df
         df = df.copy()
         all_insertions = []
+        
         def process_and_track(text):
+            original_text = text
+            
+            # Apply space fixer
             new_text = self._restore_spaces_with_tracking(text)
+            
+            # Track data if enabled
+            if self._tracking_enabled:
+                # Calculate basic statistics
+                original_spaces = original_text.count(' ')
+                fixed_spaces = new_text.count(' ')
+                spaces_added = fixed_spaces - original_spaces
+                
+                # Calculate word counts (simple split by spaces)
+                original_words = len(original_text.split())
+                fixed_words = len(new_text.split())
+                
+                # Store tracking data
+                self._tracking_data.append({
+                    'original_text': original_text,
+                    'fixed_text': new_text,
+                    'original_spaces': original_spaces,
+                    'fixed_spaces': fixed_spaces,
+                    'spaces_added': spaces_added,
+                    'original_word_count': original_words,
+                    'fixed_word_count': fixed_words,
+                    'word_count_change': fixed_words - original_words,
+                    'has_changes': original_text != new_text,
+                    'file_name': file_name
+                })
+            
             return new_text
+            
         df['text'] = df['text'].apply(process_and_track)
         if all_insertions:
             # Add dataset name to the insertions data

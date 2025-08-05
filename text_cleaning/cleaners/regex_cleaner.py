@@ -2,14 +2,10 @@ from .base_cleaner import BaseCleaner
 import pandas as pd
 import regex
 import time
-import boto3
-import io
 import os
-from utils.logger import logger
-from utils.cleaner_constants import CLEANUP_RULES
 
 class RegExCleaner(BaseCleaner):
-    def __init__(self, patterns: list[tuple[str, str]] = None, debug_mode: bool = False, save_cleaned_data: bool = False):
+    def __init__(self, patterns: list[tuple[str, str]] = None, save_word_changes: bool = True):
         super().__init__()
         # Handle both string and callable replacements
         self.patterns = []
@@ -20,138 +16,65 @@ class RegExCleaner(BaseCleaner):
             else:
                 self.patterns.append((regex.compile(p), r))
         
-        self.debug_mode = debug_mode
-        self.save_cleaned_data = save_cleaned_data
-        self.s3_client = boto3.client('s3') if debug_mode else None
+        self.save_word_changes = save_word_changes
+        self.word_changes = []
         
-        # Initialize examples tracking for each regex pattern from CLEANUP_RULES
-        self.examples_collected = {rule['regex'][0]: 0 for rule in CLEANUP_RULES} if debug_mode else {}
-        self.examples_data = {rule['regex'][0]: [] for rule in CLEANUP_RULES} if debug_mode else {}
-        self.should_stop_processing = False
-        
-        # Create local directory for storing examples temporarily
-        if debug_mode:
-            self.local_examples_dir = "regex_examples_temp"
-            os.makedirs(self.local_examples_dir, exist_ok=True)
-        
-        logger.info(f"Initialized RegExCleaner with debug_mode={debug_mode}, save_cleaned_data={save_cleaned_data}")
+        # Create directory for saving files
+        if save_word_changes:
+            self.output_dir = "regex_examples_temp"
+            os.makedirs(self.output_dir, exist_ok=True)
 
-    def _save_examples_locally(self, regex_pattern: str, examples_df: pd.DataFrame):
+    def _track_word_changes(self, original_text: str, cleaned_text: str, pattern: str):
         """
-        Save examples DataFrame locally until we reach 50 examples.
-        
-        Args:
-            regex_pattern: The regex pattern that was applied
-            examples_df: DataFrame with before/after examples
+        Track word-level changes between original and cleaned text.
         """
-        try:
-            # Create a safe filename from the regex pattern
-            safe_pattern = regex_pattern.replace('/', '_').replace('\\', '_').replace('*', '_').replace('?', '_')
-            safe_pattern = safe_pattern[:50]  # Limit length
-            
-            # Generate filename
-            filename = f"regex_examples_{safe_pattern}.csv"
-            filepath = os.path.join(self.local_examples_dir, filename)
-            
-            # Save to local file
-            examples_df.to_csv(filepath, index=False, encoding='utf-8')
-            
-            logger.info(f"Saved {len(examples_df)} examples locally to {filepath}")
-            
-        except Exception as e:
-            logger.error(f"Error saving examples locally: {str(e)}")
-
-    def _save_examples_to_s3(self, rule_info: dict, examples_df: pd.DataFrame):
-        """
-        Save examples DataFrame to S3 bucket and path specified in the rule.
-        
-        Args:
-            rule_info: Dictionary containing bucket_name, path, and other rule information
-            examples_df: DataFrame with before/after examples
-        """
-        try:
-            bucket_name = rule_info['bucket_name']
-            path = rule_info['path']
-            regex_pattern = rule_info['regex'][0]
-            
-            # Create a safe filename from the regex pattern
-            safe_pattern = regex_pattern.replace('/', '_').replace('\\', '_').replace('*', '_').replace('?', '_')
-            safe_pattern = safe_pattern[:50]  # Limit length
-            
-            # Generate filename with timestamp
-            timestamp = time.strftime('%Y%m%d_%H%M%S')
-            filename = f"regex_examples_{safe_pattern}_{timestamp}.csv"
-            
-            # Create full S3 key
-            s3_key = f"{path.rstrip('/')}/{filename}"
-            
-            # Prepare CSV data
-            csv_buffer = io.StringIO()
-            examples_df.to_csv(csv_buffer, index=False, encoding='utf-8')
-            csv_data = csv_buffer.getvalue()
-            
-            # Upload to S3
-            self.s3_client.put_object(
-                Bucket=bucket_name,
-                Key=s3_key,
-                Body=csv_data,
-                ContentType='text/csv'
-            )
-            
-            logger.info(f"Saved {len(examples_df)} examples to s3://{bucket_name}/{s3_key}")
-            
-            # Remove local file after successful S3 upload
-            local_filename = f"regex_examples_{safe_pattern}.csv"
-            local_filepath = os.path.join(self.local_examples_dir, local_filename)
-            if os.path.exists(local_filepath):
-                os.remove(local_filepath)
-                logger.info(f"Removed local file: {local_filepath}")
-            
-        except Exception as e:
-            logger.error(f"Error saving examples to S3: {str(e)}")
-
-    def _collect_example(self, original_text: str, cleaned_text: str, regex_pattern: str, rule_info: dict):
-        """
-        Collect an example for a specific regex pattern if in debug mode.
-        
-        Args:
-            original_text: Original text before cleaning
-            cleaned_text: Text after cleaning
-            regex_pattern: The regex pattern that was applied
-            rule_info: Dictionary containing rule information
-        """
-        if not self.debug_mode or regex_pattern not in self.examples_collected:
+        if not self.save_word_changes:
             return
+            
+        # Split texts into words
+        original_words = original_text.split()
+        cleaned_words = cleaned_text.split()
         
-        # Only collect if the text actually changed
-        if original_text != cleaned_text:
-            # Check if we still need examples for this pattern
-            if self.examples_collected[regex_pattern] < 50:
-                example = {
-                    'original_text': original_text,
-                    'cleaned_text': cleaned_text,
-                    'regex_pattern': regex_pattern,
-                    'rule_info': rule_info['info'],
-                    'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
-                }
-                
-                self.examples_data[regex_pattern].append(example)
-                self.examples_collected[regex_pattern] += 1
-                
-                logger.info(f"Collected example {self.examples_collected[regex_pattern]}/50 for pattern: {regex_pattern[:50]}...")
-                
-                # Save locally after each example collection
-                examples_df = pd.DataFrame(self.examples_data[regex_pattern])
-                self._save_examples_locally(regex_pattern, examples_df)
-                
-                # If we've collected 50 examples for this pattern, save them to S3
-                if self.examples_collected[regex_pattern] == 50:
-                    self._save_examples_to_s3(rule_info, examples_df)
-                    
-                    # Check if we've collected enough examples for all patterns
-                    if all(count >= 50 for count in self.examples_collected.values()):
-                        logger.info("Collected 50 examples for all patterns. Will stop processing after current batch.")
-                        self.should_stop_processing = True
+        # Find differences between word lists
+        max_len = max(len(original_words), len(cleaned_words))
+        
+        for i in range(max_len):
+            original_word = original_words[i] if i < len(original_words) else ""
+            cleaned_word = cleaned_words[i] if i < len(cleaned_words) else ""
+            
+            # If words are different, track the change
+            if original_word != cleaned_word:
+                self.word_changes.append({
+                    'before': original_word,
+                    'after': cleaned_word,
+                    'regex_pattern': pattern
+                })
+
+    def save_word_changes_to_file(self):
+        """
+        Save word changes to CSV file.
+        """
+        if not self.save_word_changes or not self.word_changes:
+            return
+            
+        try:
+            timestamp = time.strftime('%Y%m%d_%H%M%S')
+            filename = f"word_changes_{timestamp}.csv"
+            filepath = os.path.join(self.output_dir, filename)
+            
+            df = pd.DataFrame(self.word_changes)
+            df.to_csv(filepath, index=False, encoding='utf-8')
+            
+            print(f"Saved {len(df)} word changes to {filepath}")
+            
+        except Exception as e:
+            print(f"Error saving word changes: {str(e)}")
+
+    def get_word_changes_df(self) -> pd.DataFrame:
+        """
+        Get DataFrame of word changes.
+        """
+        return pd.DataFrame(self.word_changes)
 
     def _clean_implementation(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -163,10 +86,6 @@ class RegExCleaner(BaseCleaner):
         Returns:
             Cleaned DataFrame with 'text' and 'n_words' columns
         """
-        if self.should_stop_processing:
-            logger.info("Debug mode: Stopping processing as all examples have been collected.")
-            return df
-
         cleaned_texts = []
         n_words = []
 
@@ -178,9 +97,6 @@ class RegExCleaner(BaseCleaner):
 
         # 2. Apply every (pattern → replacement) once over the *entire* string
         for pattern, repl in self.patterns:
-            if self.should_stop_processing:
-                break
-                
             # Store original text before applying this pattern
             text_before_pattern = joined_text
             
@@ -208,33 +124,21 @@ class RegExCleaner(BaseCleaner):
                     self.stats["patterns_matched"].get(pattern.pattern, 0) + n_subs
                 )
                 
-                # If in debug mode, collect examples for this pattern
-                if self.debug_mode:
-                    # Find the corresponding rule info from CLEANUP_RULES
-                    rule_info = None
-                    for rule in CLEANUP_RULES:
-                        if rule['regex'][0] == pattern.pattern:
-                            rule_info = rule
-                            break
+                # Track word changes if enabled
+                if self.save_word_changes:
+                    # Split back to individual texts to collect examples
+                    if callable(repl):
+                        # We already have the before/after texts
+                        texts_before_split = texts_before
+                        texts_after_split = texts_after
+                    else:
+                        texts_before_split = text_before_pattern.split(_DELIM)
+                        texts_after_split = joined_text.split(_DELIM)
                     
-                    if rule_info:
-                        # Split back to individual texts to collect examples
-                        if callable(repl):
-                            # We already have the before/after texts
-                            texts_before_split = texts_before
-                            texts_after_split = texts_after
-                        else:
-                            texts_before_split = text_before_pattern.split(_DELIM)
-                            texts_after_split = joined_text.split(_DELIM)
-                        
-                        # Collect examples for this pattern
-                        for i, (orig, cleaned) in enumerate(zip(texts_before_split, texts_after_split)):
-                            if self.should_stop_processing:
-                                break
-                            if orig != cleaned:
-                                self._collect_example(orig, cleaned, pattern.pattern, rule_info)
-                                if self.should_stop_processing:
-                                    break
+                    # Collect examples for this pattern
+                    for orig, cleaned in zip(texts_before_split, texts_after_split):
+                        if orig != cleaned:
+                            self._track_word_changes(orig, cleaned, pattern.pattern)
 
         # 3. Split back to the original rows and final post-processing
         cleaned_texts = [t.strip() for t in joined_text.split(_DELIM)]
@@ -258,48 +162,25 @@ class RegExCleaner(BaseCleaner):
         """        
         cleaned_df = self._clean_implementation(df)
         
-        # If save_cleaned_data is True, save the cleaned data
-        if self.save_cleaned_data:
-            self._save_cleaned_data(cleaned_df)
-        
-        # If in debug mode and we've collected examples for all patterns, stop processing
-        if self.debug_mode and self.should_stop_processing:
-            logger.info("Debug mode: Collected 50 examples for all patterns. Stopping processing.")
+        # Save word changes if enabled
+        if self.save_word_changes:
+            self.save_word_changes_to_file()
             
         return cleaned_df
 
-    def _save_cleaned_data(self, cleaned_df: pd.DataFrame):
+    def get_stats(self) -> dict:
         """
-        Save the cleaned data to a local file.
-        
-        Args:
-            cleaned_df: DataFrame with cleaned data
-        """
-        try:
-            timestamp = time.strftime('%Y%m%d_%H%M%S')
-            filename = f"cleaned_data_{timestamp}.csv"
-            filepath = os.path.join(self.local_examples_dir, filename)
-            
-            cleaned_df.to_csv(filepath, index=False, encoding='utf-8')
-            logger.info(f"Saved cleaned data to {filepath}")
-            
-        except Exception as e:
-            logger.error(f"Error saving cleaned data: {str(e)}")
-
-    def get_debug_stats(self) -> dict:
-        """
-        Get debug mode statistics.
+        Get cleaning statistics.
         
         Returns:
-            Dictionary with debug statistics
+            Dictionary with cleaning statistics
         """
-        if not self.debug_mode:
-            return {}
-        
-        return {
-            'examples_collected': self.examples_collected,
-            'total_examples': sum(self.examples_collected.values()),
-            'patterns_with_50_examples': sum(1 for count in self.examples_collected.values() if count >= 50),
-            'should_stop_processing': self.should_stop_processing,
-            'save_cleaned_data': self.save_cleaned_data
+        stats = {
+            'patterns_matched': self.stats.get('patterns_matched', {}),
+            'rows_modified': self.stats.get('rows_modified', 0)
         }
+        
+        if self.save_word_changes:
+            stats['word_changes_tracked'] = len(self.word_changes)
+        
+        return stats

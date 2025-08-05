@@ -10,6 +10,7 @@ import json
 import tempfile
 import os
 import rarfile
+import gzip
 
 class S3SourceFetcher(BaseFetcher):
     def __init__(self, bucket_name: str, prefix: str, source_name: str, output_prefix: str, 
@@ -57,8 +58,9 @@ class S3SourceFetcher(BaseFetcher):
                 files_jsonl = filename.startswith(self.source_name) and filename.endswith('.jsonl')
                 files_rar = filename.startswith(self.source_name) and filename.endswith('.rar')
                 files_csv = filename.startswith(self.source_name) and filename.endswith('.csv')
+                files_gz = filename.startswith(self.source_name) and filename.endswith('.gz')
                 
-                if files_jsonl or files_rar or files_csv:
+                if files_jsonl or files_rar or files_csv or files_gz:
                     # Check if cleaned version already exists
                     file_stem = Path(filename).stem
                     if file_stem not in existing_cleaned_files:
@@ -249,6 +251,63 @@ class S3SourceFetcher(BaseFetcher):
             logger.error(f"Error extracting RAR file: {str(e)}")
             return pd.DataFrame()
 
+    def _extract_gz_and_read_data(self, gz_data: bytes, original_filename: str) -> pd.DataFrame:
+        """
+        Extract GZ file and read content from it.
+        Supports JSONL, CSV, and other text formats.
+        
+        Args:
+            gz_data: Raw bytes of the GZ file
+            original_filename: Original filename to determine content type
+            
+        Returns:
+            DataFrame with extracted data
+        """
+        try:
+            # Decompress the gz data
+            decompressed_data = gzip.decompress(gz_data)
+            
+            # Determine the content type based on the original filename
+            # Remove .gz extension to get the actual file type
+            base_filename = original_filename.replace('.gz', '')
+            
+            if base_filename.endswith('.jsonl'):
+                # Handle JSONL content
+                logger.info(f"Processing GZ-compressed JSONL file: {original_filename}")
+                return self._read_jsonl_data(decompressed_data)
+            elif base_filename.endswith('.csv'):
+                # Handle CSV content
+                logger.info(f"Processing GZ-compressed CSV file: {original_filename}")
+                df = pd.read_csv(io.BytesIO(decompressed_data), header=None, names=["text", "n_words"])
+                return df
+            else:
+                # Try to detect content type by examining the first few lines
+                try:
+                    # Try as JSONL first
+                    text = decompressed_data.decode('utf-8')
+                    first_line = text.split('\n')[0].strip()
+                    json.loads(first_line)  # Test if it's valid JSON
+                    logger.info(f"Detected JSONL content in GZ file: {original_filename}")
+                    return self._read_jsonl_data(decompressed_data)
+                except (json.JSONDecodeError, IndexError):
+                    # Try as CSV
+                    try:
+                        logger.info(f"Detected CSV content in GZ file: {original_filename}")
+                        df = pd.read_csv(io.BytesIO(decompressed_data), header=None, names=["text", "n_words"])
+                        return df
+                    except Exception:
+                        # Treat as plain text
+                        logger.info(f"Treating GZ file as plain text: {original_filename}")
+                        text = decompressed_data.decode('utf-8')
+                        lines = [line.strip() for line in text.split('\n') if line.strip()]
+                        df = pd.DataFrame({'text': lines})
+                        df['n_words'] = df['text'].str.split().str.len()
+                        return df
+                        
+        except Exception as e:
+            logger.error(f"Error extracting GZ file: {str(e)}")
+            return pd.DataFrame()
+
     def fetch_single_file(self, file_path: str) -> pd.DataFrame:
         """
         Fetch data from a single S3 file.
@@ -273,6 +332,12 @@ class S3SourceFetcher(BaseFetcher):
                 # Handle CSV files
                 logger.info(f"Processing CSV file: {file_path}")
                 df = pd.read_csv(io.BytesIO(response["Body"].read()), header=None, names=["text", "n_words"])
+            elif file_path.endswith('.gz'):
+                # Handle GZ compressed files
+                logger.info(f"Processing GZ file: {file_path}")
+                file_data = response["Body"].read()
+                original_filename = file_path.split('/')[-1]
+                df = self._extract_gz_and_read_data(file_data, original_filename)
             else:
                 logger.warning(f"Unsupported file format: {file_path}")
                 return pd.DataFrame()

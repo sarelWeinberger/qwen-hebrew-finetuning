@@ -2,8 +2,8 @@ from cleaning_pipeline import CleaningPipeline
 from fetchers.s3_source_fetcher import S3SourceFetcher
 from cleaners.regex_cleaner import RegExCleaner
 from cleaners.spacefix_cleaner import SpaceFixCleaner  # Added import
-from utils.cleaner_constants import SOURCES, CLEANUP_RULES
-import argparse
+from utils.cleaner_constants import CLEANUP_RULES
+
 
 
 def create_registry(debug_mode):
@@ -232,18 +232,54 @@ def create_registry(debug_mode):
         #     #     save_cleaned_data=False
         #     # )
         # },
-        'OcrTau': {
+        # 'OcrTau': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='tau_clean/',
+        #         source_name='HQ',
+        #         output_prefix = 'processed_and_cleaned/TauOCR',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         save_word_changes=False
+        #     )
+        # },
+        # 'TauDigital': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='tau_clean/',
+        #         source_name='DigitalMarkdown_Tables.jsonl',
+        #         output_prefix = 'processed_and_cleaned/TauDigital',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #         save_word_changes=False
+        #     )
+        # },
+        # 'BIU': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/biu-drive/',
+        #         source_name='AllBIUDriveDocs-MD-Deduped.forgpt.jsonl.gz',
+        #         output_prefix='processed_and_cleaned/BIU',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #     )
+        # },
+        'sefaria': {
             'fetcher': S3SourceFetcher(
                 bucket_name='israllm-datasets',
-                prefix='tau_clean/',
-                source_name='HQwOcr_Markdown_Tables_batch1.jsonl',
-                output_prefix = 'processed_and_cleaned/TauOCR',
+                prefix='raw-datasets/sefaria',
+                source_name='AllOfSefariaTexts',
+                output_prefix='processed_and_cleaned/sefaria',
                 output_bucket_name='gepeta-datasets'
             ),
             'cleaner': RegExCleaner(
                 patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-                debug_mode=debug_mode,
-                save_cleaned_data=False
             )
         }
     }
