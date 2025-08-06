@@ -23,13 +23,13 @@ def create_registry():
     Create registry with all sources from main.py (including commented ones)
     """
     registry = {
-        'AllHebNLI': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/nli/csv_output/',
-            'source_name': 'AllHebNLI',
-            'output_prefix': 'processed_and_cleaned/test',
-            'output_bucket_name': 'gepeta-datasets'
-        },
+        # 'AllHebNLI': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/nli/csv_output/',
+        #     'source_name': 'AllHebNLI',
+        #     'output_prefix': 'processed_and_cleaned/test',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
         'AllOfHEOscarData-Combined-Deduped-DC4.forgpt': {
             'bucket_name': 'israllm-datasets',
             'prefix': 'raw-datasets/rar/csv_output/',
@@ -208,16 +208,83 @@ def read_csv_data(file_data):
     try:
         text = file_data.decode('utf-8')
         total_words = 0
-        df = pd.read_csv(StringIO(text))
-        if 'n_words' in df.columns:
-            total_words = df['n_words'].sum()
-        else:
-            print("No n_words column found in CSV")
-            return 0
         
-        return total_words
+        # Try reading with header first
+        try:
+            df = pd.read_csv(StringIO(text))
+            if 'n_words' in df.columns:
+                total_words = df['n_words'].sum()
+                return total_words
+            elif 'text' in df.columns:
+                total_words = df['text'].apply(count_words_in_text).sum()
+                return total_words
+        except:
+            pass
+        
+        # Try reading without header and add headers
+        try:
+            df = pd.read_csv(StringIO(text), header=None)
+            if len(df.columns) > 0:
+                # Add headers: text, n_words (or just text if only one column)
+                if len(df.columns) == 1:
+                    df.columns = ['text']
+                elif len(df.columns) == 2:
+                    df.columns = ['text', 'n_words']
+                
+                # Now check for n_words or text columns
+                if 'n_words' in df.columns:
+                    total_words = df['n_words'].sum()
+                    return total_words
+                elif 'text' in df.columns:
+                    total_words = df['text'].apply(count_words_in_text).sum()
+                    return total_words
+        except:
+            pass
+        
+        print("Could not read CSV data properly")
+        return 0
+        
     except Exception as e:
         print(f"Error reading CSV: {e}")
+        return 0
+
+
+def read_parquet_data(file_data):
+    """Read parquet data from bytes"""
+    try:
+        df = pd.read_parquet(io.BytesIO(file_data))
+        total_words = 0
+        
+        # Try with named columns first
+        if 'n_words' in df.columns:
+            total_words = df['n_words'].sum()
+            return total_words
+        elif 'text' in df.columns:
+            # Count words in text column
+            total_words = df['text'].apply(count_words_in_text).sum()
+            return total_words
+        
+        # If no named columns, add headers and try again
+        if len(df.columns) > 0:
+            # Add headers: text, n_words (or just text if only one column)
+            if len(df.columns) == 1:
+                df.columns = ['text']
+            elif len(df.columns) == 2:
+                df.columns = ['text', 'n_words']
+
+            # Now check for n_words or text columns
+            if 'n_words' in df.columns:
+                total_words = df['n_words'].sum()
+                return total_words
+            elif 'text' in df.columns:
+                total_words = df['text'].apply(count_words_in_text).sum()
+                return total_words
+        
+        print("No usable columns found in parquet")
+        return 0
+        
+    except Exception as e:
+        print(f"Error reading parquet: {e}")
         return 0
 
 
@@ -235,7 +302,7 @@ def count_words_in_source(bucket_name, prefix, source_name):
                 key = obj['Key']
                 filename = key.split('/')[-1]
                 print(f'filename: {filename}')
-                if filename.startswith(source_name) and (filename.endswith('.jsonl') or filename.endswith('.csv') or filename.endswith('.gz')):
+                if filename.startswith(source_name) and (filename.endswith('.jsonl') or filename.endswith('.csv') or filename.endswith('.gz') or filename.endswith('.parquet')):
                     try:
                         response = s3.get_object(Bucket=bucket_name, Key=key)
                         file_data = response["Body"].read()
@@ -244,6 +311,8 @@ def count_words_in_source(bucket_name, prefix, source_name):
                             words = read_jsonl_data(file_data)
                         elif key.endswith('.csv'):
                             words = read_csv_data(file_data)
+                        elif key.endswith('.parquet'):
+                            words = read_parquet_data(file_data)
                         elif key.endswith('.gz'):
                             # Handle GZ compressed files
                             decompressed_data = gzip.decompress(file_data)
@@ -252,6 +321,8 @@ def count_words_in_source(bucket_name, prefix, source_name):
                                 words = read_jsonl_data(decompressed_data)
                             elif base_filename.endswith('.csv'):
                                 words = read_csv_data(decompressed_data)
+                            elif base_filename.endswith('.parquet'):
+                                words = read_parquet_data(decompressed_data)
                             else:
                                 continue
                         else:
@@ -283,11 +354,18 @@ def count_words_after_cleaning(output_bucket_name, output_prefix):
                 key = obj['Key']
                 filename = key.split('/')[-1]
                 
-                if filename.endswith('_cleaned.csv'):
+                if filename.endswith('_cleaned.csv') or filename.endswith('_cleaned.parquet'):
                     try:
                         response = s3.get_object(Bucket=output_bucket_name, Key=key)
                         file_data = response["Body"].read()
-                        words = read_csv_data(file_data)
+                        
+                        if key.endswith('_cleaned.csv'):
+                            words = read_csv_data(file_data)
+                        elif key.endswith('_cleaned.parquet'):
+                            words = read_parquet_data(file_data)
+                        else:
+                            continue
+                            
                         total_words += words
                         file_count += 1
                         
