@@ -12,15 +12,17 @@ MAP_LABELS = {
     '4': '4',
 }
 
+
 def get_mmlu_datasets():
     datasets = {}
     # MMLU
     # dev - 285 samples | val - 1531 samples | test - 14042 samples
     # datasets['mmlu_dev'] = load_dataset("cais/mmlu", "all", split='dev')
     # datasets['mmlu_auxiliary_train'] = load_dataset("cais/mmlu", "all", split='auxiliary_train')
-    datasets['mmlu_val'] = load_dataset("cais/mmlu", "all", split='validation')
-    # datasets['mmlu_test'] = load_dataset("cais/mmlu", "all", split='test')
+    # datasets['mmlu_val'] = load_dataset("cais/mmlu", "all", split='validation')
+    datasets['mmlu_test'] = load_dataset("cais/mmlu", "all", split='test')
     return datasets
+
 
 def mmlu_sample_to_dict(sample):
     return {

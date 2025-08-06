@@ -1,5 +1,7 @@
 import pandas as pd
+import numpy as np
 import re
+import matplotlib.pyplot as plt
 
 
 def parse_labeled_sample(text):
@@ -122,11 +124,10 @@ def parse_from_gradio(labeled_file_name, csv_file_name):
     or_df = pd.read_csv(csv_file_name)
 
     label_df = label_df.fillna('')
-    
 
     # Split options
     label_df[['option 1', 'option 2']] = label_df.apply(split_to_option, result_type='expand', axis=1)
-    
+
     # Check matching between label_df and or_df
     assert (or_df['original'] == label_df['text_column']).all(), 'problems with original'
     assert (or_df['option 1'] == label_df['option 1']).all(), 'problems with option 1'
@@ -160,6 +161,12 @@ def parse_labeled_file(file_name, csv_file_name):
     # Read the csv with the models we used
     or_df = pd.read_csv(csv_file_name)
 
+    or_df['original'] = or_df['original'].apply(lambda x: x.replace('\xa0', ' '))
+    or_df['option 1'] = or_df['option 1'].apply(lambda x: x.replace('\xa0', ' '))
+    or_df['option 2'] = or_df['option 2'].apply(lambda x: x.replace('\xa0', ' '))
+
+    # return label_df, or_df
+
     # Check matching between label_df and or_df
     assert (or_df['option 1'] == label_df['option 1']).all(), 'problems with option 1'
     assert (or_df['option 2'] == label_df['option 2']).all(), 'problems with option 2'
@@ -172,3 +179,185 @@ def parse_labeled_file(file_name, csv_file_name):
     or_df['was fixed'] = label_df['gold'] != ''
 
     return label_df, or_df
+
+
+def rating_gold_metrics(or_df, bench_name='', annotate=True):
+    print(f'From {or_df.shape[0]} samples overall, the distribution of choosing the best model:')
+    # Clauclate number of choosing each model - and how many times was it fixed to 'gold'
+    rating = or_df[or_df['rating model'] != 'SKIP']
+    group_1 = rating[~rating['was fixed']]['rating model'].value_counts()
+    group_2 = rating[rating['was fixed']]['rating model'].value_counts()
+
+    # Add values for missing indecies if needed:
+    all_models = group_1.index.union(group_2.index)  # Get all unique model names
+    group_1 = group_1.reindex(all_models, fill_value=0)
+    group_2 = group_2.reindex(all_models, fill_value=0)
+
+    # stacked bat plot
+    plt.bar(group_1.index, group_1.values, label='Already gold')
+    plt.bar(group_2.index, group_2.values, bottom=group_1, label='Was fixed')
+
+    # Add annotations
+    for i, model in enumerate(group_1.index):
+        y1 = group_1.values[i]
+        y2 = group_2.values[i]
+
+        if annotate:
+            if y1 > 0:
+                plt.text(i, y1 / 2, f'{np.round(100 * y1 / (y1 + y2), 2)}%', ha='center', va='center', color='white', fontsize=12)
+            if y2 > 0:
+                plt.text(i, y1 + y2 / 2, f'{np.round(100 * y2 / (y1 + y2), 2)}%', ha='center', va='center', color='white', fontsize=12)
+
+        plt.text(i, y1 + y2, f'{y1 + y2}', ha='center', color='black', fontsize=12)
+    plt.legend()
+    plt.ylim(0, (group_1.max() + group_2.max()) * 1.05)
+    plt.xlabel('Choosen model')
+    plt.ylabel('Count')
+    plt.title(f'{bench_name} Better model comparison')
+    plt.show()
+
+
+categories_x = [
+    "Adequacy - Mistranslation",
+    "Adequacy - Omission",
+    "Adequacy - Addition",
+    "Adequacy - TerminologyNamedEntity",
+    "Adequacy - CulturalReference",
+    "Fluency - Agreement",
+    "Fluency - MorphologyFunction",
+    "Fluency - WordOrderSyntax",
+    "Fluency - OrthographyPunct",
+    "LocaleStyle - Register",
+    "LocaleStyle - Conventions",
+]
+
+severity_x = [
+    'minor',
+    'major',
+    'critical',
+]
+
+
+def MQM_metrics(mqm_res, mqm_score, bench_name=''):
+    print('MQM average scores:')
+    for k in mqm_score:
+        print(f'\t{k:20} - {sum(mqm_score[k]) / len(mqm_score[k])}')
+    print()
+    corr = pd.DataFrame(mqm_score).corr().values[0, 1]
+    print(f'\tThere is a correlation in the MQM scores of: {corr:.3}')
+
+    # ----- MQM scores histogram
+    fig, axs = plt.subplots(2, 1, figsize=(6, 8))
+    for k in mqm_score:
+        # pd.Series(mqm_score[k]).value_counts().plot(alpha=0.5, label=k, kind='bar')
+        axs[0].hist(mqm_score[k], alpha=0.5, label=k, range=(-0.5, 8.5), bins=9)
+    axs[0].legend()
+    axs[0].grid()
+    axs[0].set_xticks(range(9))
+    axs[0].set_xlabel('MQM score')
+    axs[0].set_ylabel('Count')
+    axs[0].set_title('Below 10')
+
+    for k in mqm_score:
+        # pd.Series(mqm_score[k]).value_counts().plot(alpha=0.5, label=k, kind='bar')
+        axs[1].hist(mqm_score[k], alpha=0.5, label=k, range=(24.5, 30.5), bins=7)
+    axs[1].legend()
+    axs[1].grid()
+    axs[1].set_xticks(range(25, 32))
+    axs[1].set_ylabel('Count')
+    axs[1].set_title('Above 25')
+    
+    axs[1].set_xlabel('MQM score')
+    fig.suptitle(f'{bench_name} MQM scores histogram')
+    fig.subplots_adjust(hspace=0.6)
+    fig.tight_layout()
+    plt.show()
+
+    print('\n' + '-' * 30, end='\n')
+    # ----- MQM severity distribution
+    fig, axs = plt.subplots(len(mqm_res), 1, figsize=(6, 6), sharex=True)
+    for i, k in enumerate(mqm_res):
+        severities = pd.DataFrame(mqm_res[k])[1].value_counts(normalize=False)
+        severities = severities.reindex(severity_x, fill_value=0).loc[severity_x]
+        axs[i].bar(severities.index, severities.values, alpha=0.8)
+        axs[i].grid()
+        axs[i].set_title(k)
+        # axs[i].set_xlabel('MQM severity')
+        # axs[i].set_yticks(np.linspace(0, 1, 11))
+
+        # Add annotations
+        for place, y1 in enumerate(severities.values):
+            axs[i].text(place, y1, f'{np.round(100 * y1 / severities.sum(), 2)}%', ha='center', color='black', fontsize=12)
+    
+    # fig.supxlabel('MQM severity')
+    fig.subplots_adjust(hspace=0.6)
+    # plt.ylabel('Count')
+    fig.suptitle(f'{bench_name} MQM severity distribution')
+    fig.tight_layout()
+    plt.show()
+
+    print('\n' + '-' * 30, end='\n')
+    # ----- MQM category distribution
+    fig, axs = plt.subplots(1 + len(mqm_res), 1, figsize=(6, 12), sharex=True)
+    
+    for k in mqm_res:
+        categories = pd.DataFrame(mqm_res[k])[0].value_counts(normalize=True)
+        categories = categories.reindex(categories_x, fill_value=0)
+        categories = categories.loc[categories_x]
+        axs[0].bar(categories.index, categories.values, alpha=0.5, label=k)
+    axs[0].legend()
+    axs[0].grid()
+    # axs[0].set_xticks(rotation=90)
+    # axs[0].set_xlabel('MQM category')
+    # plt.ylabel('Count')
+    axs[0].set_title('distribution')
+
+    # MQM minor-major distribution
+    for indx, k in enumerate(mqm_res, start=1):
+        group_1 = [mqm_res[k][i][0] for i in range(len(mqm_res[k])) if mqm_res[k][i][1] == 'minor']
+        group_2 = [mqm_res[k][i][0] for i in range(len(mqm_res[k])) if mqm_res[k][i][1] == 'major']
+        group_3 = [mqm_res[k][i][0] for i in range(len(mqm_res[k])) if mqm_res[k][i][1] == 'critical']
+
+        group_1 = pd.Series(group_1).value_counts()
+        group_2 = pd.Series(group_2).value_counts()
+        group_3 = pd.Series(group_3).value_counts()
+    
+        # Add values for missing indecies if needed:
+        group_1 = group_1.reindex(categories_x, fill_value=0).loc[categories_x]
+        group_2 = group_2.reindex(categories_x, fill_value=0).loc[categories_x]
+        group_3 = group_3.reindex(categories_x, fill_value=0).loc[categories_x]
+    
+        # stacked bat plot
+        axs[indx].bar(group_1.index, group_1.values, label='minor')
+        axs[indx].bar(group_2.index, group_2.values, bottom=group_1, label='major')
+        X = group_1 + group_2
+        axs[indx].bar(group_3.index, group_3.values, bottom=X, label='critical')
+    
+        # Add annotations
+        for i, _ in enumerate(categories_x):
+            y1 = group_1.values[i]
+            y2 = group_2.values[i]
+            y3 = group_3.values[i]
+            
+            if y1 > 0:
+                axs[indx].text(i, y1 / 2, f'{y1 / (y1 + y2 + y3):.3}', ha='center', va='center', color='white', fontsize=8)
+            if y2 > 0:
+                axs[indx].text(i, y1 + y2 / 2 - 2 * (y3 > 0), f'{y2 / (y1 + y2 + y3):.3}', ha='center', va='center', color='white', fontsize=8)
+            if y3 > 0:
+                axs[indx].text(i, y1 + y2 + y3 / 2, f'{y3 / (y1 + y2 + y3):.3}', ha='center', va='center', color='white', fontsize=8)
+    
+        axs[indx].legend()
+        axs[indx].set_ylim(0, (group_1.max() + group_2.max() + group_3.max()) * 1.1)
+        axs[indx].grid()
+        # axs[indx].set_xlabel('MQM category')
+        # axs[indx].xticks(rotation=90)
+        axs[indx].set_title(f'{k} - histogram')
+
+    plt.setp(axs[2].get_xticklabels(), rotation=90, ha="center")
+    
+    fig.supxlabel('MQM category')
+    fig.subplots_adjust(hspace=0.6)
+    # plt.ylabel('Count')
+    fig.suptitle(f'{bench_name} MQM category')
+    fig.tight_layout()
+    plt.show()

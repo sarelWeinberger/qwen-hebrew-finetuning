@@ -1,6 +1,12 @@
 import requests
 import json
 from time import sleep
+import gradio as gr
+
+"""
+This code is (mostly) brought to you by Gemini.
+"""
+
 
 def get_wikidata_qid(term_en):
     """
@@ -30,9 +36,6 @@ def get_wikidata_qid(term_en):
         
         if data["search"]:
             # Return the QID of the first result
-            print()
-            print(len(data["search"]))
-            print()
             return data["search"][0]["id"]
         else:
             print(f"No Wikidata item found for '{term_en}'.")
@@ -44,16 +47,16 @@ def get_wikidata_qid(term_en):
 def translate_term(term_en, target_langs=["he"]):
     """
     Translates a scientific term from English to a list of other languages
-    using the Wikidata SPARQL API.
+    using the Wikidata SPARQL API, retrieving both the label and description.
 
     Args:
         term_en (str): The English scientific term (e.g., "DNA").
         target_langs (list): A list of language codes (e.g., ["es", "fr", "de"]).
 
     Returns:
-        dict: A dictionary with the target language as the key and the
-              translation as the value. Returns an empty dictionary if
-              the term is not found or an error occurs.
+        dict: A dictionary where each key is a target language, and the value is
+              another dictionary with "label" and "description".
+              Returns an empty dictionary if the term is not found or an error occurs.
     """
     print(f"Attempting to find Wikidata item for: '{term_en}'...")
     qid = get_wikidata_qid(term_en)
@@ -61,25 +64,27 @@ def translate_term(term_en, target_langs=["he"]):
     if not qid:
         return {}
 
-    print(f"Found QID: {qid}. Fetching translations...")
+    print(f"Found QID: {qid}. Fetching translations and descriptions...")
 
     # The SPARQL query endpoint
     endpoint_url = "https://query.wikidata.org/sparql"
     
     # Construct the SPARQL query string
-    # We use a FILTER to only get labels in the languages we care about.
-    # The SERVICE statement allows us to get the labels directly.
+    # We now select ?label and ?description
     query = f"""
-    SELECT ?lang ?label
+    SELECT ?lang ?label ?description
     WHERE 
     {{
       BIND(wd:{qid} AS ?item)
-      SERVICE wikibase:label {{
-        bd:serviceParam wikibase:language "[AUTO_LANGUAGE],{','.join(target_langs)}" .
-        ?item rdfs:label ?label .
-      }}
-      BIND(LANG(?label) AS ?lang)
-      FILTER(?lang IN ("{'", "'.join(target_langs)}"))
+      ?item rdfs:label ?label.
+      ?item schema:description ?description.
+      
+      BIND(LANG(?label) AS ?lang_label)
+      BIND(LANG(?description) AS ?lang_desc)
+      
+      FILTER(?lang_label IN ("{'", "'.join(target_langs)}"))
+      FILTER(?lang_desc = ?lang_label)
+      BIND(?lang_label AS ?lang)
     }}
     """
     
@@ -108,7 +113,13 @@ def translate_term(term_en, target_langs=["he"]):
         for result in data["results"]["bindings"]:
             lang_code = result["lang"]["value"]
             label = result["label"]["value"]
-            translations[lang_code] = label
+            description = result["description"]["value"]
+            
+            if lang_code not in translations:
+                translations[lang_code] = {}
+            
+            translations[lang_code]['label'] = label
+            translations[lang_code]['description'] = description
         
         return translations
     
@@ -116,30 +127,57 @@ def translate_term(term_en, target_langs=["he"]):
         print(f"Error translating term '{term_en}': {e}")
         return {}
 
-
-def check_wikidata_transalte():
-    # Example usage
-    english_term = "Mitochondrion"
-    target_languages = ["he"]
-
-    translations = translate_term(english_term, target_languages)
-
-    if translations:
-        print(f"\nTranslations for '{english_term}':")
-        for lang, translation in translations.items():
-            print(f"- {lang.upper()}: {translation}")
+# Example usage:
+if __name__ == '__main__':
+    english_term = "DNA"
+    hebrew_translation = translate_term(english_term, target_langs=["he"])
+    
+    if hebrew_translation and "he" in hebrew_translation:
+        print(f"\n--- Translation for '{english_term}' ---")
+        print(f"Language: he")
+        print(f"  Label: {hebrew_translation['he'].get('label', 'N/A')}")
+        print(f"  Description: {hebrew_translation['he'].get('description', 'N/A')}")
     else:
-        print(f"\nCould not get translations for '{english_term}'.")
+        print(f"\nCould not retrieve the Hebrew translation and description for '{english_term}'.")
 
-    print("-" * 30)
+    print("\n" + "="*30 + "\n")
 
-    english_term_2 = "Quantum entanglement"
-    target_languages_2 = ["he"]
-    translations_2 = translate_term(english_term_2, target_languages_2)
+    english_term_astro = "Black hole"
+    multi_language_translations = translate_term(english_term_astro, target_langs=["es", "fr", "de"])
 
-    if translations_2:
-        print(f"\nTranslations for '{english_term_2}':")
-        for lang, translation in translations_2.items():
-            print(f"- {lang.upper()}: {translation}")
+    if multi_language_translations:
+        print(f"--- Translations for '{english_term_astro}' ---")
+        for lang, data in multi_language_translations.items():
+            print(f"Language: {lang}")
+            print(f"  Label: {data.get('label', 'N/A')}")
+            print(f"  Description: {data.get('description', 'N/A')}")
     else:
-        print(f"\nCould not get translations for '{english_term_2}'.")
+        print(f"\nCould not retrieve translations for '{english_term_astro}'.")
+
+
+def translate_try_multi(x):
+    lst = []
+    for v in translate_term(x).values():
+        lst.append(v['label'] + ' - ' + v['description'])
+    for v in translate_term(x + ' (math').values():
+        lst.append(v['label'] + ' - ' + v['description'])
+    for v in translate_term(x + ' (mathematics)').values():
+        lst.append(v['label'] + ' - ' + v['description'])
+        
+    lst += ['']
+
+    return '\n'.join(lst)
+
+
+def wikidata_gradio():
+    # --- Create the Gradio Interface ---
+    iface = gr.Interface(
+     fn=translate_try_multi,
+     inputs=gr.Textbox(lines=2, placeholder="Enter term to translate..."),
+     outputs="text",
+     title="Term Translator",
+     description="Enter a term and click 'Run' to see the translation."
+    )
+
+    iface.launch(share=True, inline=False)
+    return iface

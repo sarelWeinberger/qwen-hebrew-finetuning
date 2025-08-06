@@ -2,6 +2,10 @@ import gradio as gr
 import pandas as pd
 import os
 
+"""
+This code is (mostly) brought to you by Gemini.
+"""
+
 # --- Configuration & Global Data ---
 
 CHOICE1_OPTIONS = ["", "1", "2", "BOTH", "SKIP"]
@@ -15,6 +19,7 @@ CATEGORY_OPTIONS = [""] + CATEGORY_OPTIONS_BASE
 SEVERITY_OPTIONS_BASE = ["minor", "major", "critical"]
 SEVERITY_OPTIONS = [""] + SEVERITY_OPTIONS_BASE
 NUM_MQM_PAIRS = 6 # Total number of Category/Severity pairs
+
 
 # --- Helper Functions for Data Handling ---
 
