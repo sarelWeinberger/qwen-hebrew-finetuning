@@ -23,13 +23,13 @@ def create_registry():
     Create registry with all sources from main.py (including commented ones)
     """
     registry = {
-        # 'AllHebNLI': {
-        #     'bucket_name': 'israllm-datasets',
-        #     'prefix': 'raw-datasets/nli/csv_output/',
-        #     'source_name': 'AllHebNLI',
-        #     'output_prefix': 'processed_and_cleaned/test',
-        #     'output_bucket_name': 'gepeta-datasets'
-        # },
+        'AllHebNLI': {
+            'bucket_name': 'israllm-datasets',
+            'prefix': 'raw-datasets/nli/csv_output/',
+            'source_name': 'AllHebNLI',
+            'output_prefix': 'processed_and_cleaned/test',
+            'output_bucket_name': 'gepeta-datasets'
+        },
         'AllOfHEOscarData-Combined-Deduped-DC4.forgpt': {
             'bucket_name': 'israllm-datasets',
             'prefix': 'raw-datasets/rar/csv_output/',
