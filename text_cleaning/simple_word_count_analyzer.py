@@ -17,9 +17,7 @@ import gzip
 import boto3
 import pandas as pd
 import rarfile
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from multiprocessing import Pool, cpu_count
-import threading
+
 
 def create_registry():
     """
@@ -177,62 +175,7 @@ def count_words_in_text(text):
     return len(text.split())
 
 
-def process_single_file(args):
-    """Process a single file and return word count. Used for parallel processing."""
-    bucket_name, key, source_name = args
-    
-    try:
-        s3 = boto3.client("s3")
-        response = s3.get_object(Bucket=bucket_name, Key=key)
-        file_data = response["Body"].read()
-        
-        if key.endswith('.jsonl'):
-            words = read_jsonl_data(file_data)
-        elif key.endswith('.csv'):
-            words = read_csv_data(file_data)
-        elif key.endswith('.parquet'):
-            words = read_parquet_data(file_data)
-        elif key.endswith('.gz'):
-            # Handle GZ compressed files
-            decompressed_data = gzip.decompress(file_data)
-            base_filename = key.split('/')[-1].replace('.gz', '')
-            if base_filename.endswith('.jsonl'):
-                words = read_jsonl_data(decompressed_data)
-            elif base_filename.endswith('.csv'):
-                words = read_csv_data(decompressed_data)
-            elif base_filename.endswith('.parquet'):
-                words = read_parquet_data(decompressed_data)
-            else:
-                return 0
-        else:
-            return 0
-        
-        return words
-    except Exception as e:
-        print(f"Error processing {key}: {str(e)}")
-        return 0
 
-
-def process_single_cleaned_file(args):
-    """Process a single cleaned file and return word count. Used for parallel processing."""
-    bucket_name, key = args
-    
-    try:
-        s3 = boto3.client("s3")
-        response = s3.get_object(Bucket=bucket_name, Key=key)
-        file_data = response["Body"].read()
-        
-        if key.endswith('_cleaned.csv'):
-            words = read_csv_data(file_data)
-        elif key.endswith('_cleaned.parquet'):
-            words = read_parquet_data(file_data)
-        else:
-            return 0
-        
-        return words
-    except Exception as e:
-        print(f"Error processing cleaned {key}: {str(e)}")
-        return 0
 
 
 def read_jsonl_data(file_data):
@@ -355,38 +298,47 @@ def count_words_in_source(bucket_name, prefix, source_name):
     try:
         s3 = boto3.client("s3")
         paginator = s3.get_paginator('list_objects_v2')
-        files_to_process = []
+        total_words = 0
+        file_count = 0
         
-        # Collect all files to process
         for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
             for obj in page.get('Contents', []):
                 key = obj['Key']
                 filename = key.split('/')[-1]
                 print(f'filename: {filename}')
                 if filename.startswith(source_name) and (filename.endswith('.jsonl') or filename.endswith('.csv') or filename.endswith('.gz') or filename.endswith('.parquet')):
-                    files_to_process.append((bucket_name, key, source_name))
+                    try:
+                        response = s3.get_object(Bucket=bucket_name, Key=key)
+                        file_data = response["Body"].read()
+                        
+                        if key.endswith('.jsonl'):
+                            words = read_jsonl_data(file_data)
+                        elif key.endswith('.csv'):
+                            words = read_csv_data(file_data)
+                        elif key.endswith('.parquet'):
+                            words = read_parquet_data(file_data)
+                        elif key.endswith('.gz'):
+                            # Handle GZ compressed files
+                            decompressed_data = gzip.decompress(file_data)
+                            base_filename = filename.replace('.gz', '')
+                            if base_filename.endswith('.jsonl'):
+                                words = read_jsonl_data(decompressed_data)
+                            elif base_filename.endswith('.csv'):
+                                words = read_csv_data(decompressed_data)
+                            elif base_filename.endswith('.parquet'):
+                                words = read_parquet_data(decompressed_data)
+                            else:
+                                continue
+                        else:
+                            continue
+                        
+                        total_words += words
+                        file_count += 1
+                        
+                    except Exception as e:
+                        print(f"Error processing {key}: {str(e)}")
         
-        if not files_to_process:
-            return 0, 0
-        
-        # Process files in parallel using ThreadPoolExecutor (better for I/O operations)
-        total_words = 0
-        max_workers = min(10, len(files_to_process))  # Limit concurrent connections
-        
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks
-            future_to_file = {executor.submit(process_single_file, file_args): file_args for file_args in files_to_process}
-            
-            # Collect results as they complete
-            for future in as_completed(future_to_file):
-                file_args = future_to_file[future]
-                try:
-                    words = future.result()
-                    total_words += words
-                except Exception as e:
-                    print(f"Error processing {file_args[1]}: {str(e)}")
-        
-        return total_words, len(files_to_process)
+        return total_words, file_count
     except Exception as e:
         print(f"Error accessing S3: {e}")
         return 0, 0
@@ -398,90 +350,36 @@ def count_words_after_cleaning(output_bucket_name, output_prefix):
     try:
         s3 = boto3.client("s3")
         paginator = s3.get_paginator('list_objects_v2')
-        files_to_process = []
+        total_words = 0
+        file_count = 0
         
-        # Collect all cleaned files to process
         for page in paginator.paginate(Bucket=output_bucket_name, Prefix=output_prefix):
             for obj in page.get('Contents', []):
                 key = obj['Key']
                 filename = key.split('/')[-1]
                 
                 if filename.endswith('_cleaned.csv') or filename.endswith('_cleaned.parquet'):
-                    files_to_process.append((output_bucket_name, key))
+                    try:
+                        response = s3.get_object(Bucket=output_bucket_name, Key=key)
+                        file_data = response["Body"].read()
+                        
+                        if key.endswith('_cleaned.csv'):
+                            words = read_csv_data(file_data)
+                        elif key.endswith('_cleaned.parquet'):
+                            words = read_parquet_data(file_data)
+                        else:
+                            continue
+                            
+                        total_words += words
+                        file_count += 1
+                        
+                    except Exception as e:
+                        print(f"Error processing cleaned {key}: {str(e)}")
         
-        if not files_to_process:
-            return 0, 0
-        
-        # Process files in parallel using ThreadPoolExecutor
-        total_words = 0
-        max_workers = min(10, len(files_to_process))  # Limit concurrent connections
-        
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks
-            future_to_file = {executor.submit(process_single_cleaned_file, file_args): file_args for file_args in files_to_process}
-            
-            # Collect results as they complete
-            for future in as_completed(future_to_file):
-                file_args = future_to_file[future]
-                try:
-                    words = future.result()
-                    total_words += words
-                except Exception as e:
-                    print(f"Error processing {file_args[1]}: {str(e)}")
-        
-        return total_words, len(files_to_process)
+        return total_words, file_count
     except Exception as e:
         print(f"Error accessing S3: {e}")
         return 0, 0
-
-
-def process_single_source(args):
-    """Process a single source and return results. Used for parallel processing."""
-    source_name, config = args
-    
-    print(f"\nProcessing source: {source_name}")
-    s3_path = f"s3://{config['bucket_name']}/{config['prefix']}"
-    print(f"  Raw data: {s3_path}")
-    print(f"  Cleaned data: s3://{config['output_bucket_name']}/{config['output_prefix']}")
-    
-    try:
-        # Count words in raw data
-        raw_words, raw_files = count_words_in_source(
-            bucket_name=config['bucket_name'],
-            prefix=config['prefix'],
-            source_name=config['source_name']
-        )
-        
-        # Count words in cleaned data
-        cleaned_words, cleaned_files = count_words_after_cleaning(
-            output_bucket_name=config['output_bucket_name'],
-            output_prefix=config['output_prefix']
-        )
-        
-        result = {
-            'source_name': source_name,
-            's3_path': s3_path,
-            'n_words_raw': raw_words,
-            'n_words_cleaned': cleaned_words
-        }
-        
-        print(f"  Raw: {raw_words:,} words ({raw_files} files)")
-        print(f"  Cleaned: {cleaned_words:,} words ({cleaned_files} files)")
-        
-        if raw_words > 0:
-            reduction = ((raw_words - cleaned_words) / raw_words * 100)
-            print(f"  Reduction: {reduction:.1f}%")
-        
-        return result
-        
-    except Exception as e:
-        print(f"  Error processing {source_name}: {str(e)}")
-        return {
-            'source_name': source_name,
-            's3_path': s3_path,
-            'n_words_raw': 0,
-            'n_words_cleaned': 0
-        }
 
 
 def main():
@@ -491,29 +389,50 @@ def main():
     
     print(f"Found {len(registry)} sources to analyze")
     
-    # Process sources in parallel (limited to avoid overwhelming S3)
-    max_workers = min(5, len(registry))  # Limit concurrent sources
     results = []
     
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit all source processing tasks
-        future_to_source = {executor.submit(process_single_source, (name, config)): name 
-                           for name, config in registry.items()}
+    for source_name, config in registry.items():
+        print(f"\nProcessing source: {source_name}")
+        s3_path = f"s3://{config['bucket_name']}/{config['prefix']}"
+        print(f"  Raw data: {s3_path}")
+        print(f"  Cleaned data: s3://{config['output_bucket_name']}/{config['output_prefix']}")
         
-        # Collect results as they complete
-        for future in as_completed(future_to_source):
-            source_name = future_to_source[future]
-            try:
-                result = future.result()
-                results.append(result)
-            except Exception as e:
-                print(f"Error processing source {source_name}: {str(e)}")
-                results.append({
-                    'source_name': source_name,
-                    's3_path': f"s3://{registry[source_name]['bucket_name']}/{registry[source_name]['prefix']}",
-                    'n_words_raw': 0,
-                    'n_words_cleaned': 0
-                })
+        try:
+            # Count words in raw data
+            raw_words, raw_files = count_words_in_source(
+                bucket_name=config['bucket_name'],
+                prefix=config['prefix'],
+                source_name=config['source_name']
+            )
+            
+            # Count words in cleaned data
+            cleaned_words, cleaned_files = count_words_after_cleaning(
+                output_bucket_name=config['output_bucket_name'],
+                output_prefix=config['output_prefix']
+            )
+            
+            results.append({
+                'source_name': source_name,
+                's3_path': s3_path,
+                'n_words_raw': raw_words,
+                'n_words_cleaned': cleaned_words
+            })
+            
+            print(f"  Raw: {raw_words:,} words ({raw_files} files)")
+            print(f"  Cleaned: {cleaned_words:,} words ({cleaned_files} files)")
+            
+            if raw_words > 0:
+                reduction = ((raw_words - cleaned_words) / raw_words * 100)
+                print(f"  Reduction: {reduction:.1f}%")
+            
+        except Exception as e:
+            print(f"  Error processing {source_name}: {str(e)}")
+            results.append({
+                'source_name': source_name,
+                's3_path': s3_path,
+                'n_words_raw': 0,
+                'n_words_cleaned': 0
+            })
     
     # Save results to CSV
     output_file = 'word_count_analysis.csv'
