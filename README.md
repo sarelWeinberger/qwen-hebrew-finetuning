@@ -149,10 +149,22 @@ deepspeed --num_gpus=8 qwen_model/test_pipeline.py --dataset_path qwen_model/dat
 ```
 
 ### 8. Evaluate the Model
-
+# Demo
 ```bash
 ./qwen_model/start_evaluation.sh --model_path qwen_model/finetuned
 ```
+# Install LightEval directly from GitHub using uv
+uv pip install 'git+https://github.com/EleutherAI/lighteval.git'
+bash
+# Run LightEval with the desired configuration
+python -m lighteval accelerate \
+  "model_name=Qwen/Qwen3-30B-A3B-Base" \
+  "leaderboard|arc:challenge|0|0" \
+  --output-dir ./subset_test_results_30B_fewshots \
+  --save-details \
+  --results-path-template "subset_test_30B_fewshots.json" \
+  --max-samples 50 \
+  --num-fewshot-seeds 25
 
 ## Documentation
 
