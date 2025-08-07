@@ -115,7 +115,8 @@ source .venv/bin/activate
 And finally:
 
 ```bash
-nohup accelerate launch --config_file=deepspeed_zero3.yaml train.py --wandb_name run-name-for-wandb > training_output.log 2>&1 &```
+nohup accelerate launch --config_file=deepspeed_zero3.yaml train.py --wandb_name run-name-for-wandb > training_output.log 2>&1 &
+```
 
 Other parameters to set:
 
