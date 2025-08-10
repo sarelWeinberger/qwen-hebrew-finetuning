@@ -30,7 +30,7 @@ def parse_args():
         "--dataset_path",
         type=str,
         required=False,
-        default='he_wiki_sample.jsonl',
+        default='wikipedia_he_part_002.jsonl',
         help="Path to the HuggingFace dataset or local JSON/L file (for now)"
     )
     parser.add_argument(
@@ -56,6 +56,30 @@ def parse_args():
         type=str,
         default="llm_train_mafat",
         help="Weights & Biases entity name"
+    )
+    parser.add_argument(
+        "--adam_beta1",
+        type=float,
+        default=None,
+        help="Adam optimizer beta1 parameter"
+    )
+    parser.add_argument(
+        "--adam_beta2",
+        type=float,
+        default=None,
+        help="Adam optimizer beta2 parameter"
+    )
+    parser.add_argument(
+        "--adam_epsilon",
+        type=float,
+        default=None,
+        help="Adam optimizer epsilon parameter"
+    )
+    parser.add_argument(
+        "--weight_decay",
+        type=float,
+        default=None,
+        help="Weight decay for optimizer"
     )
     return parser.parse_args()
 
@@ -102,6 +126,16 @@ def train():
     # load in the training config
     with open(args.config, 'r', encoding='utf8') as f:
         config = json.loads(f.read())
+
+    # Override config with CLI arguments if provided
+    if args.adam_beta1 is not None:
+        config["adam_beta1"] = args.adam_beta1
+    if args.adam_beta2 is not None:
+        config["adam_beta2"] = args.adam_beta2
+    if args.adam_epsilon is not None:
+        config["adam_epsilon"] = args.adam_epsilon
+    if args.weight_decay is not None:
+        config["weight_decay"] = args.weight_decay
 
     # Initialize Weights & Biases - only on the main process
     accelerator = Accelerator()
@@ -179,6 +213,10 @@ def train():
         save_total_limit=config.get("save_total_limit", 5),
         warmup_ratio=config.get('warmup_ratio', None), # default to 100 steps
         warmup_steps=config.get('warmup_steps', 100) if not 'warmup_ratio' in config else 0,
+        weight_decay=config.get('weight_decay', 0.0),
+        adam_beta1=config.get('adam_beta1', 0.9),
+        adam_beta2=config.get('adam_beta2', 0.999),
+        adam_epsilon=config.get('adam_epsilon', 1e-8),
         # Defaults:
         report_to=['wandb'],
         gradient_checkpointing=True,

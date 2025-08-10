@@ -2,13 +2,17 @@
     "model_name_or_path": "Qwen/Qwen3-30B-A3B-Base",
     "output_dir": "./output",
     "per_device_train_batch_size": 1,
-    "gradient_accumulation_steps": 1,
-    "learning_rate": 1e-05,
-    "max_steps": 1000,
+    "gradient_accumulation_steps": 4,
+    "learning_rate": 2.236262146655957e-05,
+    "max_steps": 100,
     "save_strategy": "steps",
     "save_steps": 500,
     "save_total_limit": 3,
     "logging_steps": 1,
-    "warmup_ratio": 0.1,
-    "max_seq_length": 2048
+    "warmup_ratio": 0.02407864414309099,
+    "max_seq_length": 2048,
+    "weight_decay": 0.0016868340125208105,
+    "adam_beta1": 0.9377454185664112,
+    "adam_beta2": 0.9853943877925512,
+    "adam_epsilon": 4.52991173889856e-08
 }
