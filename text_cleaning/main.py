@@ -3,6 +3,7 @@ from fetchers.s3_source_fetcher import S3SourceFetcher
 from cleaners.regex_cleaner import RegExCleaner
 from cleaners.spacefix_cleaner import SpaceFixCleaner  # Added import
 from utils.cleaner_constants import CLEANUP_RULES
+import pandas as pd
 
 
 
@@ -270,12 +271,72 @@ def create_registry(debug_mode):
         #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
         #     )
         # },
-        'sefaria': {
+        # 'sefaria': {
+        #     'fetcher': S3SourceFetcher(
+        #         bucket_name='israllm-datasets',
+        #         prefix='raw-datasets/sefaria',
+        #         source_name='AllOfSefariaTexts',
+        #         output_prefix='processed_and_cleaned/sefaria',
+        #         output_bucket_name='gepeta-datasets'
+        #     ),
+        #     'cleaner': RegExCleaner(
+        #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+        #     )
+        # },
+        'COGNI': {
             'fetcher': S3SourceFetcher(
                 bucket_name='israllm-datasets',
-                prefix='raw-datasets/sefaria',
-                source_name='AllOfSefariaTexts',
-                output_prefix='processed_and_cleaned/sefaria',
+                prefix='raw-datasets/other_documents/parsed/',
+                source_name='COGNI-IDF3_texts.deduped',
+                output_prefix='processed_and_cleaned/COGNI',
+                output_bucket_name='gepeta-datasets'
+            ),
+            'cleaner': RegExCleaner(
+                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+            )
+        },
+        'kohelet': {
+            'fetcher': S3SourceFetcher(
+                bucket_name='israllm-datasets',
+                prefix='raw-datasets/other_documents/parsed/',
+                source_name='kohelet_texts.deduped',
+                output_prefix='processed_and_cleaned/kohelet',
+                output_bucket_name='gepeta-datasets'
+            ),
+            'cleaner': RegExCleaner(
+                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+            )
+        },
+        'RAMA': {
+            'fetcher': S3SourceFetcher(
+                bucket_name='israllm-datasets',
+                prefix='raw-datasets/other_documents/parsed/',
+                source_name='RAMA_texts.deduped',
+                output_prefix='processed_and_cleaned/RAMA',
+                output_bucket_name='gepeta-datasets'
+            ),
+            'cleaner': RegExCleaner(
+                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+            )
+        },
+        'SecuritiesAuthority': {
+            'fetcher': S3SourceFetcher(
+                bucket_name='israllm-datasets',
+                prefix='raw-datasets/other_documents/parsed/',
+                source_name='SecuritiesAuthority_texts.deduped',
+                output_prefix='processed_and_cleaned/SecuritiesAuthority',
+                output_bucket_name='gepeta-datasets'
+            ),
+            'cleaner': RegExCleaner(
+                patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+            )
+        },
+        'StateComptrollerReports': {
+            'fetcher': S3SourceFetcher(
+                bucket_name='israllm-datasets',
+                prefix='raw-datasets/other_documents/parsed/',
+                source_name='StateComptrollerReports_texts.deduped',
+                output_prefix='processed_and_cleaned/StateComptrollerReports',
                 output_bucket_name='gepeta-datasets'
             ),
             'cleaner': RegExCleaner(
@@ -326,6 +387,111 @@ def run_full_cleaning(debug_mode=False):
             print(f"Error processing full cleaning for {source_name}: {str(e)}")
 
 
+def count_words_for_all_sources():
+    """
+    Count words before and after cleaning for all sources and save comprehensive results.
+    """
+    from simple_word_count_analyzer import count_words_in_source, count_words_after_cleaning
+    
+    registry = create_registry(debug_mode=False)
+    results = []
+    
+    print("Counting words for all sources...")
+    
+    for source_name, components in registry.items():
+        print(f"\nProcessing source: {source_name}")
+        
+        try:
+            fetcher = components["fetcher"]
+            
+            # Count words in raw data
+            raw_words, raw_files = count_words_in_source(
+                bucket_name=fetcher.bucket_name,
+                prefix=fetcher.prefix,
+                source_name=fetcher.source_name
+            )
+            
+            # Count words in cleaned data
+            cleaned_words, cleaned_files = count_words_after_cleaning(
+                output_bucket_name=fetcher.output_bucket_name,
+                output_prefix=fetcher.output_prefix
+            )
+            
+            # Calculate reduction percentage
+            reduction_percent = ((raw_words - cleaned_words) / raw_words * 100) if raw_words > 0 else 0
+            
+            results.append({
+                'source_name': source_name,
+                'raw_words': raw_words,
+                'cleaned_words': cleaned_words,
+                'reduction_percent': reduction_percent,
+                'raw_files': raw_files,
+                'cleaned_files': cleaned_files,
+                'raw_s3_path': f"s3://{fetcher.bucket_name}/{fetcher.prefix}",
+                'cleaned_s3_path': f"s3://{fetcher.output_bucket_name}/{fetcher.output_prefix}"
+            })
+            
+            print(f"  Raw: {raw_words:,} words ({raw_files} files)")
+            print(f"  Cleaned: {cleaned_words:,} words ({cleaned_files} files)")
+            print(f"  Reduction: {reduction_percent:.2f}%")
+            
+        except Exception as e:
+            print(f"  Error processing {source_name}: {str(e)}")
+            results.append({
+                'source_name': source_name,
+                'raw_words': 0,
+                'cleaned_words': 0,
+                'reduction_percent': 0,
+                'raw_files': 0,
+                'cleaned_files': 0,
+                'raw_s3_path': f"s3://{components['fetcher'].bucket_name}/{components['fetcher'].prefix}",
+                'cleaned_s3_path': f"s3://{components['fetcher'].output_bucket_name}/{components['fetcher'].output_prefix}"
+            })
+    
+    # Create comprehensive summary
+    total_raw = sum(r['raw_words'] for r in results)
+    total_cleaned = sum(r['cleaned_words'] for r in results)
+    total_reduction = ((total_raw - total_cleaned) / total_raw * 100) if total_raw > 0 else 0
+    
+    summary = f"""n words before cleaning: {total_raw:,}
+n words after cleaning: {total_cleaned:,}
+
+Individual sources:
+"""
+    
+    for result in results:
+        summary += f"""{result['source_name']}:
+n words before cleaning: {result['raw_words']:,}
+n words after cleaning: {result['cleaned_words']:,}
+
+"""
+    
+    # Save to a common location
+    try:
+        import boto3
+        s3 = boto3.client("s3")
+        
+        filename = f"word_count_all_sources.txt"
+        
+        # Save to gepeta-datasets bucket in a common location
+        output_key = f"word_count_analyses/{filename}"
+        
+        s3.put_object(
+            Bucket='gepeta-datasets',
+            Key=output_key,
+            Body=summary.encode('utf-8'),
+            ContentType='text/plain'
+        )
+        
+        print(f"\nComprehensive analysis saved to: s3://gepeta-datasets/{output_key}")
+        
+    except Exception as e:
+        print(f"Error saving comprehensive analysis: {str(e)}")
+    
+    return results
+
+
 if __name__ == "__main__":
     # Default: run full cleaning. To run samples, call run_all_samples()
+    # To count words for all sources, call count_words_for_all_sources()
     run_full_cleaning()

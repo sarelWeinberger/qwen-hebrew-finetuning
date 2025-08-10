@@ -4,6 +4,9 @@ import numpy as np
 from pathlib import Path
 from utils.logger import logger
 import random
+import io
+import json
+import gzip
 
 class CleaningPipeline:
     def __init__(self, fetcher, cleaner, source_name: str):
@@ -32,6 +35,76 @@ class CleaningPipeline:
                 logger.warning(f"Skipped empty file {i}/{total_files}")
         
         logger.info(f"Cleaning pipeline completed for all {total_files} files.")
+        
+        # Count words before and after cleaning
+        self.count_words_before_after()
+
+    def count_words_before_after(self):
+        """Count words before and after cleaning for all sources and save results."""
+        logger.info("Counting words before and after cleaning...")
+        
+        # Import the word counting functions from the analyzer
+        from simple_word_count_analyzer import count_words_in_source, count_words_after_cleaning
+        
+        try:
+            # Count words in raw data
+            raw_words, raw_files = count_words_in_source(
+                bucket_name=self.fetcher.bucket_name,
+                prefix=self.fetcher.prefix,
+                source_name=self.fetcher.source_name
+            )
+            
+            # Count words in cleaned data
+            cleaned_words, cleaned_files = count_words_after_cleaning(
+                output_bucket_name=self.fetcher.output_bucket_name,
+                output_prefix=self.fetcher.output_prefix
+            )
+            
+            # Calculate reduction percentage
+            reduction_percent = ((raw_words - cleaned_words) / raw_words * 100) if raw_words > 0 else 0
+            
+            # Create simple results summary
+            results_summary = f"""n words before cleaning: {raw_words:,}
+n words after cleaning: {cleaned_words:,}"""
+            
+            # Save results to S3
+            self.save_word_count_results(results_summary)
+            
+            logger.info(f"Word count analysis completed for {self.source_name}")
+            logger.info(f"Raw: {raw_words:,} words, Cleaned: {cleaned_words:,} words, Reduction: {reduction_percent:.2f}%")
+            
+        except Exception as e:
+            logger.error(f"Error in word count analysis: {str(e)}")
+            # Save error message
+            error_summary = f"""n words before cleaning: 0
+n words after cleaning: 0
+Error: {str(e)}"""
+            self.save_word_count_results(error_summary)
+
+    def save_word_count_results(self, results_text):
+        """Save word count results as a text file to S3."""
+        try:
+            import boto3
+            s3 = boto3.client("s3")
+            
+            # Create simple filename
+            filename = f"word_count_{self.source_name}.txt"
+            
+            # Create the output key
+            output_key = f"{self.fetcher.output_prefix.rstrip('/')}/{filename}"
+            
+            # Upload to S3
+            s3.put_object(
+                Bucket=self.fetcher.output_bucket_name,
+                Key=output_key,
+                Body=results_text.encode('utf-8'),
+                ContentType='text/plain'
+            )
+            
+            logger.info(f"Word count results saved to s3://{self.fetcher.output_bucket_name}/{output_key}")
+            
+        except Exception as e:
+            logger.error(f"Error saving word count results: {str(e)}")
 
     def run_sample_mode(self, custom_output_prefix=None, custom_bucket_name=None):
         """
