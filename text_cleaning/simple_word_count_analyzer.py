@@ -28,142 +28,142 @@ def create_registry():
             'bucket_name': 'israllm-datasets',
             'prefix': 'raw-datasets/nli/csv_output/',
             'source_name': 'AllHebNLI',
-            'output_prefix': 'processed_and_cleaned/test',
+            'output_prefix': 'processed_and_cleaned/AllHebNLI/',
             'output_bucket_name': 'gepeta-datasets'
         },
-        'AllOfHEOscarData-Combined-Deduped-DC4.forgpt': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/rar/csv_output/',
-            'source_name': 'AllOfHEOscarData-Combined-Deduped-DC4.forgpt',
-            'output_prefix': 'processed_and_cleaned/AllOfHEOscarData',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'AllTzenzuraData-Combined-Deduped-DC4.forgpt': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/rar/csv_output/',
-            'source_name': 'AllTzenzuraData-Combined-Deduped-DC4.forgpt',
-            'output_prefix': 'processed_and_cleaned/AllTzenzuraData',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'BooksNLI2-Combined-Deduped.forgpt': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/rar/csv_output/',
-            'source_name': 'BooksNLI2-Combined-Deduped.forgpt',
-            'output_prefix': 'processed_and_cleaned/BooksNLI2',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'GeektimeCorpus-Combined-Deduped.forgpt': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/rar/csv_output/',
-            'source_name': 'GeektimeCorpus-Combined-Deduped.forgpt',
-            'output_prefix': 'processed_and_cleaned/GeektimeCorpus',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'hebrew_tweets_text_clean_full-Deduped.forgpt': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/rar/csv_output/',
-            'source_name': 'hebrew_tweets_text_clean_full-Deduped.forgpt',
-            'output_prefix': 'processed_and_cleaned/hebrew_tweets',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'HeC4DictaCombined-Clean-Deduped.forgpt': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/rar/csv_output/',
-            'source_name': 'HeC4DictaCombined-Clean-Deduped.forgpt',
-            'output_prefix': 'processed_and_cleaned/HeC4DictaCombined',
-            'output_bucket_name': 'gepeta-datasets'
-        },
+        # 'AllOfHEOscarData-Combined-Deduped-DC4.forgpt': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/rar/csv_output/',
+        #     'source_name': 'AllOfHEOscarData-Combined-Deduped-DC4.forgpt',
+        #     'output_prefix': 'processed_and_cleaned/AllOfHEOscarData',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'AllTzenzuraData-Combined-Deduped-DC4.forgpt': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/rar/csv_output/',
+        #     'source_name': 'AllTzenzuraData-Combined-Deduped-DC4.forgpt',
+        #     'output_prefix': 'processed_and_cleaned/AllTzenzuraData',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'BooksNLI2-Combined-Deduped.forgpt': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/rar/csv_output/',
+        #     'source_name': 'BooksNLI2-Combined-Deduped.forgpt',
+        #     'output_prefix': 'processed_and_cleaned/BooksNLI2',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'GeektimeCorpus-Combined-Deduped.forgpt': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/rar/csv_output/',
+        #     'source_name': 'GeektimeCorpus-Combined-Deduped.forgpt',
+        #     'output_prefix': 'processed_and_cleaned/GeektimeCorpus',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'hebrew_tweets_text_clean_full-Deduped.forgpt': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/rar/csv_output/',
+        #     'source_name': 'hebrew_tweets_text_clean_full-Deduped.forgpt',
+        #     'output_prefix': 'processed_and_cleaned/hebrew_tweets',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'HeC4DictaCombined-Clean-Deduped.forgpt': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/rar/csv_output/',
+        #     'source_name': 'HeC4DictaCombined-Clean-Deduped.forgpt',
+        #     'output_prefix': 'processed_and_cleaned/HeC4DictaCombined',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
         'YifatDataBatch2-Round3-Deduped.forgpt': {
             'bucket_name': 'israllm-datasets',
             'prefix': 'raw-datasets/rar/csv_output/',
             'source_name': 'YifatDataBatch2-Round3-Deduped.forgpt',
-            'output_prefix': 'processed_and_cleaned/YifatDataBatch2',
+            'output_prefix': 'processed_and_cleaned/YifatDataBatch2/',
             'output_bucket_name': 'gepeta-datasets'
         },
-        'YifatDataRound2-Deduped.forgpt': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/rar/csv_output/',
-            'source_name': 'YifatDataRound2-Deduped.forgpt',
-            'output_prefix': 'processed_and_cleaned/YifatDataRound2',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'YifatToCombine-Deduped.forgpt': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/rar/csv_output/',
-            'source_name': 'YifatToCombine-Deduped.forgpt',
-            'output_prefix': 'processed_and_cleaned/YifatToCombine',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'YisraelHayomData-Combined-Deduped.forgpt': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/rar/csv_output/',
-            'source_name': 'YisraelHayomData-Combined-Deduped.forgpt',
-            'output_prefix': 'processed_and_cleaned/YisraelHayomData',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'FineWeb2': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/fineweb2',
-            'source_name': 'batch',
-            'output_prefix': 'processed_and_cleaned/FineWeb2/',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'HeC4': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/HeC4',
-            'source_name': 'part',
-            'output_prefix': 'processed_and_cleaned/HeC4-HF',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'SupremeCourtOfIsrael': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/SupremeCourtOfIsrael/text_extraction/',
-            'source_name': 'batch',
-            'output_prefix': 'processed_and_cleaned/SupremeCourtOfIsrael',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'YifatDataBatch2-Round4': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/Yifat4+5/csv_output',
-            'source_name': 'YifatDataBatch2-Round4',
-            'output_prefix': 'processed_and_cleaned/YifatDataBatch2-Round4',
-            'output_bucket_name': 'gepeta-datasets'
-        },
+        # 'YifatDataRound2-Deduped.forgpt': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/rar/csv_output/',
+        #     'source_name': 'YifatDataRound2-Deduped.forgpt',
+        #     'output_prefix': 'processed_and_cleaned/YifatDataRound2',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'YifatToCombine-Deduped.forgpt': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/rar/csv_output/',
+        #     'source_name': 'YifatToCombine-Deduped.forgpt',
+        #     'output_prefix': 'processed_and_cleaned/YifatToCombine',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'YisraelHayomData-Combined-Deduped.forgpt': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/rar/csv_output/',
+        #     'source_name': 'YisraelHayomData-Combined-Deduped.forgpt',
+        #     'output_prefix': 'processed_and_cleaned/YisraelHayomData',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'FineWeb2': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/fineweb2',
+        #     'source_name': 'batch',
+        #     'output_prefix': 'processed_and_cleaned/FineWeb2/',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'HeC4': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/HeC4',
+        #     'source_name': 'part',
+        #     'output_prefix': 'processed_and_cleaned/HeC4-HF',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'SupremeCourtOfIsrael': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/SupremeCourtOfIsrael/text_extraction/',
+        #     'source_name': 'batch',
+        #     'output_prefix': 'processed_and_cleaned/SupremeCourtOfIsrael',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'YifatDataBatch2-Round4': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/Yifat4+5/csv_output',
+        #     'source_name': 'YifatDataBatch2-Round4',
+        #     'output_prefix': 'processed_and_cleaned/YifatDataBatch2-Round4',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
         'YifatDataBatch3-Round5': {
             'bucket_name': 'israllm-datasets',
             'prefix': 'raw-datasets/Yifat4+5/csv_output',
             'source_name': 'YifatDataBatch3-Round5',
-            'output_prefix': 'test_spacefix/YifatDataBatch2-Round5',
+            'output_prefix': 'processed_and_cleaned/YifatDataBatch2-Round5/',
             'output_bucket_name': 'gepeta-datasets'
         },
-        'OcrTau': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'tau_clean/',
-            'source_name': 'HQ',
-            'output_prefix': 'processed_and_cleaned/TauOCR',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'TauDigital': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'tau_clean/',
-            'source_name': 'DigitalMarkdown_Tables.jsonl',
-            'output_prefix': 'processed_and_cleaned/TauDigital',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'BIU': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/biu-drive/',
-            'source_name': 'AllBIUDriveDocs-MD-Deduped.forgpt.jsonl.gz',
-            'output_prefix': 'processed_and_cleaned/BIU',
-            'output_bucket_name': 'gepeta-datasets'
-        },
-        'sefaria': {
-            'bucket_name': 'israllm-datasets',
-            'prefix': 'raw-datasets/sefaria',
-            'source_name': 'AllOfSefariaTexts',
-            'output_prefix': 'processed_and_cleaned/sefaria',
-            'output_bucket_name': 'gepeta-datasets'
-        }
+        # 'OcrTau': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'tau_clean/',
+        #     'source_name': 'HQ',
+        #     'output_prefix': 'processed_and_cleaned/TauOCR',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'TauDigital': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'tau_clean/',
+        #     'source_name': 'DigitalMarkdown_Tables.jsonl',
+        #     'output_prefix': 'processed_and_cleaned/TauDigital',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'BIU': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/biu-drive/',
+        #     'source_name': 'AllBIUDriveDocs-MD-Deduped.forgpt.jsonl.gz',
+        #     'output_prefix': 'processed_and_cleaned/BIU',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # },
+        # 'sefaria': {
+        #     'bucket_name': 'israllm-datasets',
+        #     'prefix': 'raw-datasets/sefaria',
+        #     'source_name': 'AllOfSefariaTexts',
+        #     'output_prefix': 'processed_and_cleaned/sefaria',
+        #     'output_bucket_name': 'gepeta-datasets'
+        # }
     }
     return registry
 
@@ -357,7 +357,7 @@ def count_words_after_cleaning(output_bucket_name, output_prefix):
             for obj in page.get('Contents', []):
                 key = obj['Key']
                 filename = key.split('/')[-1]
-                
+                print(f'filename: {filename}')
                 if filename.endswith('_cleaned.csv') or filename.endswith('_cleaned.parquet'):
                     try:
                         response = s3.get_object(Bucket=output_bucket_name, Key=key)
