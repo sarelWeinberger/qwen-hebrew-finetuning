@@ -152,3 +152,4 @@ if __name__ == "__main__":
     # To count words for all sources, call count_words_for_all_sources()
     registry = spacefix_registry
     run_full_cleaning(registry)
+    
