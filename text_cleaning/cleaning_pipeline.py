@@ -38,6 +38,14 @@ class CleaningPipeline:
         
         # Count words before and after cleaning
         self.count_words_before_after()
+        
+        # If using SpaceFixCleaner, also count words from tracking data
+        if hasattr(self.cleaner, 'count_words_before_after'):
+            self.cleaner.count_words_before_after(
+                source_name=self.source_name,
+                output_bucket_name=self.fetcher.output_bucket_name,
+                output_prefix=self.fetcher.output_prefix
+            )
 
     def count_words_before_after(self):
         """Count words before and after cleaning for all sources and save results."""

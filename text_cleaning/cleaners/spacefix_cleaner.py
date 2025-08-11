@@ -3,6 +3,7 @@ import re
 from transformers import pipeline
 from .base_cleaner import BaseCleaner
 import os
+import boto3
 class SpaceFixCleaner(BaseCleaner):
     _oracle = None  # Class variable to hold the pipeline singleton
     _insertions_df = None  # Class variable to hold all insertions DataFrame
@@ -127,6 +128,62 @@ class SpaceFixCleaner(BaseCleaner):
                 # Create new file
                 pd.DataFrame(all_insertions).to_csv('spacefix_insertions.csv', index=False)
         return df 
+
+    def count_words_before_after(self, source_name, output_bucket_name, output_prefix):
+        """Count words before and after space fixing and save results."""
+        try:
+            # Count words in the tracking data
+            if not self._tracking_data:
+                print(f"No tracking data available for {source_name}")
+                return
+            
+            tracking_df = pd.DataFrame(self._tracking_data)
+            
+            # Calculate total words before and after
+            total_words_before = tracking_df['original_word_count'].sum()
+            total_words_after = tracking_df['fixed_word_count'].sum()
+            
+            # Create simple results summary
+            results_summary = f"""n words before cleaning: {total_words_before:,}
+n words after cleaning: {total_words_after:,}"""
+            
+            # Save results to S3
+            self.save_word_count_results(results_summary, source_name, output_bucket_name, output_prefix)
+            
+            print(f"Word count analysis completed for {source_name}")
+            print(f"Raw: {total_words_before:,} words, Cleaned: {total_words_after:,} words")
+            
+        except Exception as e:
+            print(f"Error in word count analysis: {str(e)}")
+            # Save error message
+            error_summary = f"""n words before cleaning: 0
+n words after cleaning: 0
+Error: {str(e)}"""
+            self.save_word_count_results(error_summary, source_name, output_bucket_name, output_prefix)
+
+    def save_word_count_results(self, results_text, source_name, output_bucket_name, output_prefix):
+        """Save word count results as a text file to S3."""
+        try:
+            s3 = boto3.client("s3")
+            
+            # Create simple filename
+            filename = f"word_count_{source_name}.txt"
+            
+            # Create the output key
+            output_key = f"{output_prefix.rstrip('/')}/{filename}"
+            
+            # Upload to S3
+            s3.put_object(
+                Bucket=output_bucket_name,
+                Key=output_key,
+                Body=results_text.encode('utf-8'),
+                ContentType='text/plain'
+            )
+            
+            print(f"Word count results saved to s3://{output_bucket_name}/{output_key}")
+            
+        except Exception as e:
+            print(f"Error saving word count results: {str(e)}")
 
     def apply_insertions_to_text(self, original_text, insertions):
         """
