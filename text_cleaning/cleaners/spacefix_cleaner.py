@@ -4,6 +4,7 @@ from transformers import pipeline
 from .base_cleaner import BaseCleaner
 import os
 import boto3
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 class SpaceFixCleaner(BaseCleaner):
     _oracle = None  # Class variable to hold the pipeline singleton
     _insertions_df = None  # Class variable to hold all insertions DataFrame
@@ -72,34 +73,21 @@ class SpaceFixCleaner(BaseCleaner):
         # Combine processed chunks
         return ''.join(processed_chunks)
     
-    def _split_text_at_spaces(self, text: str, max_length: int = 2046):
-        """Split text into chunks at space boundaries, ensuring no chunk exceeds max_length."""
+    def _split_text_at_spaces(self, text: str, max_length: int = 2000):
+        """Split text into chunks using LangChain's RecursiveCharacterTextSplitter."""
         if len(text) <= max_length:
             return [text]
         
-        chunks = []
-        start = 0
+        # Initialize the recursive text splitter
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=max_length,
+            chunk_overlap=0,  # No overlap to avoid duplicate processing
+            length_function=len,
+            separators=["\n\n", "\n", ". ", " ", "."]  # Split on paragraphs, lines, spaces, then characters
+        )
         
-        while start < len(text):
-            # Find the end position for this chunk
-            end = start + max_length
-            
-            # If we're not at the end of the text, try to find a space to split at
-            if end < len(text):
-                # Look backwards from end to find the last space
-                last_space = text.rfind(' ', start, end)
-                if last_space > start:
-                    end = last_space + 1  # Include the space in the current chunk
-                else:
-                    # No space found, force split at max_length
-                    end = start + max_length
-            
-            # Extract the chunk
-            chunk = text[start:end]
-            chunks.append(chunk)
-            
-            # Move to next chunk
-            start = end
+        # Split the text
+        chunks = text_splitter.split_text(text)
         
         return chunks
     
@@ -265,3 +253,4 @@ Error: {str(e)}"""
             text.insert(idx, ins['char'])
             offset += 1
         return ''.join(text)
+
