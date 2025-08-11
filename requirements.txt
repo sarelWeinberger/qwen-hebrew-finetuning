@@ -24,3 +24,6 @@ packaging>=20.0
 pyyaml>=6.0
 boto3>=1.38.28
 rarfile>=4.0
+
+# Text processing
+langchain>=0.1.0
