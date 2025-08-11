@@ -9,7 +9,7 @@ REGISTRY = {
     'AllHebNLI': {
         'fetcher': S3SourceFetcher(
             bucket_name='gepeta-datasets',
-            prefix='processed_cleaned_filtered/run_4/AllHebNLI/filtering/output/',
+            prefix='processed_cleaned_filtered/run_5/AllHebNLI/filtering/output/',
             source_name='000',
             output_prefix='processed_and_cleaned_spacefixed/AllHebNLI',
             output_bucket_name='gepeta-datasets'
@@ -19,7 +19,7 @@ REGISTRY = {
     'AllOfHEOscarData-Combined-Deduped-DC4.forgpt': {
         'fetcher': S3SourceFetcher(
             bucket_name='gepeta-datasets',
-            prefix='processed_cleaned_filtered/run_4/AllOfHEOscarData/filtering/output/',
+            prefix='processed_cleaned_filtered/run_5/AllOfHEOscarData/filtering/output/',
             source_name='000',
             output_prefix='processed_and_cleaned_spacefixed/AllOfHEOscarData',
             output_bucket_name='gepeta-datasets'

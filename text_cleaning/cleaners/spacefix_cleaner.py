@@ -215,4 +215,4 @@ Error: {str(e)}"""
                 idx = len(text)
             text.insert(idx, ins['char'])
             offset += 1
-        return ''.join(text) 
+        return ''.join(text)
