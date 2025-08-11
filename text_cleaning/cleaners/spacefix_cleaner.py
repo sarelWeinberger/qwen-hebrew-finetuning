@@ -13,10 +13,16 @@ class SpaceFixCleaner(BaseCleaner):
     @classmethod
     def get_oracle(cls):
         if cls._oracle is None:
-            cls._oracle = pipeline('token-classification', model='dicta-il/dictabert-char-spacefix')
+            # Check if CUDA is available and use GPU if possible
+            import torch
+            device = 0 if torch.cuda.is_available() else -1
+            cls._oracle = pipeline('token-classification', 
+                                 model='dicta-il/dictabert-char-spacefix',
+                                 device=device)
+            print(f"SpaceFixCleaner initialized on device: {'GPU' if device == 0 else 'CPU'}")
         return cls._oracle
 
-    def __init__(self, enable_tracking=True):
+    def __init__(self, enable_tracking=False):
         super().__init__()
         # Do not load the pipeline here; use get_oracle when needed
         # Hebrew Unicode range: \u0590-\u05FF
