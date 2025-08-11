@@ -56,13 +56,62 @@ class SpaceFixCleaner(BaseCleaner):
     def _restore_spaces_with_tracking(self, text: str):
         if not isinstance(text, str) or not text.strip():
             return text
+        
+        # If text is short enough, process it directly
+        if len(text) <= 2046:
+            return self._process_text_chunk(text)
+        
+        # Split text into chunks at space boundaries
+        chunks = self._split_text_at_spaces(text, max_length=2046)
+        processed_chunks = []
+        
+        for chunk in chunks:
+            processed_chunk = self._process_text_chunk(chunk)
+            processed_chunks.append(processed_chunk)
+        
+        # Combine processed chunks
+        return ''.join(processed_chunks)
+    
+    def _split_text_at_spaces(self, text: str, max_length: int = 2046):
+        """Split text into chunks at space boundaries, ensuring no chunk exceeds max_length."""
+        if len(text) <= max_length:
+            return [text]
+        
+        chunks = []
+        start = 0
+        
+        while start < len(text):
+            # Find the end position for this chunk
+            end = start + max_length
+            
+            # If we're not at the end of the text, try to find a space to split at
+            if end < len(text):
+                # Look backwards from end to find the last space
+                last_space = text.rfind(' ', start, end)
+                if last_space > start:
+                    end = last_space + 1  # Include the space in the current chunk
+                else:
+                    # No space found, force split at max_length
+                    end = start + max_length
+            
+            # Extract the chunk
+            chunk = text[start:end]
+            chunks.append(chunk)
+            
+            # Move to next chunk
+            start = end
+        
+        return chunks
+    
+    def _process_text_chunk(self, text: str):
+        """Process a single text chunk with the space fix model."""
         oracle = self.get_oracle()
         raw_output = oracle(text)
         new_text = ''
         try:
             assert len(raw_output) == len(text)
         except AssertionError:
-            print(f"AssertionError: the model calculated a different length than the text: {text}")
+            print(f"AssertionError: the model calculated a different length than the text: {len(text)} != {len(raw_output)}")
             return text
         for i, (o, c) in enumerate(zip(raw_output,text)):
             is_heb = self.hebrew_pattern.match(o['word'])
