@@ -18,6 +18,267 @@ import numpy as np
 from typing import Dict, List, Union
 from datasets import load_dataset
 
+class WandbMetricsCallback(TrainerCallback):
+    """Enhanced W&B callback for comprehensive training and validation monitoring"""
+    
+    def __init__(self):
+        self.step_count = 0
+        self.optimizer_params = {}
+        
+    def on_step_begin(self, args, state, control, model=None, optimizer=None, **kwargs):
+        """Called at the beginning of each training step"""
+        if not wandb.run or optimizer is None:
+            return
+        
+        # Track optimizer parameters for each parameter group
+        if hasattr(optimizer, 'param_groups'):
+            for i, param_group in enumerate(optimizer.param_groups):
+                # Basic optimizer parameters
+                self.optimizer_params[f'optimizer/lr_group_{i}'] = param_group.get('lr', 0)
+                self.optimizer_params[f'optimizer/weight_decay_group_{i}'] = param_group.get('weight_decay', 0)
+                self.optimizer_params[f'optimizer/eps_group_{i}'] = param_group.get('eps', 0)
+                
+                # Adam/AdamW specific parameters
+                if 'betas' in param_group:
+                    self.optimizer_params[f'optimizer/beta1_group_{i}'] = param_group['betas'][0]
+                    self.optimizer_params[f'optimizer/beta2_group_{i}'] = param_group['betas'][1]
+                
+                # Parameter group size
+                self.optimizer_params[f'optimizer/param_count_group_{i}'] = len(param_group['params'])
+        
+        # Track optimizer state statistics (for debugging convergence)
+        if hasattr(optimizer, 'state') and self.step_count % 50 == 0:  # Every 50 steps
+            try:
+                total_params = 0
+                exp_avg_norms = []
+                exp_avg_sq_norms = []
+                
+                for param_group in optimizer.param_groups:
+                    for param in param_group['params']:
+                        if param in optimizer.state:
+                            state = optimizer.state[param]
+                            total_params += 1
+                            
+                            # Track momentum and second moment statistics
+                            if 'exp_avg' in state:
+                                exp_avg_norms.append(torch.norm(state['exp_avg']).item())
+                            if 'exp_avg_sq' in state:
+                                exp_avg_sq_norms.append(torch.norm(state['exp_avg_sq']).item())
+                
+                if exp_avg_norms:
+                    self.optimizer_params['optimizer/momentum_norm_mean'] = np.mean(exp_avg_norms)
+                    self.optimizer_params['optimizer/momentum_norm_std'] = np.std(exp_avg_norms)
+                if exp_avg_sq_norms:
+                    self.optimizer_params['optimizer/second_moment_norm_mean'] = np.mean(exp_avg_sq_norms)
+                    self.optimizer_params['optimizer/second_moment_norm_std'] = np.std(exp_avg_sq_norms)
+                    
+                self.optimizer_params['optimizer/total_tracked_params'] = total_params
+                
+            except Exception as e:
+                print(f"Warning: Could not track optimizer state: {e}")
+
+    def on_step_end(self, args, state, control, model=None, optimizer=None, lr_scheduler=None, **kwargs):
+        """Called at the end of each training step"""
+        if not wandb.run:
+            return
+        
+        self.step_count += 1
+        
+        # Consolidate all metrics into a single log call to avoid step conflicts
+        all_metrics = {}
+        
+        # Add optimizer parameters
+        if self.optimizer_params:
+            all_metrics.update(self.optimizer_params)
+            self.optimizer_params.clear()
+        
+        # Track learning rate scheduler details
+        if lr_scheduler is not None:
+            try:
+                if hasattr(lr_scheduler, 'get_last_lr'):
+                    last_lrs = lr_scheduler.get_last_lr()
+                    for i, lr in enumerate(last_lrs):
+                        all_metrics[f'scheduler/lr_group_{i}'] = lr
+                
+                # Track scheduler state if available
+                if hasattr(lr_scheduler, '_last_lr'):
+                    all_metrics['scheduler/last_lr_avg'] = np.mean(lr_scheduler._last_lr)
+                
+                # Track step count for schedulers
+                if hasattr(lr_scheduler, '_step_count'):
+                    all_metrics['scheduler/step_count'] = lr_scheduler._step_count
+                    
+            except Exception as e:
+                print(f"Warning: Could not track scheduler details: {e}")
+        
+        # Track layer-wise gradient norms and update patterns (every 10 steps)
+        if model is not None and self.step_count % 10 == 0:
+            layer_metrics = self._compute_layer_metrics(model)
+            if layer_metrics:
+                all_metrics.update(layer_metrics)
+        
+        # Compute and log update rhythms (every 20 steps)
+        if model is not None and optimizer is not None and self.step_count % 20 == 0:
+            update_metrics = self._compute_update_rhythms(model, optimizer)
+            if update_metrics:
+                all_metrics.update(update_metrics)
+        
+        # Log all metrics in a single call to prevent step conflicts
+        if all_metrics:
+            wandb.log(all_metrics, step=state.global_step)
+
+    def on_evaluate(self, args, state, control, model=None, logs=None, **kwargs):
+        """Called after validation evaluation"""
+        if not wandb.run or logs is None:
+            return
+        
+        # Log validation metrics with val/ prefix to match your expectation
+        validation_metrics = {}
+        for key, value in logs.items():
+            if key.startswith('eval_'):
+                # Remove eval_ prefix and add val/ prefix
+                clean_key = key.replace('eval_', '')
+                validation_metrics[f'val/{clean_key}'] = value
+        
+        if validation_metrics:
+            wandb.log(validation_metrics, step=state.global_step)
+            print(f"Validation metrics logged: {validation_metrics}")
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        """Called when the trainer logs training metrics"""
+        if not wandb.run or logs is None:
+            return
+        
+        # Since report_to=["wandb"] is enabled, basic metrics (loss, learning_rate, etc.) 
+        # are automatically logged by the built-in integration.
+        # This callback now focuses on additional metrics and validation prefixing
+        
+        # Log additional training metrics with prefixes (but skip basic ones to avoid duplicates)
+        additional_metrics = {}
+        basic_metrics = {'loss', 'learning_rate', 'epoch', 'grad_norm', 'train_loss'}
+        
+        for key, value in logs.items():
+            # Skip eval metrics as they're handled in on_evaluate
+            # Skip basic metrics that are already logged by built-in integration
+            if not key.startswith('eval_') and key not in basic_metrics:
+                additional_metrics[f'train/{key}'] = value
+        
+        if additional_metrics:
+            wandb.log(additional_metrics, step=state.global_step)
+
+    def _compute_layer_metrics(self, model):
+        """Compute layer-wise gradient norms and parameter statistics"""
+        layer_metrics = {}
+        
+        try:
+            # Group parameters by layer type
+            layer_groups = {
+                'attention': [],
+                'mlp': [],
+                'embedding': [],
+                'norm': [],
+                'other': []
+            }
+            
+            for name, param in model.named_parameters():
+                if param.grad is not None:
+                    grad_norm = torch.norm(param.grad).item()
+                    param_norm = torch.norm(param).item()
+                    
+                    # Categorize layers
+                    if 'attn' in name.lower() or 'attention' in name.lower():
+                        layer_type = 'attention'
+                    elif 'mlp' in name.lower() or 'feed_forward' in name.lower() or 'ffn' in name.lower():
+                        layer_type = 'mlp'
+                    elif 'embed' in name.lower():
+                        layer_type = 'embedding'
+                    elif 'norm' in name.lower() or 'ln' in name.lower():
+                        layer_type = 'norm'
+                    else:
+                        layer_type = 'other'
+                    
+                    layer_groups[layer_type].append({
+                        'grad_norm': grad_norm,
+                        'param_norm': param_norm,
+                        'name': name
+                    })
+            
+            # Compute statistics for each layer type
+            for layer_type, params in layer_groups.items():
+                if params:
+                    grad_norms = [p['grad_norm'] for p in params]
+                    param_norms = [p['param_norm'] for p in params]
+                    
+                    layer_metrics[f'layer_gradients/{layer_type}_grad_norm_mean'] = np.mean(grad_norms)
+                    layer_metrics[f'layer_gradients/{layer_type}_grad_norm_std'] = np.std(grad_norms)
+                    layer_metrics[f'layer_gradients/{layer_type}_grad_norm_max'] = np.max(grad_norms)
+                    layer_metrics[f'layer_gradients/{layer_type}_param_norm_mean'] = np.mean(param_norms)
+                    layer_metrics[f'layer_gradients/{layer_type}_param_norm_std'] = np.std(param_norms)
+                    
+                    # Update rhythm - ratio of gradient norm to parameter norm
+                    update_ratios = [g/max(p, 1e-8) for g, p in zip(grad_norms, param_norms)]
+                    layer_metrics[f'layer_updates/{layer_type}_update_ratio_mean'] = np.mean(update_ratios)
+                    layer_metrics[f'layer_updates/{layer_type}_update_ratio_std'] = np.std(update_ratios)
+            
+            # Global gradient statistics
+            all_grad_norms = []
+            all_param_norms = []
+            for params in layer_groups.values():
+                all_grad_norms.extend([p['grad_norm'] for p in params])
+                all_param_norms.extend([p['param_norm'] for p in params])
+            
+            if all_grad_norms:
+                layer_metrics['gradients/global_grad_norm_mean'] = np.mean(all_grad_norms)
+                layer_metrics['gradients/global_grad_norm_std'] = np.std(all_grad_norms)
+                layer_metrics['gradients/global_grad_norm_max'] = np.max(all_grad_norms)
+                layer_metrics['gradients/global_param_norm_mean'] = np.mean(all_param_norms)
+                
+                # Global update rhythm
+                global_update_ratios = [g/max(p, 1e-8) for g, p in zip(all_grad_norms, all_param_norms)]
+                layer_metrics['updates/global_update_ratio_mean'] = np.mean(global_update_ratios)
+                layer_metrics['updates/global_update_ratio_std'] = np.std(global_update_ratios)
+        
+        except Exception as e:
+            print(f"Warning: Could not compute layer metrics: {e}")
+            
+        return layer_metrics
+
+    def _compute_update_rhythms(self, model, optimizer):
+        """Compute advanced update rhythm metrics"""
+        update_metrics = {}
+        
+        try:
+            param_updates = []
+            param_magnitudes = []
+            
+            for param_group in optimizer.param_groups:
+                for param in param_group['params']:
+                    if param.grad is not None:
+                        # Approximate parameter update magnitude
+                        lr = param_group['lr']
+                        grad_norm = torch.norm(param.grad).item()
+                        param_norm = torch.norm(param).item()
+                        
+                        # Estimated update magnitude
+                        update_magnitude = lr * grad_norm
+                        param_updates.append(update_magnitude)
+                        param_magnitudes.append(param_norm)
+            
+            if param_updates:
+                update_metrics['rhythm/update_magnitude_mean'] = np.mean(param_updates)
+                update_metrics['rhythm/update_magnitude_std'] = np.std(param_updates)
+                update_metrics['rhythm/update_magnitude_max'] = np.max(param_updates)
+                
+                # Relative update size
+                relative_updates = [u/max(p, 1e-8) for u, p in zip(param_updates, param_magnitudes)]
+                update_metrics['rhythm/relative_update_mean'] = np.mean(relative_updates)
+                update_metrics['rhythm/relative_update_std'] = np.std(relative_updates)
+                
+        except Exception as e:
+            print(f"Warning: Could not compute update rhythms: {e}")
+        
+        return update_metrics
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Fine-tune Qwen3-30B-A3B-Base model")
     parser.add_argument(
@@ -30,7 +291,7 @@ def parse_args():
         "--dataset_path",
         type=str,
         required=False,
-        default='wikipedia_he_part_002.jsonl',
+        default='datasets/BIU.jsonl',
         help="Path to the HuggingFace dataset or local JSON/L file (for now)"
     )
     parser.add_argument(
@@ -58,28 +319,16 @@ def parse_args():
         help="Weights & Biases entity name"
     )
     parser.add_argument(
-        "--adam_beta1",
+        "--validation_split",
         type=float,
-        default=None,
-        help="Adam optimizer beta1 parameter"
+        default=0.1,
+        help="Fraction of data to use for validation (default: 0.1 = 10%)"
     )
     parser.add_argument(
-        "--adam_beta2",
-        type=float,
-        default=None,
-        help="Adam optimizer beta2 parameter"
-    )
-    parser.add_argument(
-        "--adam_epsilon",
-        type=float,
-        default=None,
-        help="Adam optimizer epsilon parameter"
-    )
-    parser.add_argument(
-        "--weight_decay",
-        type=float,
-        default=None,
-        help="Weight decay for optimizer"
+        "--validation_seed",
+        type=int,
+        default=42,
+        help="Seed for validation split"
     )
     return parser.parse_args()
 
@@ -106,13 +355,13 @@ def print_trainable_parameters(model):
 
 def create_tokenize_function(tokenizer, max_seq_length):
     def tokenize_function(examples):
-        # Tokenize the texts with padding to max length
+        # Tokenize the texts with truncation but no padding here
+        # Let the DataCollator handle padding during batch creation
         return tokenizer(
             examples["text"],
-            padding="max_length",
             truncation=True,
             max_length=max_seq_length,
-            return_tensors="pt"
+            # Remove return_tensors="pt" - let DataCollator handle tensor conversion
         )
     return tokenize_function
 
@@ -127,30 +376,44 @@ def train():
     with open(args.config, 'r', encoding='utf8') as f:
         config = json.loads(f.read())
 
-    # Override config with CLI arguments if provided
-    if args.adam_beta1 is not None:
-        config["adam_beta1"] = args.adam_beta1
-    if args.adam_beta2 is not None:
-        config["adam_beta2"] = args.adam_beta2
-    if args.adam_epsilon is not None:
-        config["adam_epsilon"] = args.adam_epsilon
-    if args.weight_decay is not None:
-        config["weight_decay"] = args.weight_decay
-
     # Initialize Weights & Biases - only on the main process
     accelerator = Accelerator()
     if accelerator.is_local_main_process:
         run_name = args.wandb_name or f"qwen-hebrew-{args.seed}"
+        
+        # Enhanced W&B configuration
+        wandb_config = dict(
+            # Training arguments
+            **{k: v for k, v in args.__dict__.items()},
+            # Model and training config
+            **config,
+            # Additional metadata
+            model_name=config["model_name_or_path"],
+            total_parameters="30.53B",
+            gpu_count=torch.cuda.device_count() if torch.cuda.is_available() else 0,
+            distributed_training=True,
+            deepspeed_enabled=True,
+            validation_enabled=args.validation_split > 0,
+            # Environment info
+            torch_version=torch.__version__,
+            transformers_version="4.47.1",  # Update as needed
+            python_version="3.12",
+        )
+        
         wandb.init(
             entity=args.wandb_entity,
             project=args.wandb_project,
             name=run_name,
-            config=dict(
-                args=args,
-                config=config
-            )
+            config=wandb_config,
+            tags=["qwen", "hebrew", "fine-tuning", "deepspeed", "validation"],
+            notes=f"Training {config['model_name_or_path']} on {args.dataset_path} with {args.validation_split:.1%} validation split"
         )
         print(f"Initialized Weights & Biases run: {run_name}")
+        
+        # Log model architecture info
+        if wandb.run:
+            wandb.run.summary["model_parameters"] = "30.53B"
+            wandb.run.summary["model_architecture"] = "Qwen3-30B-A3B-Base"
     
     # Load tokenizer
     print("Loading tokenizer...")
@@ -178,33 +441,84 @@ def train():
     # Disabled - gradient checkpointing is done in the trainer
     # model.gradient_checkpointing_enable()
     
-    # Load dataset - either from a local file or from the hug
+    # Load dataset - either from a local file or from huggingface
     print(f"Loading dataset from {args.dataset_path}...")
     if os.path.isfile(args.dataset_path):
         dataset = load_dataset('json', data_files=args.dataset_path, split="train")
     else:
         dataset = load_dataset(args.dataset_path, split="train")
     
-    # Print dataset info & Check if the dataset has the expected columns (which is, `text`)
+    # Print dataset info & Check if the dataset has the expected columns (which is, text)
     print(f"Dataset loaded: {dataset}")
     print(f"Dataset train split columns: {dataset.column_names}")
     if "text" not in dataset.column_names:
         raise ValueError(f"Dataset does not have a 'text' column. Available columns: {dataset.column_names}")
     
-    print("Tokenizing dataset...")
-    tokenized_dataset = dataset.map(
+    # Create train/validation split
+    if args.validation_split > 0:
+        print(f"Creating train/validation split with {args.validation_split:.1%} validation data...")
+        split_dataset = dataset.train_test_split(
+            test_size=args.validation_split,
+            seed=args.validation_seed,
+            shuffle=True
+        )
+        train_dataset = split_dataset['train']
+        val_dataset = split_dataset['test']
+        print(f"Train dataset size: {len(train_dataset)}")
+        print(f"Validation dataset size: {len(val_dataset)}")
+    else:
+        print("No validation split created (validation_split=0)")
+        train_dataset = dataset
+        val_dataset = None
+    
+    print("Tokenizing datasets...")
+    
+    # Tokenize training dataset
+    tokenized_train_dataset = train_dataset.map(
         create_tokenize_function(tokenizer, config["max_seq_length"]),
         batched=True,
         num_proc=64,
-        remove_columns=["text"]
+        remove_columns=["text", "id", "metadata"]  # Remove all non-tokenization columns
     )
+    
+    # Tokenize validation dataset if it exists
+    tokenized_val_dataset = None
+    if val_dataset is not None:
+        tokenized_val_dataset = val_dataset.map(
+            create_tokenize_function(tokenizer, config["max_seq_length"]),
+            batched=True,
+            num_proc=64,
+            remove_columns=["text", "id", "metadata"]  # Remove all non-tokenization columns
+        )
+        print(f"Tokenized validation dataset: {tokenized_val_dataset}")
+    
+    # Add debugging info about the tokenized datasets
+    print(f"Tokenized train dataset: {tokenized_train_dataset}")
+    print(f"Tokenized train dataset features: {tokenized_train_dataset.features}")
+    if len(tokenized_train_dataset) > 0:
+        print(f"Sample tokenized train item: {tokenized_train_dataset[0]}")
+        print(f"Train input IDs shape: {len(tokenized_train_dataset[0]['input_ids'])}")
+        if 'attention_mask' in tokenized_train_dataset[0]:
+            print(f"Train attention mask shape: {len(tokenized_train_dataset[0]['attention_mask'])}")
+    
+    if tokenized_val_dataset is not None and len(tokenized_val_dataset) > 0:
+        print(f"Sample tokenized validation item: {tokenized_val_dataset[0]}")
+        print(f"Validation input IDs shape: {len(tokenized_val_dataset[0]['input_ids'])}")
+        if 'attention_mask' in tokenized_val_dataset[0]:
+            print(f"Validation attention mask shape: {len(tokenized_val_dataset[0]['attention_mask'])}")
     
     # Training arguments optimized for 8x H100 GPUs
     print("Setting up training arguments...")
+    
+    # Set evaluation strategy based on whether we have validation data
+    eval_strategy = "steps" if tokenized_val_dataset is not None else "no"
+    eval_steps = config.get("eval_steps", 100) if tokenized_val_dataset is not None else None
+    
     training_args = TrainingArguments(
         output_dir=config.get("output_dir", "./output"),
         gradient_accumulation_steps=config["gradient_accumulation_steps"],
         per_device_train_batch_size=config["per_device_train_batch_size"],
+        per_device_eval_batch_size=config.get("per_device_eval_batch_size", config["per_device_train_batch_size"]),
         learning_rate=config.get("learning_rate", 1e-5),
         logging_steps=config.get("logging_steps", 10),
         num_train_epochs=config.get("num_train_epochs", 1) if not 'max_steps' in config else 0, 
@@ -213,42 +527,65 @@ def train():
         save_total_limit=config.get("save_total_limit", 5),
         warmup_ratio=config.get('warmup_ratio', None), # default to 100 steps
         warmup_steps=config.get('warmup_steps', 100) if not 'warmup_ratio' in config else 0,
-        weight_decay=config.get('weight_decay', 0.0),
-        adam_beta1=config.get('adam_beta1', 0.9),
-        adam_beta2=config.get('adam_beta2', 0.999),
-        adam_epsilon=config.get('adam_epsilon', 1e-8),
+        # Evaluation settings
+        eval_strategy=eval_strategy,
+        eval_steps=eval_steps,
+        eval_accumulation_steps=config.get("eval_accumulation_steps", None),
         # Defaults:
-        report_to=['wandb'],
+        report_to=["wandb"],  # Enable W&B reporting for basic metrics
         gradient_checkpointing=True,
         gradient_checkpointing_kwargs={'use_reentrant': True},
         save_strategy="steps",
         bf16=True,
         lr_scheduler_type="cosine",
-        eval_strategy="no", # evaluation we'll do separately?
         logging_first_step=True,
         remove_unused_columns=False,
         dataloader_num_workers=4,  # Can use more workers with H100s
         push_to_hub=False, # When running fo real, set to True and specify a larger save_steps
+        # Load best model at end if we have validation
+        load_best_model_at_end=tokenized_val_dataset is not None,
+        metric_for_best_model="eval_loss" if tokenized_val_dataset is not None else None,
+        greater_is_better=False if tokenized_val_dataset is not None else None,
     )
     print(f"Training arguments set up successfully: {training_args}")
-    
-    # Prepare validation dataset if it exists
-    # Commented out for now - if we do go with this, then eval_strategy will have to be updated
-    # in training_args, and the dataset loading has to handle the splits, right now we load just
-    # the train split directly
-    eval_dataset = None # tokenized_dataset["validation"] if "validation" in tokenized_dataset else None
     
     # Initialize Trainer with our configuration
     # No need to move parameters to GPU, all handled automatically with accelerate
     print("Initializing Trainer...")
+    
+    # Create data collator with proper padding
+    data_collator = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer, 
+        mlm=False,
+        pad_to_multiple_of=8,  # Pad to multiple of 8 for efficiency
+        return_tensors="pt"
+    )
+    
+    # Initialize custom W&B callback for enhanced monitoring
+    wandb_callback = WandbMetricsCallback()
+    
     trainer = Trainer(
         model=model,
         processing_class=tokenizer, # renamed from tokenizer
         args=training_args,
-        train_dataset=tokenized_dataset,
-        eval_dataset=eval_dataset,
-        data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False)
+        train_dataset=tokenized_train_dataset,
+        eval_dataset=tokenized_val_dataset,  # This can be None
+        data_collator=data_collator,
+        callbacks=[wandb_callback]  # Add our custom callback
     )
+    print("Trainer initialized successfully")
+    
+    # Log dataset information to W&B
+    if accelerator.is_local_main_process and wandb.run:
+        dataset_info = {
+            "dataset_path": args.dataset_path,
+            "train_size": len(tokenized_train_dataset),
+            "validation_size": len(tokenized_val_dataset) if tokenized_val_dataset else 0,
+            "validation_split": args.validation_split,
+            "max_seq_length": config["max_seq_length"],
+            "has_validation": tokenized_val_dataset is not None
+        }
+        wandb.log(dataset_info)
     print("Trainer initialized successfully")
     
     # Start training
@@ -260,7 +597,7 @@ def train():
         print(f"Training error: {e}")
         # Save checkpoint even if training fails
         trainer.save_model(config["output_dir"] + "/error_checkpoint")
-        print(f"Saved checkpoint after error to {config['resume_from_checkpoint']}/error_checkpoint")
+        print(f"Saved checkpoint after error to {config['output_dir']}/error_checkpoint")
         raise e
     
     # Save the final model

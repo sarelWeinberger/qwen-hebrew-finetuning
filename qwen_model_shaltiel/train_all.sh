@@ -13,7 +13,8 @@ for DATASET in datasets/*.jsonl; do
   python clean_cuda.py
 
   echo "Training on $DATASET with wandb run name $WANDB_NAME"
-  accelerate launch --config_file=$DEEPSPEED train.py --dataset_path "$DATASET" --wandb_name $WANDB_NAME | tee $LOGFILE
+  echo "To trace the current log output: tail -f $LOGFILE"
+  accelerate launch --config_file=$DEEPSPEED train.py --dataset_path "$DATASET" --wandb_name "$WANDB_NAME" | tee $LOGFILE
 
   echo "Cleaning GPU memory after training on $DATASET"
   python clean_cuda.py
