@@ -16,7 +16,68 @@ import deepspeed
 from accelerate import Accelerator
 import numpy as np
 from typing import Dict, List, Union
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
+
+# --- Custom Data Collator for Document Packing ---
+class DataCollatorForDocumentPacking(DataCollatorForLanguageModeling):
+    """
+    Data Collator that creates a document-aware causal attention mask and
+    document-relative position_ids for packed sequences.
+    """
+    def __init__(self, tokenizer, **kwargs):
+        super().__init__(tokenizer=tokenizer, mlm=False, **kwargs)
+        self.tokenizer = tokenizer
+        self.eos_token_id = tokenizer.eos_token_id
+
+    def torch_call(self, examples: list[dict]) -> dict:
+        batch = super().torch_call(examples)
+        
+        input_ids = batch["input_ids"]
+        labels = batch["labels"]
+        
+        if not isinstance(input_ids, torch.Tensor):
+            input_ids = torch.stack(input_ids)
+        
+        batch_size, sequence_length = input_ids.shape
+        device = input_ids.device
+        
+        # Initialize attention_mask and position_ids
+        attention_mask = torch.zeros(
+            (batch_size, sequence_length, sequence_length), dtype=torch.bool, device=device
+        )
+        position_ids = torch.zeros_like(input_ids, device=device)
+        
+        # Build the document-aware causal mask and position ids
+        for i in range(batch_size):
+            sequence_ids = input_ids[i]
+            # Find the indices of the EOS tokens
+            eos_indices = (sequence_ids == self.eos_token_id).nonzero(as_tuple=False).squeeze(-1)
+            
+            doc_start_indices = [0] + (eos_indices[:-1] + 1).tolist()
+            doc_end_indices = eos_indices.tolist()
+
+            current_pos = 0
+            for doc_start, doc_end in zip(doc_start_indices, doc_end_indices):
+                doc_len = doc_end - doc_start + 1
+                
+                # Update position_ids for the current document
+                position_ids[i, doc_start : doc_end + 1] = torch.arange(doc_len, device=device)
+                
+                # Apply causal mask within the document boundaries
+                attention_mask[i, doc_start : doc_end + 1, doc_start : doc_end + 1] = torch.tril(
+                    torch.ones(doc_len, doc_len, dtype=torch.bool, device=device)
+                )
+
+        # The model's attention mechanism expects a 2D mask.
+        # We can either provide a 3D mask if the model supports it, or flatten it.
+        # Here we provide a causal mask that is `True` for all non-padded tokens.
+        # This simplification might need adjustment based on the model's exact implementation.
+        batch["attention_mask"] = attention_mask.any(dim=1).to(device)
+        batch["position_ids"] = position_ids
+        
+        return batch
+
+# --- Your original code starts here ---
 
 class WandbMetricsCallback(TrainerCallback):
     """Enhanced W&B callback for comprehensive training and validation monitoring"""
@@ -352,16 +413,39 @@ def print_trainable_parameters(model):
         f"trainable params: {trainable_params:,d} || all params: {all_param:,d} || trainable%: {100 * trainable_params / all_param}"
     )
 
+# New function for packing
+def group_texts(examples, block_size):
+    """
+    Concatenates all texts and chunks them into fixed-size blocks.
+    """
+    # Concatenate all texts from the 'input_ids' and 'attention_mask' lists
+    concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+    total_length = len(concatenated_examples[list(examples.keys())[0]])
 
-def create_tokenize_function(tokenizer, max_seq_length):
+    # We drop the last chunk if it's smaller than the block_size
+    total_length = (total_length // block_size) * block_size
+
+    # Split by chunks of block_size
+    result = {
+        k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
+        for k, t in concatenated_examples.items()
+    }
+
+    # Create the labels by shifting the input_ids
+    result["labels"] = result["input_ids"].copy()
+    return result
+
+# Modified tokenize function for packing
+def create_tokenize_function_for_packing(tokenizer):
+    """
+    Tokenizes the texts without truncation.
+    """
     def tokenize_function(examples):
-        # Tokenize the texts with truncation but no padding here
-        # Let the DataCollator handle padding during batch creation
+        # Tokenize the texts without truncation and return attention_mask
         return tokenizer(
             examples["text"],
-            truncation=True,
-            max_length=max_seq_length,
-            # Remove return_tensors="pt" - let DataCollator handle tensor conversion
+            truncation=False,
+            return_attention_mask=True
         )
     return tokenize_function
 
@@ -471,35 +555,45 @@ def train():
         train_dataset = dataset
         val_dataset = None
     
-    print("Tokenizing datasets...")
+    print("Tokenizing and packing datasets...")
+
+    block_size = config["max_seq_length"]
+    tokenize_function = create_tokenize_function_for_packing(tokenizer)
     
-    # Determine which columns to remove (only remove columns that actually exist)
-    columns_to_remove = [col for col in ["text", "id", "metadata"] if col in train_dataset.column_names]
-    print(f"Dataset columns: {train_dataset.column_names}")
-    print(f"Columns to remove: {columns_to_remove}")
-    
-    # Tokenize training dataset
+    # Tokenize and pack training dataset
     tokenized_train_dataset = train_dataset.map(
-        create_tokenize_function(tokenizer, config["max_seq_length"]),
+        tokenize_function,
         batched=True,
         num_proc=64,
-        remove_columns=columns_to_remove  # Remove only existing columns
+        remove_columns=["text", "id", "metadata"]  # Remove all non-tokenization columns
     )
-    
-    # Tokenize validation dataset if it exists
+    tokenized_train_dataset = tokenized_train_dataset.map(
+        lambda examples: group_texts(examples, block_size),
+        batched=True,
+        num_proc=64,
+        remove_columns=tokenized_train_dataset.column_names, # Remove old columns after packing
+    )
+
+    # Tokenize and pack validation dataset if it exists
     tokenized_val_dataset = None
     if val_dataset is not None:
         tokenized_val_dataset = val_dataset.map(
-            create_tokenize_function(tokenizer, config["max_seq_length"]),
+            tokenize_function,
             batched=True,
             num_proc=64,
-            remove_columns=columns_to_remove  # Remove only existing columns
+            remove_columns=["text", "id", "metadata"]
         )
-        print(f"Tokenized validation dataset: {tokenized_val_dataset}")
+        tokenized_val_dataset = tokenized_val_dataset.map(
+            lambda examples: group_texts(examples, block_size),
+            batched=True,
+            num_proc=64,
+            remove_columns=tokenized_val_dataset.column_names
+        )
+        print(f"Tokenized and packed validation dataset: {tokenized_val_dataset}")
     
     # Add debugging info about the tokenized datasets
-    print(f"Tokenized train dataset: {tokenized_train_dataset}")
-    print(f"Tokenized train dataset features: {tokenized_train_dataset.features}")
+    print(f"Tokenized and packed train dataset: {tokenized_train_dataset}")
+    print(f"Tokenized and packed train dataset features: {tokenized_train_dataset.features}")
     if len(tokenized_train_dataset) > 0:
         print(f"Sample tokenized train item: {tokenized_train_dataset[0]}")
         print(f"Train input IDs shape: {len(tokenized_train_dataset[0]['input_ids'])}")
@@ -524,7 +618,7 @@ def train():
         gradient_accumulation_steps=config["gradient_accumulation_steps"],
         per_device_train_batch_size=config["per_device_train_batch_size"],
         per_device_eval_batch_size=config.get("per_device_eval_batch_size", config["per_device_train_batch_size"]),
-        learning_rate=config.get("learning_rate", 1e-5),
+        learning_rate=config.get("learning_rate", 1e-4),
         logging_steps=config.get("logging_steps", 10),
         num_train_epochs=config.get("num_train_epochs", 1) if not 'max_steps' in config else 0, 
         max_steps=config.get("max_steps", 0), # default to 1 epoch 
@@ -555,27 +649,23 @@ def train():
     print(f"Training arguments set up successfully: {training_args}")
     
     # Initialize Trainer with our configuration
-    # No need to move parameters to GPU, all handled automatically with accelerate
+    # Note: We no longer need DataCollatorForLanguageModeling because our data is already packed.
+    # All sequences are the same length.
     print("Initializing Trainer...")
     
-    # Create data collator with proper padding
-    data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer, 
-        mlm=False,
-        pad_to_multiple_of=8,  # Pad to multiple of 8 for efficiency
-        return_tensors="pt"
-    )
-    
-    # Initialize custom W&B callback for enhanced monitoring
+    # Create the callback object
     wandb_callback = WandbMetricsCallback()
     
+    # The new DataCollatorForDocumentPacking will handle the attention mask and position_ids for packed data.
+    data_collator = DataCollatorForDocumentPacking(tokenizer)
+
     trainer = Trainer(
         model=model,
         processing_class=tokenizer, # renamed from tokenizer
         args=training_args,
         train_dataset=tokenized_train_dataset,
         eval_dataset=tokenized_val_dataset,  # This can be None
-        data_collator=data_collator,
+        data_collator=data_collator, # Pass the new custom collator
         callbacks=[wandb_callback]  # Add our custom callback
     )
     print("Trainer initialized successfully")

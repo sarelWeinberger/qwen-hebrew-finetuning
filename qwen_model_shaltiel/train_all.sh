@@ -4,7 +4,7 @@ DEEPSPEED="deepspeed_zero3.yaml"
 
 for DATASET in datasets/*.jsonl; do
   BASENAME=$(basename "$DATASET" .jsonl)
-  WANDB_NAME="qwen-hebrew-finetuning-$BASENAME"
+  WANDB_NAME="qwen-hebrew-finetuning-$BASENAME-with-packing"
   LOGFILE="train_all.log"
   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
   ARCHIVE_LOGFILE="train_${BASENAME}_${TIMESTAMP}.log"
