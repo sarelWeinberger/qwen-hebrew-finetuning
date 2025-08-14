@@ -473,12 +473,17 @@ def train():
     
     print("Tokenizing datasets...")
     
+    # Determine which columns to remove (only remove columns that actually exist)
+    columns_to_remove = [col for col in ["text", "id", "metadata"] if col in train_dataset.column_names]
+    print(f"Dataset columns: {train_dataset.column_names}")
+    print(f"Columns to remove: {columns_to_remove}")
+    
     # Tokenize training dataset
     tokenized_train_dataset = train_dataset.map(
         create_tokenize_function(tokenizer, config["max_seq_length"]),
         batched=True,
         num_proc=64,
-        remove_columns=["text", "id", "metadata"]  # Remove all non-tokenization columns
+        remove_columns=columns_to_remove  # Remove only existing columns
     )
     
     # Tokenize validation dataset if it exists
@@ -488,7 +493,7 @@ def train():
             create_tokenize_function(tokenizer, config["max_seq_length"]),
             batched=True,
             num_proc=64,
-            remove_columns=["text", "id", "metadata"]  # Remove all non-tokenization columns
+            remove_columns=columns_to_remove  # Remove only existing columns
         )
         print(f"Tokenized validation dataset: {tokenized_val_dataset}")
     
