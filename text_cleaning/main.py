@@ -150,6 +150,6 @@ n words after cleaning: {result['cleaned_words']:,}
 if __name__ == "__main__":
     # Default: run full cleaning. To run samples, call run_all_samples()
     # To count words for all sources, call count_words_for_all_sources()
-    registry = spacefix_registry
+    registry = regex_registry
     run_full_cleaning(registry)
     
