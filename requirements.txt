@@ -27,3 +27,8 @@ rarfile>=4.0
 
 # Text processing
 langchain>=0.1.0
+
+# MinHash system dependencies
+ray[default]>=2.8.0
+datatrove[ray,s3,processing]>=0.0.1
+s3fs>=2023.10.0

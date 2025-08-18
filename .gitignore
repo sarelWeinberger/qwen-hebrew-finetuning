@@ -76,3 +76,7 @@ Thumbs.db
 
 # logging
 *.log
+
+# ray
+ray_logs/
+cluster.yaml
