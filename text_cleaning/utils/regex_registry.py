@@ -77,20 +77,18 @@ REGISTRY = {
     #         save_cleaned_data=False
     #     )
     # },
-    # 'hebrew_tweets_text_clean_full-Deduped.forgpt': {
-    #     'fetcher': S3SourceFetcher(
-    #         bucket_name='israllm-datasets',
-    #         prefix='raw-datasets/rar/csv_output/',
-    #         source_name='hebrew_tweets_text_clean_full-Deduped.forgpt',
-    #         output_prefix='processed_and_cleaned/hebrew_tweets',
-    #         output_bucket_name='gepeta-datasets'
-    #     ),
-    #     'cleaner': RegExCleaner(
-    #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-    #         debug_mode=debug_mode,
-    #         save_cleaned_data=False
-    #     )
-    # },
+    'hebrew_tweets_text_clean_full-Deduped.forgpt': {
+        'fetcher': S3SourceFetcher(
+            bucket_name='israllm-datasets',
+            prefix='raw-datasets/rar/csv_output/',
+            source_name='hebrew_tweets_text_clean_full-Deduped.forgpt',
+            output_prefix='processed_and_cleaned_test/hebrew_tweets',
+            output_bucket_name='gepeta-datasets'
+        ),
+        'cleaner': RegExCleaner(
+            patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES]
+        )
+    },
     # 'HeC4DictaCombined-Clean-Deduped.forgpt': {
     #     'fetcher': S3SourceFetcher(
     #         bucket_name='israllm-datasets',
@@ -281,64 +279,64 @@ REGISTRY = {
     #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
     #     )
     # },
-    'COGNI': {
-        'fetcher': S3SourceFetcher(
-            bucket_name='israllm-datasets',
-            prefix='raw-datasets/other_documents/parsed/',
-            source_name='COGNI-IDF3_texts.deduped',
-            output_prefix='processed_and_cleaned/COGNI',
-            output_bucket_name='gepeta-datasets'
-        ),
-        'cleaner': RegExCleaner(
-            patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-        )
-    },
-    'kohelet': {
-        'fetcher': S3SourceFetcher(
-            bucket_name='israllm-datasets',
-            prefix='raw-datasets/other_documents/parsed/',
-            source_name='kohelet_texts.deduped',
-            output_prefix='processed_and_cleaned/kohelet',
-            output_bucket_name='gepeta-datasets'
-        ),
-        'cleaner': RegExCleaner(
-            patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-        )
-    },
-    'RAMA': {
-        'fetcher': S3SourceFetcher(
-            bucket_name='israllm-datasets',
-            prefix='raw-datasets/other_documents/parsed/',
-            source_name='RAMA_texts.deduped',
-            output_prefix='processed_and_cleaned/RAMA',
-            output_bucket_name='gepeta-datasets'
-        ),
-        'cleaner': RegExCleaner(
-            patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-        )
-    },
-    'SecuritiesAuthority': {
-        'fetcher': S3SourceFetcher(
-            bucket_name='israllm-datasets',
-            prefix='raw-datasets/other_documents/parsed/',
-            source_name='SecuritiesAuthority_texts.deduped',
-            output_prefix='processed_and_cleaned/SecuritiesAuthority',
-            output_bucket_name='gepeta-datasets'
-        ),
-        'cleaner': RegExCleaner(
-            patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-        )
-    },
-    'StateComptrollerReports': {
-        'fetcher': S3SourceFetcher(
-            bucket_name='israllm-datasets',
-            prefix='raw-datasets/other_documents/parsed/',
-            source_name='StateComptrollerReports_texts.deduped',
-            output_prefix='processed_and_cleaned/StateComptrollerReports',
-            output_bucket_name='gepeta-datasets'
-        ),
-        'cleaner': RegExCleaner(
-            patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
-        )
-    }
+    # 'COGNI': {
+    #     'fetcher': S3SourceFetcher(
+    #         bucket_name='israllm-datasets',
+    #         prefix='raw-datasets/other_documents/parsed/',
+    #         source_name='COGNI-IDF3_texts.deduped',
+    #         output_prefix='processed_and_cleaned/COGNI',
+    #         output_bucket_name='gepeta-datasets'
+    #     ),
+    #     'cleaner': RegExCleaner(
+    #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+    #     )
+    # },
+    # 'kohelet': {
+    #     'fetcher': S3SourceFetcher(
+    #         bucket_name='israllm-datasets',
+    #         prefix='raw-datasets/other_documents/parsed/',
+    #         source_name='kohelet_texts.deduped',
+    #         output_prefix='processed_and_cleaned/kohelet',
+    #         output_bucket_name='gepeta-datasets'
+    #     ),
+    #     'cleaner': RegExCleaner(
+    #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+    #     )
+    # },
+    # 'RAMA': {
+    #     'fetcher': S3SourceFetcher(
+    #         bucket_name='israllm-datasets',
+    #         prefix='raw-datasets/other_documents/parsed/',
+    #         source_name='RAMA_texts.deduped',
+    #         output_prefix='processed_and_cleaned/RAMA',
+    #         output_bucket_name='gepeta-datasets'
+    #     ),
+    #     'cleaner': RegExCleaner(
+    #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+    #     )
+    # },
+    # 'SecuritiesAuthority': {
+    #     'fetcher': S3SourceFetcher(
+    #         bucket_name='israllm-datasets',
+    #         prefix='raw-datasets/other_documents/parsed/',
+    #         source_name='SecuritiesAuthority_texts.deduped',
+    #         output_prefix='processed_and_cleaned/SecuritiesAuthority',
+    #         output_bucket_name='gepeta-datasets'
+    #     ),
+    #     'cleaner': RegExCleaner(
+    #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+    #     )
+    # },
+    # 'StateComptrollerReports': {
+    #     'fetcher': S3SourceFetcher(
+    #         bucket_name='israllm-datasets',
+    #         prefix='raw-datasets/other_documents/parsed/',
+    #         source_name='StateComptrollerReports_texts.deduped',
+    #         output_prefix='processed_and_cleaned/StateComptrollerReports',
+    #         output_bucket_name='gepeta-datasets'
+    #     ),
+    #     'cleaner': RegExCleaner(
+    #         patterns=[(rule['regex'][0], rule['regex'][1]) for rule in CLEANUP_RULES],
+    #     )
+    # }
 }
