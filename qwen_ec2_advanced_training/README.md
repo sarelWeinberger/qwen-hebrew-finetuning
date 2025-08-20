@@ -1,9 +1,70 @@
 
-# Training Qwen3-30B-A3B 
+# Qwen3-30B-A3B Fine-tuning
 
 A working reproduction of single-node distributed continuous-pretraining of a MoE model, using HF Accelerate + DeepSpeed, with no CPU-offloading. 
 
-## Setup
+## Quick Start
+
+### 1. One-Command Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/sarelWeinberger/qwen-hebrew-finetuning.git
+cd qwen-hebrew-finetuning/qwen_ec2_advanced_training/
+
+# Run the setup script
+./setup.sh
+```
+
+### 2. Login to Services
+
+```bash
+# Activate the virtual environment
+source .venv/bin/activate
+
+# Login to Weights & Biases
+wandb login
+
+# Login to HuggingFace (for model downloads and uploads)
+huggingface-cli login
+```
+
+### 3. AWS Credentials Setup
+
+Create or update `~/.aws/credentials`:
+
+```ini
+[default]
+aws_access_key_id = YOUR_ACCESS_KEY
+aws_secret_access_key = YOUR_SECRET_KEY
+```
+
+### 4. Add Your Datasets
+
+Place your JSONL dataset files in the `datasets/` directory:
+
+```json
+{"text": "text of document one"}
+{"text": "text of document two"}
+...
+```
+
+### 5. Start Training
+
+```bash
+# Launch training (runs in background)
+nohup ./train_all.sh > logs/train.log 2>&1 &
+
+# Monitor progress
+tail -f logs/train.log
+
+# Terminate a running training process
+./kill_train_all.sh
+```
+
+## Manual Setup (Alternative)
+
+If you prefer to set up manually or the automatic setup fails:
 
 ### AWS Details
 
@@ -13,14 +74,14 @@ Machine Type: `p4de.24xlarge`
 
 AMI: `Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.7 (Ubuntu 22.04)`
 
-### Environment
+Storage: (recommended on the safe side) 4 Tbytes
 
-The following code only needs to run *once* per machine (for resuming, see below)
+### Environment Setup
 
 ```bash
-# Clone & Locate
-git clone -b shaltiel_training https://github.com/sarelWeinberger/qwen-hebrew-finetuning
-cd qwen-hebrew-finetuning/qwen_model_shaltiel
+# Clone & Navigate
+git clone https://github.com/sarelWeinberger/qwen-hebrew-finetuning.git
+cd qwen-hebrew-finetuning/qwen_ec2_advanced_training/
 
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -32,28 +93,36 @@ source .venv/bin/activate
 
 # Install libraries
 uv pip install -r requirements.txt
-# To install other libraries, run `uv pip install new_library`
 
-# Download model
+# Create necessary directories
+mkdir -p logs datasets output
+
+# Set up HuggingFace transfer for faster downloads
 export HF_HUB_ENABLE_HF_TRANSFER=1
-hf download Qwen/Qwen3-30B-A3B-Base
+
+# Download models (optional - will be downloaded automatically if needed)
+huggingface-cli download Qwen/Qwen3-30B-A3B-Base
+huggingface-cli download Qwen/Qwen3-32B
 
 # Login to services
 wandb login
-# hf login - this will be needed when we want to push models to the hub
+huggingface-cli login
 ```
 
-When logging back into a machine after a stop, jus tactivate the venv again:
+### Resuming on Existing Machine
+
+When logging back into a machine after a stop, just activate the venv again:
 
 ```bash
+cd qwen-hebrew-finetuning/qwen_ec2_advanced_training/
 source .venv/bin/activate
 ```
 
 ### Data
 
-Right now the script default to a sample of wikipedia data located in the current directory - [here](./he_wiki_sample.jsonl). 
-
-The format is a JSON-Lines file where each line contains an object with a `text` field:
+Put all the datasets you want to run in the `datasets/` sub-directory.
+Don't put there other files.
+Dataset should be in .jsonl format, as below:
 
 ```json
 {"text": "text of document one"}
@@ -62,6 +131,24 @@ The format is a JSON-Lines file where each line contains an object with a `text`
 ```
 
 ## Training
+
+### Quick Launch
+
+For the most common use case, simply run:
+
+```bash
+```bash
+# Start training (runs in background, creates logs automatically)
+nohup ./train_all.sh > logs/train.log 2>&1 &
+
+# Monitor training progress
+tail -f logs/train.log
+
+# Check if training is running
+ps aux | grep train
+```
+
+### Advanced Training Options
 
 ### Configuration
 
@@ -105,17 +192,31 @@ The only important to note here is that the `gradient_accumulation_steps` **must
 
 ### Running! 
 
-First of all, make sure you are in the virtual environment, and if not, run:
+First, make sure you are in the virtual environment:
 
 ```bash
-cd qwen-hebrew-finetuning/qwen_model_shaltiel/
+cd qwen-hebrew-finetuning/qwen_ec2_advanced_training/
 source .venv/bin/activate
 ```
 
-And finally:
+#### Single Training Run
+
+For a single training run with custom parameters:
 
 ```bash
 accelerate launch --config_file=deepspeed_zero3.yaml train.py --wandb_name run-name-for-wandb
+```
+
+#### Multiple Datasets (Automated)
+
+To train on all datasets in the `datasets/` directory automatically:
+
+```bash
+# Run in background with logging
+nohup ./train_all.sh > logs/train.log 2>&1 &
+
+# Monitor progress
+tail -f logs/train.log
 ```
 
 Other parameters to set:
@@ -124,6 +225,95 @@ Other parameters to set:
 - `--dataset_path /path/to/data/jsonl` (Path to alternative [Data](#data))
 - `--seed 111` (Specifying a different random seed)
 - `--wandb_project a_different_wandb_project` (For separating runs into a different WandB project)
+
+## Monitoring Training
+
+### Manual Monitoring
+
+```bash
+# Follow training logs
+tail -f logs/train.log
+
+# Check if training is running
+ps aux | grep train
+
+# Monitor GPU usage
+nvidia-smi
+
+# Check disk space
+df -h
+```
+
+### Stopping Training
+
+```bash
+# Stop training using the provided script
+./kill_train_all.sh
+
+# Or find and kill training processes manually
+ps aux | grep train
+kill <PID>
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"No such file or directory: logs/"**
+   - Run `mkdir -p logs` or use the setup script
+   - The `train_all.sh` script now creates this automatically
+
+2. **Virtual environment not found**
+   - Run `./setup.sh` to create and configure everything
+   - Or manually: `uv venv && source .venv/bin/activate`
+
+3. **Permission denied on scripts**
+   - Run `chmod +x *.sh` to make scripts executable
+
+4. **CUDA out of memory**
+   - Reduce `per_device_train_batch_size` in `cpt_config.json`
+   - Increase `gradient_accumulation_steps` to maintain effective batch size
+
+5. **Slow downloads**
+   - Ensure `export HF_HUB_ENABLE_HF_TRANSFER=1` is set
+   - Check internet connection and HuggingFace status
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"No such file or directory: logs/"**
+   - The `train_all.sh` script now creates this automatically
+   - Or manually run: `mkdir -p logs`
+
+2. **Virtual environment not found**
+   - Create it: `uv venv && source .venv/bin/activate`
+
+3. **Permission denied on scripts**
+   - Run `chmod +x *.sh` to make scripts executable
+
+4. **CUDA out of memory**
+   - Reduce `per_device_train_batch_size` in `cpt_config.json`
+   - Increase `gradient_accumulation_steps` to maintain effective batch size
+
+5. **Slow downloads**
+   - Ensure `export HF_HUB_ENABLE_HF_TRANSFER=1` is set
+   - Check internet connection and HuggingFace status
+## File Structure
+
+```
+qwen_ec2_advanced_training/
+├── train_all.sh          # Main training script (fixed paths)
+├── logs/                 # Training logs (auto-created)
+├── datasets/             # Place your JSONL files here
+├── output/               # Model checkpoints saved here
+├── .venv/                # Python virtual environment
+├── cpt_config.json       # Training configuration
+├── deepspeed_zero3.yaml  # DeepSpeed configuration
+├── train.py              # Core training script
+├── requirements.txt      # Python dependencies
+└── kill_train_all.sh     # Script to stop training
+```
 
 ## Next Steps
 
@@ -147,3 +337,13 @@ That being said, there are still many improvements that must be done to the scri
     1. Perplexity - this can be done within the `train.py` script, we just need to update the script accordingly and set `eval_dataset` to the relevant dataset. 
 
     2. Quality - this will involve pulling the checkpoints from the hub as they're uploaded, and then evaluting them using a library like `lighteval`. 
+
+## Troubleshooting
+
+**Issue: "No such file or directory: logs/"**
+
+The training script now automatically creates the logs directory. If you still encounter this error, manually create it:
+
+```bash
+mkdir -p logs
+``` 
