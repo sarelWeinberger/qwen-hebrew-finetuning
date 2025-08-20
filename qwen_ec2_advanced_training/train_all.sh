@@ -2,8 +2,12 @@
 CONFIG="cpt_config.json"
 DEEPSPEED="deepspeed_zero3.yaml"
 
-# Set paths to virtual environment executables
-VENV_PATH="/home/ec2-user/qwen-hebrew-finetuning/qwen_model_shaltiel/.venv"
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
+# Get the current script directory and set up virtual environment path
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_PATH="$SCRIPT_DIR/.venv"
 PYTHON="$VENV_PATH/bin/python"
 ACCELERATE="$VENV_PATH/bin/accelerate"
 
@@ -22,7 +26,5 @@ for DATASET in datasets/*.jsonl; do
 
   echo "Cleaning GPU memory after training on $DATASET"
   $PYTHON clean_cuda.py
-
-  cp $LOGFILE $ARCHIVE_LOGFILE
 
 done
