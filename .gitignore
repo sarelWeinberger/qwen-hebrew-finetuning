@@ -78,13 +78,10 @@ qwen_model_shaltiel/.gitignore
 
 # Other
 =*
+aws-efa-installer/
 
 # csv
 *.csv
 
 # logging
 *.log
-
-# ray
-ray_logs/
-cluster.yaml
