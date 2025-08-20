@@ -9,7 +9,6 @@ ACCELERATE="$VENV_PATH/bin/accelerate"
 
 for DATASET in datasets/*.jsonl; do
   BASENAME=$(basename "$DATASET" .jsonl)
-  WANDB_NAME="gemma-hebrew-finetuning-$BASENAME"
   LOGFILE="logs/train.log"
   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
   ARCHIVE_LOGFILE="train_${BASENAME}_${TIMESTAMP}.log"
@@ -17,9 +16,9 @@ for DATASET in datasets/*.jsonl; do
   echo "Cleaning GPU memory before training on $DATASET"
   $PYTHON clean_cuda.py
 
-  echo "Training on $DATASET with wandb run name $WANDB_NAME"
+  echo "Training on $DATASET - wandb name will be auto-generated from model + dataset"
   echo "To trace the current log output: tail -f $LOGFILE"
-  $ACCELERATE launch --config_file=$DEEPSPEED train.py --dataset_path "$DATASET" --wandb_name "$WANDB_NAME" | tee $LOGFILE
+  $ACCELERATE launch --config_file=$DEEPSPEED train.py --dataset_path "$DATASET" --validation_split 0.1 | tee $LOGFILE
 
   echo "Cleaning GPU memory after training on $DATASET"
   $PYTHON clean_cuda.py
