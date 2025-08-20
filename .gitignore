@@ -32,12 +32,18 @@ qwen_model/finetuning/hp_tuning/
 # Data files
 qwen_model/data/raw/
 qwen_model/data/dataset/
+qwen_model_shaltiel/datasets/
+qwen_model_shaltiel/datasets_bkp/
+
+# Output files
+qwen_model_shaltiel/output/
 
 # Logs
 qwen_model/logs/
 wandb/
 lightning_logs/
 runs/
+qwen_model_shaltiel/*.log
 
 # Environment
 .env
@@ -67,6 +73,8 @@ Thumbs.db
 
 # Git
 .git/
+.gitignore
+qwen_model_shaltiel/.gitignore
 
 # Other
 =*
