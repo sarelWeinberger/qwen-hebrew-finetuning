@@ -1,7 +1,0 @@
-Cleaning GPU memory before training on datasets/mixed_dataset.jsonl
-./train_all.sh: line 20: /home/ec2-user/qwen-hebrew-finetuning/qwen_model_shaltiel/.venv/bin/python: No such file or directory
-Training on datasets/mixed_dataset.jsonl - wandb name will be auto-generated from model + dataset
-To trace the current log output: tail -f logs/train.log
-./train_all.sh: line 24: /home/ec2-user/qwen-hebrew-finetuning/qwen_model_shaltiel/.venv/bin/accelerate: No such file or directory
-Cleaning GPU memory after training on datasets/mixed_dataset.jsonl
-./train_all.sh: line 27: /home/ec2-user/qwen-hebrew-finetuning/qwen_model_shaltiel/.venv/bin/python: No such file or directory
