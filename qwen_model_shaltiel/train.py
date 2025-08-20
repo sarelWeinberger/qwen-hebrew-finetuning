@@ -4,6 +4,8 @@ import argparse
 import subprocess
 import torch
 import wandb
+import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -18,6 +20,7 @@ from accelerate import Accelerator
 import numpy as np
 from typing import Dict, List, Union
 from datasets import load_dataset
+from datetime import datetime
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Fine-tune Qwen3-30B-A3B-Base model")
@@ -174,8 +177,147 @@ def create_tokenize_function(tokenizer, max_seq_length):
         )
     return tokenize_function
 
-def train():
+def detect_dataset_name(args):
+    """
+    Detect dataset name from datasets directory or use provided dataset_path.
+    """
+    datasets_dir = "./datasets"
+    
+    # If a specific dataset is provided in args, use it
+    if args.dataset_path and args.dataset_path != 'wikipedia_he_part_002.jsonl':
+        return os.path.splitext(os.path.basename(args.dataset_path))[0]
+    
+    # Otherwise, look in datasets directory
+    if os.path.exists(datasets_dir):
+        dataset_files = [f for f in os.listdir(datasets_dir) if f.endswith(('.jsonl', '.json'))]
+        if dataset_files:
+            dataset_files.sort()  # Sort for consistency
+            if len(dataset_files) == 1:
+                return os.path.splitext(dataset_files[0])[0]
+            else:
+                # Multiple datasets, use first one with "_et_al" suffix
+                return f"{os.path.splitext(dataset_files[0])[0]}_et_al"
+    
+    # Fallback to the provided dataset path
+    return os.path.splitext(os.path.basename(args.dataset_path))[0]
 
+def create_run_identifier(config, args):
+    """
+    Create a simple, consistent run identifier based on model and dataset (no timestamp).
+    """
+    # Extract model name (last part after /)
+    model_name = config["model_name_or_path"].split("/")[-1]
+    
+    # Detect dataset name intelligently
+    dataset_name = detect_dataset_name(args)
+    
+    # Simple, consistent naming without timestamp
+    return f"{model_name}_{dataset_name}"
+
+def create_s3_checkpoint_path(run_id, step=None):
+    """
+    Create S3 path for checkpoints.
+    """
+    base_path = f"s3://gepeta-checkpoints/{run_id}"
+    if step is not None:
+        if isinstance(step, int):
+            checkpoint_name = f"step-{step}"
+        else:
+            checkpoint_name = f"step-{step}" if not step.startswith("step-") else step
+        return f"{base_path}/{checkpoint_name}"
+    return base_path
+
+class S3CheckpointCallback(TrainerCallback):
+    """Simple callback to sync checkpoints to S3 after saving."""
+    
+    def __init__(self, run_id):
+        self.run_id = run_id
+        self.uploaded_steps = set()
+    
+    def on_save(self, args, state, control, **kwargs):
+        """Upload checkpoint to S3 after local save."""
+        if state.global_step > 0 and state.global_step not in self.uploaded_steps:
+            checkpoint_dir_trainer = f"checkpoint-{state.global_step}"
+            checkpoint_dir_ours = f"step-{state.global_step}"
+            
+            local_checkpoint_path_trainer = os.path.join(args.output_dir, checkpoint_dir_trainer)
+            local_checkpoint_path_ours = os.path.join(args.output_dir, checkpoint_dir_ours)
+            
+            # Wait a moment to ensure all files are written
+            import time
+            time.sleep(2)
+            
+            # Check if Trainer created checkpoint-{step}, and rename to step-{step}
+            if os.path.exists(local_checkpoint_path_trainer) and not os.path.exists(local_checkpoint_path_ours):
+                try:
+                    import shutil
+                    print(f"Renaming checkpoint: {checkpoint_dir_trainer} -> {checkpoint_dir_ours}")
+                    shutil.move(local_checkpoint_path_trainer, local_checkpoint_path_ours)
+                except Exception as e:
+                    print(f"Warning: Failed to rename checkpoint: {e}")
+                    # Use the original name if rename fails
+                    local_checkpoint_path_ours = local_checkpoint_path_trainer
+            
+            # Upload whichever directory exists
+            upload_path = local_checkpoint_path_ours if os.path.exists(local_checkpoint_path_ours) else local_checkpoint_path_trainer
+            
+            if os.path.exists(upload_path):
+                s3_checkpoint_path = create_s3_checkpoint_path(self.run_id, state.global_step)
+                print(f"Uploading checkpoint {os.path.basename(upload_path)} to S3...")
+                try:
+                    if sync_to_s3(upload_path, s3_checkpoint_path):
+                        self.uploaded_steps.add(state.global_step)
+                        print(f"✅ Successfully uploaded checkpoint step-{state.global_step}")
+                    else:
+                        print(f"❌ Failed to upload checkpoint step-{state.global_step}")
+                except Exception as e:
+                    print(f"❌ Error uploading checkpoint step-{state.global_step}: {e}")
+            else:
+                print(f"⚠️ Checkpoint directory not found: {upload_path}")
+
+def sync_to_s3(local_path, s3_path):
+    """
+    Sync checkpoint from local directory to S3 using boto3.
+    """
+    try:
+        s3 = boto3.client('s3')
+        
+        # Parse S3 path
+        if not s3_path.startswith('s3://'):
+            raise ValueError(f"Invalid S3 path: {s3_path}")
+        
+        path_parts = s3_path[5:].split('/', 1)
+        bucket = path_parts[0]
+        prefix = path_parts[1] if len(path_parts) > 1 else ""
+        
+        print(f"Syncing to S3: {local_path} -> {s3_path}")
+        
+        if not os.path.exists(local_path):
+            print(f"Local path does not exist: {local_path}")
+            return False
+        
+        # Walk through local directory and upload files
+        for root, dirs, files in os.walk(local_path):
+            for file in files:
+                local_file_path = os.path.join(root, file)
+                
+                # Calculate S3 key
+                relative_path = os.path.relpath(local_file_path, local_path)
+                s3_key = f"{prefix}/{relative_path}".replace('\\', '/') if prefix else relative_path.replace('\\', '/')
+                
+                # Upload file
+                s3.upload_file(local_file_path, bucket, s3_key)
+                print(f"Uploaded: {local_file_path} -> s3://{bucket}/{s3_key}")
+        
+        return True
+    except (ClientError, NoCredentialsError) as e:
+        print(f"Failed to sync to S3: {e}")
+        return False
+    except Exception as e:
+        print(f"Unexpected error syncing to S3: {e}")
+        return False
+
+def train():
     args = parse_args()
     set_seed(args.seed)
     
@@ -186,20 +328,35 @@ def train():
     with open(args.config, 'r', encoding='utf8') as f:
         config = json.loads(f.read())
 
+    # Create run identifier for this training session (consistent, no timestamp)
+    run_id = create_run_identifier(config, args)
+    print(f"Run ID: {run_id}")
+    
+    # Set up simple checkpoint directory - always use "local"
+    local_output_dir = "./checkpoints/local"
+    s3_base_path = f"s3://gepeta-checkpoints/{run_id}"
+    
+    # Update config output_dir to use our structured approach
+    config["output_dir"] = local_output_dir
+    os.makedirs(local_output_dir, exist_ok=True)
+
     # Initialize Weights & Biases - only on the main process
     accelerator = Accelerator()
     if accelerator.is_local_main_process:
-        run_name = args.wandb_name or f"qwen-hebrew-{args.seed}"
+        # Create descriptive wandb run name with timestamp for uniqueness
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        wandb_run_name = args.wandb_name or f"{run_id}_{timestamp}"
         wandb.init(
             entity=args.wandb_entity,
             project=args.wandb_project,
-            name=run_name,
+            name=wandb_run_name,
             config=dict(
                 args=args,
-                config=config
+                config=config,
+                run_id=run_id
             )
         )
-        print(f"Initialized Weights & Biases run: {run_name}")
+        print(f"Initialized Weights & Biases run: {wandb_run_name}")
     
     # Load tokenizer
     print("Loading tokenizer...")
@@ -255,8 +412,8 @@ def train():
     # Workaround for a known bug, relevant for qwen 30B only
     # Known bug with DeepSpeed freezing on the first forward: https://huggingface.co/posts/stas/984424866637646
     # This is the workaround :)
-    from transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeSparseMoeBlock
-    deepspeed.utils.set_z3_leaf_modules(model, [Qwen3MoeSparseMoeBlock])
+    # from transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeSparseMoeBlock
+    # deepspeed.utils.set_z3_leaf_modules(model, [Qwen3MoeSparseMoeBlock])
 
     # Don't move model to GPU - let DeepSpeed handle device placement
     # Enable gradient checkpointing
@@ -296,7 +453,7 @@ def train():
     # Training arguments optimized for 8x H100 GPUs
     print("Setting up training arguments...")
     training_args = TrainingArguments(
-        output_dir=config.get("output_dir", "./output"),
+        output_dir=config.get("output_dir", local_output_dir),
         gradient_accumulation_steps=config["gradient_accumulation_steps"],
         per_device_train_batch_size=config["per_device_train_batch_size"],
         learning_rate=config.get("learning_rate", 1e-5),
@@ -322,6 +479,57 @@ def train():
     )
     print(f"Training arguments set up successfully: {training_args}")
     
+    # Handle checkpoint resumption - SIMPLE LOCAL ONLY
+    resume_from_checkpoint = None
+    
+    if config.get("resume_from_checkpoint") == "auto":
+        print("🔍 Auto-resume mode: searching for latest LOCAL checkpoint...")
+        
+        # Check only the local checkpoint directory
+        if os.path.exists(local_output_dir):
+            print(f"📁 Contents of {local_output_dir}:")
+            local_checkpoints = []
+            for item in os.listdir(local_output_dir):
+                item_path = os.path.join(local_output_dir, item)
+                print(f"  - {item} ({'directory' if os.path.isdir(item_path) else 'file'})")
+                if item.startswith(('step-', 'checkpoint-')) and os.path.isdir(item_path):
+                    # Extract step number for sorting
+                    try:
+                        step_num = int(item.split("-")[1]) if item.split("-")[1].isdigit() else 0
+                        local_checkpoints.append((step_num, item_path))
+                        print(f"🔍 Found checkpoint: {item_path} (step {step_num})")
+                    except:
+                        pass
+            
+            if local_checkpoints:
+                # Sort by step number and get the latest
+                local_checkpoints.sort(key=lambda x: x[0])
+                latest_checkpoint = local_checkpoints[-1][1]
+                resume_from_checkpoint = latest_checkpoint
+                print(f"✅ Will resume from: {latest_checkpoint} (step {local_checkpoints[-1][0]})")
+            else:
+                print("❌ No checkpoints found - starting from scratch")
+        else:
+            print(f"📁 Directory {local_output_dir} does not exist - starting from scratch")
+            
+    elif isinstance(config.get("resume_from_checkpoint"), str) and config["resume_from_checkpoint"] != "auto":
+        # Use specified checkpoint path (local only)
+        checkpoint_path = config["resume_from_checkpoint"]
+        print(f"🔍 Using specified checkpoint: {checkpoint_path}")
+        
+        if os.path.exists(checkpoint_path):
+            resume_from_checkpoint = checkpoint_path
+            print(f"✅ Will resume from: {checkpoint_path}")
+        else:
+            print(f"❌ Specified checkpoint path does not exist: {checkpoint_path}")
+
+    # Debug: Show final resume decision
+    print(f"\n🎯 FINAL RESUME DECISION:")
+    if resume_from_checkpoint:
+        print(f"✅ Will resume from: {resume_from_checkpoint}")
+    else:
+        print("❌ Starting from scratch")
+
     # Prepare validation dataset if it exists
     # Commented out for now - if we do go with this, then eval_strategy will have to be updated
     # in training_args, and the dataset loading has to handle the splits, right now we load just
@@ -345,11 +553,12 @@ def train():
 
     trainer = Trainer(
         model=model,
-        processing_class=tokenizer, # renamed from tokenizer
+        processing_class=tokenizer,
         args=training_args,
         train_dataset=tokenized_dataset,
         eval_dataset=eval_dataset,
-        data_collator=data_collator
+        data_collator=data_collator,
+        callbacks=[S3CheckpointCallback(run_id)]  # Simple S3 upload callback
     )
     print("Trainer initialized successfully")
     
@@ -357,30 +566,50 @@ def train():
     print("Starting training...")
     print_trainable_parameters(model)
     try:
-        trainer.train(resume_from_checkpoint=config.get("resume_from_checkpoint", False))
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
     except Exception as e:
         print(f"Training error: {e}")
-        # Save checkpoint even if training fails
-        trainer.save_model(config["output_dir"] + "/error_checkpoint")
-        print(f"Saved checkpoint after error to {config['output_dir']}/error_checkpoint")
+        
+        # Create error checkpoint directory if it doesn't exist
+        error_checkpoint_dir = os.path.join(config["output_dir"], "step-error")
+        os.makedirs(error_checkpoint_dir, exist_ok=True)
+        
+        # Try to save with minimal data only
+        try:
+            trainer.save_model(error_checkpoint_dir)
+        except Exception as save_error:
+            print(f"Could not save error checkpoint: {save_error}")
+            # Save just the state dict as a fallback
+            try:
+                torch.save(trainer.model.state_dict(), 
+                          os.path.join(error_checkpoint_dir, "pytorch_model.bin"))
+            except Exception as fallback_error:
+                print(f"Could not save fallback checkpoint: {fallback_error}")
+        
+        # Try to upload error checkpoint to S3
+        try:
+            s3_error_path = create_s3_checkpoint_path(run_id, "error")
+            sync_to_s3(error_checkpoint_dir, s3_error_path)
+            print(f"Uploaded error checkpoint to S3: {s3_error_path}")
+        except Exception as s3_error:
+            print(f"Could not upload error checkpoint to S3: {s3_error}")
+        
         raise e
-    
-    # Save the final model
-    print(f"Saving model to {config['output_dir']}")
-    trainer.save_model()
-    tokenizer.save_pretrained(config["output_dir"])
-    
-    s3_path = "s3://gepeta-checkpoints/"
-    print(f"Uploading model to {s3_path} ...")
 
-    subprocess.run([
-    "aws", "s3", "sync",
-    config["output_dir"],
-    s3_path
-    ], check=True)
+    # Save the final model
+    print(f"Saving final model to {config['output_dir']}")
+    final_model_dir = os.path.join(config["output_dir"], "step-final")
+    trainer.save_model(final_model_dir)
+    tokenizer.save_pretrained(final_model_dir)
+    
+    # Upload final model to S3
+    final_model_s3_path = create_s3_checkpoint_path(run_id, "final")
+    print(f"Uploading final model to S3: {final_model_s3_path}")
+    sync_to_s3(final_model_dir, final_model_s3_path)
 
     print("Upload finished.")
     print("Training complete!")
+    print(f"All checkpoints available in S3 under: s3://gepeta-checkpoints/{run_id}/")
     
     # Finish wandb run
     wandb.finish()
