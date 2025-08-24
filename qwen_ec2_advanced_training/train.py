@@ -58,7 +58,7 @@ def parse_args():
     parser.add_argument(
         "--wandb_entity",
         type=str,
-        default="llm_train_mafat",
+        default="sarel-weinbergerbiu-bar-ilan-university",
         help="Weights & Biases entity name"
     )
     parser.add_argument(
