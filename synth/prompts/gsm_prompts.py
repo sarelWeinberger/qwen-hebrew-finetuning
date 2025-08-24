@@ -1,10 +1,10 @@
 """
 This file contains variables with prompts to be used when translating the 'GSM8K' benchmark:
 https://huggingface.co/datasets/openai/gsm8k
-
 This file contains only the chosen prompts to be used.
 The file 'old_gsm_prompts.py' contains old version prompts that we have tested.
 """
+
 
 # Instruction prompts
 GSM_INSTRUCT_CLAUDE_V1 = """<instruction>
