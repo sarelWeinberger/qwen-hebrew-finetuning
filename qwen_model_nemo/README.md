@@ -38,13 +38,14 @@ For my test run, I placed the source JSONL in `./data`. Example used:
 ### Build tokenized dataset (produces two files - .bin / .idx)
 
 ```bash
+mkdir tok-data
 python /opt/NeMo/scripts/nlp_language_modeling/preprocess_data_for_megatron.py \
-  --input ./data/hewiki-data.jsonl \
+  --input ./data \
   --keep-newlines \
   --tokenizer-library huggingface \
-  --tokenizer-type Qwen/Qwen3-30B-A3B \
+  --tokenizer-type Qwen/Qwen3-30B-A3B-Base \
   --append-eod \
-  --output-prefix hebdata_hewiki \
+  --output-prefix ./tok-data/hebdata_hewiki \
   --workers 128 \
   --preproc-folder \
   --files-filter '*' \
