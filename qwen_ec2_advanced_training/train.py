@@ -4,8 +4,6 @@ import argparse
 import subprocess
 import torch
 import wandb
-import boto3
-from botocore.exceptions import ClientError, NoCredentialsError
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -472,95 +470,7 @@ class WandbMetricsCallback(TrainerCallback):
         
         return update_metrics
 
-class S3CheckpointCallback(TrainerCallback):
-    """Simple callback to sync checkpoints to S3 after saving."""
-    
-    def __init__(self, run_id):
-        self.run_id = run_id
-        self.uploaded_steps = set()
-    
-    def on_save(self, args, state, control, **kwargs):
-        """Upload checkpoint to S3 after local save."""
-        if state.global_step > 0 and state.global_step not in self.uploaded_steps:
-            checkpoint_dir_trainer = f"checkpoint-{state.global_step}"
-            checkpoint_dir_ours = f"step-{state.global_step}"
-            
-            local_checkpoint_path_trainer = os.path.join(args.output_dir, checkpoint_dir_trainer)
-            local_checkpoint_path_ours = os.path.join(args.output_dir, checkpoint_dir_ours)
-            
-            # Wait a moment to ensure all files are written
-            import time
-            time.sleep(2)
-            
-            # Check if Trainer created checkpoint-{step}, and rename to step-{step}
-            if os.path.exists(local_checkpoint_path_trainer) and not os.path.exists(local_checkpoint_path_ours):
-                try:
-                    import shutil
-                    print(f"Renaming checkpoint: {checkpoint_dir_trainer} -> {checkpoint_dir_ours}")
-                    shutil.move(local_checkpoint_path_trainer, local_checkpoint_path_ours)
-                except Exception as e:
-                    print(f"Warning: Failed to rename checkpoint: {e}")
-                    # Use the original name if rename fails
-                    local_checkpoint_path_ours = local_checkpoint_path_trainer
-            
-            # Upload whichever directory exists
-            upload_path = local_checkpoint_path_ours if os.path.exists(local_checkpoint_path_ours) else local_checkpoint_path_trainer
-            
-            if os.path.exists(upload_path):
-                s3_checkpoint_path = create_s3_checkpoint_path(self.run_id, state.global_step)
-                print(f"Uploading checkpoint {os.path.basename(upload_path)} to S3...")
-                try:
-                    if sync_to_s3(upload_path, s3_checkpoint_path):
-                        self.uploaded_steps.add(state.global_step)
-                        print(f"✅ Successfully uploaded checkpoint step-{state.global_step}")
-                    else:
-                        print(f"❌ Failed to upload checkpoint step-{state.global_step}")
-                except Exception as e:
-                    print(f"❌ Error uploading checkpoint step-{state.global_step}: {e}")
-            else:
-                print(f"⚠️ Checkpoint directory not found: {upload_path}")
 
-def sync_to_s3(local_path, s3_path):
-    """
-    Sync checkpoint from local directory to S3 using boto3.
-    """
-    try:
-        s3 = boto3.client('s3')
-        
-        # Parse S3 path
-        if not s3_path.startswith('s3://'):
-            raise ValueError(f"Invalid S3 path: {s3_path}")
-        
-        path_parts = s3_path[5:].split('/', 1)
-        bucket = path_parts[0]
-        prefix = path_parts[1] if len(path_parts) > 1 else ""
-        
-        print(f"Syncing to S3: {local_path} -> {s3_path}")
-        
-        if not os.path.exists(local_path):
-            print(f"Local path does not exist: {local_path}")
-            return False
-        
-        # Walk through local directory and upload files
-        for root, dirs, files in os.walk(local_path):
-            for file in files:
-                local_file_path = os.path.join(root, file)
-                
-                # Calculate S3 key
-                relative_path = os.path.relpath(local_file_path, local_path)
-                s3_key = f"{prefix}/{relative_path}".replace('\\', '/') if prefix else relative_path.replace('\\', '/')
-                
-                # Upload file
-                s3.upload_file(local_file_path, bucket, s3_key)
-                print(f"Uploaded: {local_file_path} -> s3://{bucket}/{s3_key}")
-        
-        return True
-    except (ClientError, NoCredentialsError) as e:
-        print(f"Failed to sync to S3: {e}")
-        return False
-    except Exception as e:
-        print(f"Unexpected error syncing to S3: {e}")
-        return False
 
 def train():
     args = parse_args()
@@ -755,18 +665,18 @@ def train():
         per_device_eval_batch_size=config.get("per_device_eval_batch_size", config["per_device_train_batch_size"]),
         learning_rate=config.get("learning_rate", 1e-5),
         logging_steps=config.get("logging_steps", 10),
-        num_train_epochs=config.get("num_train_epochs", 1) if not 'max_steps' in config else 0, 
-        max_steps=config.get("max_steps", 0), # default to 1 epoch 
+        num_train_epochs=config.get("num_train_epochs", 1),
+        max_steps=config.get("max_steps", 0),
         save_steps=config.get("save_steps", 500),
         save_total_limit=config.get("save_total_limit", 5),
-        warmup_ratio=config.get('warmup_ratio', None), # default to 100 steps
+        warmup_ratio=config.get('warmup_ratio', None),
         warmup_steps=config.get('warmup_steps', 100) if not 'warmup_ratio' in config else 0,
         # Evaluation settings
         eval_strategy=eval_strategy,
         eval_steps=eval_steps,
         eval_accumulation_steps=config.get("eval_accumulation_steps", None),
         # Defaults:
-        report_to=['wandb'],  # Enable wandb reporting for basic metrics
+        report_to=['wandb'],
         gradient_checkpointing=True,
         gradient_checkpointing_kwargs={'use_reentrant': True},
         save_strategy="steps",
@@ -774,9 +684,8 @@ def train():
         lr_scheduler_type="cosine",
         logging_first_step=True,
         remove_unused_columns=False,
-        dataloader_num_workers=4,  # Can use more workers with H100s
-        push_to_hub=False, # When running fo real, set to True and specify a larger save_steps
-        # Load best model at end if we have validation
+        dataloader_num_workers=4,
+        push_to_hub=False,
         load_best_model_at_end=tokenized_val_dataset is not None,
         metric_for_best_model="eval_loss" if tokenized_val_dataset is not None else None,
         greater_is_better=False if tokenized_val_dataset is not None else None,
@@ -865,7 +774,7 @@ def train():
         train_dataset=tokenized_train_dataset,
         eval_dataset=tokenized_val_dataset,  # This will be None if no validation split
         data_collator=data_collator,
-        callbacks=[S3CheckpointCallback(run_id), wandb_callback]  # Add both callbacks
+        callbacks=[wandb_callback]
     )
     print("Trainer initialized successfully")
     
@@ -887,11 +796,9 @@ def train():
         trainer.train(resume_from_checkpoint=resume_from_checkpoint)
     except Exception as e:
         print(f"Training error: {e}")
-        
         # Create error checkpoint directory if it doesn't exist
         error_checkpoint_dir = os.path.join(config["output_dir"], "step-error")
         os.makedirs(error_checkpoint_dir, exist_ok=True)
-        
         # Try to save with minimal data only
         try:
             trainer.save_model(error_checkpoint_dir)
@@ -903,15 +810,6 @@ def train():
                           os.path.join(error_checkpoint_dir, "pytorch_model.bin"))
             except Exception as fallback_error:
                 print(f"Could not save fallback checkpoint: {fallback_error}")
-        
-        # Try to upload error checkpoint to S3
-        try:
-            s3_error_path = create_s3_checkpoint_path(run_id, "error")
-            sync_to_s3(error_checkpoint_dir, s3_error_path)
-            print(f"Uploaded error checkpoint to S3: {s3_error_path}")
-        except Exception as s3_error:
-            print(f"Could not upload error checkpoint to S3: {s3_error}")
-        
         raise e
 
     # Save the final model
@@ -919,15 +817,7 @@ def train():
     final_model_dir = os.path.join(config["output_dir"], "step-final")
     trainer.save_model(final_model_dir)
     tokenizer.save_pretrained(final_model_dir)
-    
-    # Upload final model to S3
-    final_model_s3_path = create_s3_checkpoint_path(run_id, "final")
-    print(f"Uploading final model to S3: {final_model_s3_path}")
-    sync_to_s3(final_model_dir, final_model_s3_path)
-
-    print("Upload finished.")
     print("Training complete!")
-    print(f"All checkpoints available in S3 under: s3://gepeta-checkpoints/{run_id}/")
     
     # Finish wandb run
     wandb.finish()
