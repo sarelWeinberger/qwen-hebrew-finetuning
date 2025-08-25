@@ -137,7 +137,26 @@ def parse_from_gradio(labeled_file_name, csv_file_name):
     or_df['rating model'] = label_df.apply(lambda x: map_rating_to_model(x, or_df), axis=1)
     or_df['was fixed'] = label_df['gold'] != ''
 
+
     return label_df, or_df
+
+
+def parse_single_file_gradio(labeled_file_name):
+    label_df = pd.read_csv(labeled_file_name)
+    label_df = label_df.fillna('')
+
+    # Split options
+    label_df[['option 1', 'option 2']] = label_df.apply(split_to_option, result_type='expand', axis=1)
+
+    # label_df['rating model'] = label_df.apply(lambda x: map_rating_to_model(x, label_df), axis=1)
+    label_df['rating model'] = label_df.apply(lambda x: x[f'model {x["rating"]}'] if x['rating'] in ['1', '2'] else x['rating'], axis=1)
+    label_df['was fixed'] = label_df['gold'] != ''
+
+    label_df.rename({
+        'text_column': 'original',
+    }, axis=1, inplace=True)
+
+    return label_df
 
 
 def parse_labeled_file(file_name, csv_file_name):
@@ -181,8 +200,12 @@ def parse_labeled_file(file_name, csv_file_name):
     return label_df, or_df
 
 
-def rating_gold_metrics(or_df, bench_name='', annotate=True):
-    print(f'From {or_df.shape[0]} samples overall, the distribution of choosing the best model:')
+def rating_gold_metrics(or_df, bench_name='', annotate=True, ax=None):
+    show = False
+    if ax is None:
+        _, ax = plt.subplots(1, 1)
+        show = True
+
     # Clauclate number of choosing each model - and how many times was it fixed to 'gold'
     rating = or_df[or_df['rating model'] != 'SKIP']
     group_1 = rating[~rating['was fixed']]['rating model'].value_counts()
@@ -194,8 +217,8 @@ def rating_gold_metrics(or_df, bench_name='', annotate=True):
     group_2 = group_2.reindex(all_models, fill_value=0)
 
     # stacked bat plot
-    plt.bar(group_1.index, group_1.values, label='Already gold')
-    plt.bar(group_2.index, group_2.values, bottom=group_1, label='Was fixed')
+    ax.bar(group_1.index, group_1.values, label='Already gold')
+    ax.bar(group_2.index, group_2.values, bottom=group_1, label='Was fixed')
 
     # Add annotations
     for i, model in enumerate(group_1.index):
@@ -204,17 +227,18 @@ def rating_gold_metrics(or_df, bench_name='', annotate=True):
 
         if annotate:
             if y1 > 0:
-                plt.text(i, y1 / 2, f'{np.round(100 * y1 / (y1 + y2), 2)}%', ha='center', va='center', color='white', fontsize=12)
+                ax.text(i, y1 / 2, f'{np.round(100 * y1 / (y1 + y2), 2)}%', ha='center', va='center', color='white', fontsize=12)
             if y2 > 0:
-                plt.text(i, y1 + y2 / 2, f'{np.round(100 * y2 / (y1 + y2), 2)}%', ha='center', va='center', color='white', fontsize=12)
+                ax.text(i, y1 + y2 / 2, f'{np.round(100 * y2 / (y1 + y2), 2)}%', ha='center', va='center', color='white', fontsize=12)
 
-        plt.text(i, y1 + y2, f'{y1 + y2}', ha='center', color='black', fontsize=12)
-    plt.legend()
-    plt.ylim(0, (group_1.max() + group_2.max()) * 1.05)
-    plt.xlabel('Choosen model')
-    plt.ylabel('Count')
-    plt.title(f'{bench_name} Better model comparison')
-    plt.show()
+        ax.text(i, y1 + y2, f'{y1 + y2}', ha='center', color='black', fontsize=12)
+    ax.legend()
+    ax.set_ylim(0, (group_1.max() + group_2.max()) * 1.05)
+    ax.set_xlabel('Choosen model')
+    ax.set_ylabel('Count')
+    ax.set_title(f'{bench_name} Better model comparison')
+    if show:
+        plt.show()
 
 
 categories_x = [
@@ -238,7 +262,7 @@ severity_x = [
 ]
 
 
-def MQM_metrics(mqm_res, mqm_score, bench_name=''):
+def MQM_metrics(mqm_res, mqm_score, bench_name='', files_name=''):
     print('MQM average scores:')
     for k in mqm_score:
         print(f'\t{k:20} - {sum(mqm_score[k]) / len(mqm_score[k])}')
@@ -254,9 +278,9 @@ def MQM_metrics(mqm_res, mqm_score, bench_name=''):
     axs[0].legend()
     axs[0].grid()
     axs[0].set_xticks(range(9))
-    axs[0].set_xlabel('MQM score')
-    axs[0].set_ylabel('Count')
-    axs[0].set_title('Below 10')
+    axs[0].set_xlabel('MQM score', fontsize=11)
+    axs[0].set_ylabel('Count', fontsize=11)
+    axs[0].set_title('Below 10', fontsize=13)
 
     for k in mqm_score:
         # pd.Series(mqm_score[k]).value_counts().plot(alpha=0.5, label=k, kind='bar')
@@ -264,13 +288,14 @@ def MQM_metrics(mqm_res, mqm_score, bench_name=''):
     axs[1].legend()
     axs[1].grid()
     axs[1].set_xticks(range(25, 32))
-    axs[1].set_ylabel('Count')
-    axs[1].set_title('Above 25')
+    axs[1].set_xlabel('MQM score', fontsize=11)
+    axs[1].set_ylabel('Count', fontsize=11)
+    axs[1].set_title('Above 25', fontsize=13)
     
-    axs[1].set_xlabel('MQM score')
-    fig.suptitle(f'{bench_name} MQM scores histogram')
+    fig.suptitle(f'{bench_name} MQM scores histogram', fontsize=15)
     fig.subplots_adjust(hspace=0.6)
     fig.tight_layout()
+    plt.savefig(f'plots/{files_name}_mqm_hist.jpeg')
     plt.show()
 
     print('\n' + '-' * 30, end='\n')
@@ -294,6 +319,7 @@ def MQM_metrics(mqm_res, mqm_score, bench_name=''):
     # plt.ylabel('Count')
     fig.suptitle(f'{bench_name} MQM severity distribution')
     fig.tight_layout()
+    plt.savefig(f'plots/{files_name}_mqm_sev_dist.jpeg')
     plt.show()
 
     print('\n' + '-' * 30, end='\n')
@@ -360,4 +386,5 @@ def MQM_metrics(mqm_res, mqm_score, bench_name=''):
     # plt.ylabel('Count')
     fig.suptitle(f'{bench_name} MQM category')
     fig.tight_layout()
+    plt.savefig(f'plots/{files_name}_mqm_cat_dist.jpeg')
     plt.show()

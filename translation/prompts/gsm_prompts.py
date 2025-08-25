@@ -40,7 +40,7 @@ Follow these guidelines for the final translation:
 1. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
 2. Maintain the same formatting as the original English version, keep the same numbers as the original.
 3. Write the translations in a natural Hebrew style suitable for grade school-level math questions.
-4. Adjust entities from American context into Israeli context, including names, currency, measuremnt units and etc. For example: map "USD" to "שקלים". Do not convert the numbers, only change the entities.
+4. Adjust entities from American context into Israeli context, including names, currency, measurement units, etc. For example: map "USD" to "שקלים". Do not convert the numbers, only change the entities.
 5. Adjust American scenarios into Israeli scenarios to make it more natural.
 6. Cultural adaptation for rare activities: If the activity or context involves something very rare or unfamiliar in Israeli culture (like lacrosse, specific American transit systems, or highly location-specific activities), perform transcreation instead of direct translation - replace the acticity with a similar Israeli equivalent that maintains the same logical structure.
 </instruction>"""
@@ -61,9 +61,10 @@ GSM_INSTRUCT_GEMINI_V2 = """Your task is to translate the given English question
 2. Preserve the original semantic meaning and intent of the question and answers as accurately as possible in the Hebrew translation.
 3. Maintain the same formatting as the original English version.
 4. Write the translations in a natural Hebrew style suitable for grade school-level math questions.
-5. Adjust entities from American context into Israeli context, including names, currency, measuremnt units and etc. For example: map "USD" to "שקלים".
-6. Adjust American scenarios into Israeli scenarios to make it more natural.
-7. Cultural adaptation for rare activities: If the activity or context involves something very rare or unfamiliar in Israeli culture (like lacrosse, specific American transit systems, or highly location-specific activities), perform transcreation instead of direct translation - replace the acticity with a similar Israeli equivalent that maintains the same logical structure."""
+5. Names localization: make sure to change People's names into Israeli names. For example: map "Weng" to "נוגה".
+6. Adjust entities from American context into Israeli context, including currency, measurement units, etc. For example: map "USD" to "שקלים".
+7. Adjust American scenarios into Israeli scenarios to make it more natural.
+8. Cultural adaptation for rare activities: If the activity or context involves something very rare or unfamiliar in Israeli culture (like lacrosse, specific American transit systems, or highly location-specific activities), perform transcreation instead of direct translation - replace the acticity with a similar Israeli equivalent that maintains the same logical structure."""
 
 GSM_INSTRUCT_GEMINI_MULTI_V1 = """
 """

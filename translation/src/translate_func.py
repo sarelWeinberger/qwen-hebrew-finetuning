@@ -174,7 +174,9 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
             try:
                 if result is None:
                     # Handle case where parsing failed
-                    print(f"Warning: Failed to parse response for sample {cnt}, skipping...")
+                    print(f"Warning: Failed to parse response for sample {cnt-1}, skipping...")
+                    print(output.parsed)
+                    exit()
 
                     # Create a fallback sample with original data and failure indicator
                     new_sample = sample.copy()
@@ -205,13 +207,23 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
                 hebrew_dataset[key].append(new_sample)
                 text_output[key].append("Failed to translate!")
 
-            if cnt % quota_min == 0:
-                passed = time() - start_time
-                if passed < 60:
-                    print('\r' + ' ' * 50 + '\rSleeping.... ', end='')
-                    sleep(61 - passed)
-                    print('Done!', end='')
-                start_time = time()
+            # For Free quota this is needed:
+            # if cnt % quota_min == 0:
+            #     passed = time() - start_time
+            #     if passed < 60:
+            #         print('\r' + ' ' * 50 + '\rSleeping.... ', end='')
+            #         sleep(61 - passed)
+            #         print('Done!', end='')
+            #     start_time = time()
+
+            cur_size = len(hebrew_dataset[key])
+            if cur_size % 25 == 0:
+                cp_name = f'gemini_cp/gemini_{key}_{cur_size}.pkl'
+                cp_name_text = f'gemini_cp/gemini_{key}_{cur_size}_text.pkl'
+                with open(cp_name, 'wb') as f:
+                    pickle.dump(hebrew_dataset[key], f)
+                with open(cp_name_text, 'wb') as f:
+                    pickle.dump(text_output[key], f)
 
         hebrew_dataset[key] = Dataset.from_list(hebrew_dataset[key])
     return hebrew_dataset, text_output

@@ -18,7 +18,7 @@ def get_arc_ai2_datasets():
 
     # ARC_AI2 - Challenge
     # train - 1119 samples | validation - 299 samples | test - 1172 samples
-    # datasets['arc_challenge_train'] = load_dataset("allenai/ai2_arc", 'ARC-Challenge', split='train') 
+    datasets['arc_challenge_train'] = load_dataset("allenai/ai2_arc", 'ARC-Challenge', split='train') 
     # datasets['arc_challenge_val'] = load_dataset("allenai/ai2_arc", 'ARC-Challenge', split='validation')
     datasets['arc_challenge_test'] = load_dataset("allenai/ai2_arc", 'ARC-Challenge', split='test')
     

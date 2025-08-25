@@ -42,6 +42,8 @@ def load_data(base_df, save_filename):
         # print(f"Found existing annotations file: {save_filename}. Loading...")
         try:
             loaded_df = pd.read_csv(save_filename) if save_filename.endswith(".csv") else pd.read_json(save_filename, orient='records')
+            loaded_df = loaded_df.fillna('')
+            loaded_df['rating'] = loaded_df['rating'].apply(str).replace('1.0', '1').replace('2.0', '2')
             
             # Ensure all columns from loaded_df are in base_df before merge
             for col in loaded_df.columns:
@@ -53,19 +55,7 @@ def load_data(base_df, save_filename):
             if 'text_column' in base_df.columns and 'text_column' in loaded_df.columns:
                 # Create a temporary unique ID for robust merging if 'text_column' alone isn't unique
                 if not base_df['text_column'].is_unique:
-                    base_df['temp_merge_id'] = base_df.index
-                    loaded_df['temp_merge_id'] = loaded_df.index
-                    base_df = pd.merge(base_df, loaded_df, on='temp_merge_id', how='left', suffixes=('_base', '_loaded'))
-                    # For columns that exist in both, prefer the _loaded version
-                    for col in loaded_df.columns:
-                        if col.endswith('_loaded'):
-                            original_col = col.replace('_loaded', '')
-                            if original_col in base_df.columns:
-                                base_df[original_col] = base_df[col].fillna(base_df[original_col + '_base'])
-                            else: # if the column only exists in loaded_df, just rename it
-                                base_df[original_col] = base_df[col]
-                            base_df = base_df.drop(columns=[col, original_col + '_base'], errors='ignore')
-                    base_df = base_df.drop(columns=['temp_merge_id'], errors='ignore')
+                    assert False, "'text_column' is not unique in the given dataframe."
                 else: # If text_column is unique, use it directly for update
                     base_df = base_df.set_index('text_column')
                     base_df.update(loaded_df.set_index('text_column'))
