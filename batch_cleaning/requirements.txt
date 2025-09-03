@@ -1,9 +1,0 @@
-transformers>=4.50.0
-torch>=2.1.0
-accelerate
-bitsandbytes
-huggingface_hub
-python-dotenv
-Pillow
-numpy
-scipy
