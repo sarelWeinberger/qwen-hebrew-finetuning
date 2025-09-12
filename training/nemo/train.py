@@ -21,22 +21,21 @@ if __name__ == '__main__':
     
     checkpoint_path = '/home/ubuntu/nvme/checkpoints'
     seq_length = 2048
-    micro_bs, global_bs = 4, 8
-    tp, cp, pp, ep = 2, 1, 2, 4
+    micro_bs, global_bs = 2, 16
+    tp, cp, pp = 2, 2, 2
     max_lr = 2e-5
-    max_steps = 2000
-    wandb_entity = None
-    model_name = 'Qwen/Qwen3-30B-A3B-Base'
+    max_steps = 800000
+    wandb_entity = 'llm_train_mafat'
+    model_name = 'Qwen/Qwen3-8B-Base'
 
-    pretrain = llm.qwen3_30b_a3b.pretrain_recipe(
-        name="pwc_qwen3_30b_cpt",
+    pretrain = llm.qwen3_8b.pretrain_recipe(
+        name="pwc_qwen3_8b_cpt",
         dir=checkpoint_path,
         num_nodes=1,
         num_gpus_per_node=8,
         log_every_n_steps=1,
         tensor_parallelism=tp,
         pipeline_parallelism=pp,
-        expert_parallelism=ep,
         context_parallelism=cp,
         seq_length=seq_length,
         micro_batch_size=micro_bs,
@@ -45,8 +44,11 @@ if __name__ == '__main__':
         max_lr=max_lr,
         min_lr=max_lr / 10
     )
+    # Checkpoint setting
+    pretrain.trainer.val_check_interval = 32000
+
     # wandb logging
-    pretrain.log = default_log(dir=checkpoint_path, name="pwc_qwen3_30b_cpt", wandb_logger=wandb_logger(project='pwc_qwen3_30b_cpt', name=args.run_name, entity=wandb_entity))
+    pretrain.log = default_log(dir=checkpoint_path, name="pwc_qwen3_8b_cpt", wandb_logger=wandb_logger(project='pwc_qwen3_8b_cpt', name=args.run_name, entity=wandb_entity))
 
     # alternative way to set things:
     # pretrain.optim.lr_scheduler.min_lr = lr / 10
