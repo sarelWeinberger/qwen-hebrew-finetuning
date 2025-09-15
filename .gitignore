@@ -77,3 +77,6 @@ aws-efa-installer/
 
 # logging
 *.log
+
+# sandbox
+sandbox/
