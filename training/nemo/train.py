@@ -21,15 +21,15 @@ if __name__ == '__main__':
     
     checkpoint_path = '/home/ubuntu/nvme/checkpoints'
     seq_length = 2048
-    micro_bs, global_bs = 2, 16
-    tp, cp, pp = 2, 2, 2
+    micro_bs, global_bs = 32, 256
+    tp, cp, pp = 2, 4, 1
     max_lr = 2e-5
-    max_steps = 800000
+    max_steps = 50000
     wandb_entity = 'llm_train_mafat'
     model_name = 'Qwen/Qwen3-8B-Base'
 
     pretrain = llm.qwen3_8b.pretrain_recipe(
-        name="pwc_qwen3_8b_cpt",
+        name="",
         dir=checkpoint_path,
         num_nodes=1,
         num_gpus_per_node=8,
@@ -45,7 +45,7 @@ if __name__ == '__main__':
         min_lr=max_lr / 10
     )
     # Checkpoint setting
-    pretrain.trainer.val_check_interval = 32000
+    pretrain.trainer.val_check_interval = 1000
 
     # wandb logging
     pretrain.log = default_log(dir=checkpoint_path, name="pwc_qwen3_8b_cpt", wandb_logger=wandb_logger(project='pwc_qwen3_8b_cpt', name=args.run_name, entity=wandb_entity))
@@ -78,8 +78,8 @@ if __name__ == '__main__':
         split="998,1,1" # train/val/test
     )
 
-    pretrain.resume = nemo_resume(model_name)
+    #pretrain.resume = nemo_resume(model_name)
     # uncomment the next line when you want to resume a run from a checkpoint in the checkpoint_dir
-    # pretrain.resume = default_resume(resume_ignore_no_checkpoint=False)
+    pretrain.resume = default_resume(resume_ignore_no_checkpoint=False)
 
     run.run(pretrain, executor=run.LocalExecutor())
