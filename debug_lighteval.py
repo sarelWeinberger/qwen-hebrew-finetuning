@@ -54,10 +54,10 @@ def main():
     # Commands to test
     test_commands = [
         # Test 1: Simple help
-        ['lighteval', '--help'],
+        #['lighteval', '--help'],
         
         # Test 2: Accelerate help
-        ['lighteval', 'accelerate', '--help'],
+        #['lighteval', 'accelerate', '--help'],
         
         # Test 3: Try the actual command
         ['lighteval', 'accelerate', 'model_name=openai-community/gpt2', 'leaderboard|truthfulqa:mc|0|0'],
