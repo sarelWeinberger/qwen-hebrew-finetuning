@@ -1,0 +1,16 @@
+{ "models": 
+{ "qwen3_32b": false, "model260000": true },
+ "benchmarks": 
+ { "gsm8k_heb": false,
+  "arc_ai2_heb": true, 
+  "mmlu_heb": true, 
+  "copa_heb": true,
+  "hellaswag_heb": true, 
+  "psychometric_heb_math": false, 
+  "psychometric_heb_analogies": false, 
+  "psychometric_heb_restatement": false, 
+  "psychometric_heb_sentence_complete_english": false, 
+  "psychometric_heb_sentence_complete_hebrew": false, 
+  "psychometric_heb_sentence_text_english": false, 
+  "psychometric_heb_sentence_text_hebrew": false, 
+  "psychometric_heb_understanding_hebrew": false } }
