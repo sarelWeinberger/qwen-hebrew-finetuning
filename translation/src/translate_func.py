@@ -12,16 +12,6 @@ import pickle
 # The base prompt of the English-Hebrew
 BASE_PROMPT = "English:\n{X}\nHebrew:\n{Y}"
 
-CHOOSE_INSTRUCT = """Your task is to choose the best translation from English to Hebrew, given a number of options. Follow these guidelines:
-1. The input is <key>English | [option 1, option 2, ....]</key>, with number of 'keys'.
-2. Choose the option which have the best fluency, while maintaining the same style and semantic meaning as the original.
-3. The output for 'key' should be the chosen best translation from English of the 'key'"""
-
-CHOOSE_MODEL_INSTRUCT = """Your task is to choose the best translation from English to Hebrew, given two options of two different models. Follow these guidelines:
-1. The input is 'English: <key>text</key>\n\noption A: <key>translated text</key>\n\noption B: <key>translated text</key>'.
-2. Choose the option which have the best fluency, while maintaining the same style and semantic meaning as the original.
-3. The output should be either 'option A' or 'option B', according to the better translation."""
-
 
 def dict_to_prompt(dct):
     # Don't add the 'translation_status' value to the string...
@@ -177,7 +167,7 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
                 if result is None:
                     # Handle case where parsing failed
                     print(f"Warning: Failed to parse response for sample {cnt - 1}, skipping...")
-                    print(output.parsed)
+                    print(output)
                     # return None
 
                     # Create a fallback sample with original data and failure indicator
@@ -208,15 +198,6 @@ def gemini_translation(google_client, datasets, instruct, few_shots, sample_to_d
 
                 hebrew_dataset[key].append(new_sample)
                 text_output[key].append(thinking_summary)
-
-            # For Free quota this is needed:
-            # if cnt % quota_min == 0:
-            #     passed = time() - start_time
-            #     if passed < 60:
-            #         print('\r' + ' ' * 50 + '\rSleeping.... ', end='')
-            #         sleep(61 - passed)
-            #         print('Done!', end='')
-            #     start_time = time()
 
             cur_size = len(hebrew_dataset[key])
             if cur_size % 15 == 0:

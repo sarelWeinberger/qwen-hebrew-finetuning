@@ -274,38 +274,3 @@ def run_annotator(dataframe, save_filename="annotated_data.csv", extra_title='')
     demo.launch(share=True, inline=False)
 
     return demo
-
-
-def check():
-    # CHANGE: Added 'new_text_column' to the example data
-    example_data = {
-        'text_column': [
-            "This is the first sample text. It contains some information that needs to be categorized.",
-            "Here is the second sample, a bit longer, detailing a different subject.",
-            "The third sample focuses on a specific topic with unique characteristics.",
-        ],
-        'new_text_column': [
-            "טקסט חדש לדוגמה, שצריך להיות מוצג מימין לשמאל.",
-            "זוהי הדוגמה השנייה, והיא גם כתובה בעברית.",
-            "והדוגמה השלישית והאחרונה לבדיקה.",
-        ],
-        'gold': [
-            'Gold 1',
-            'Gold 2',
-            'Gold 3',
-        ],
-        'original_id': [101, 102, 103],
-        'source': ['email', 'web', 'report']
-    }
-    my_dataframe = pd.DataFrame(example_data)
-    # Initialize the 'gold' column so it exists for the app
-    my_dataframe['gold'] = [
-        "This is the first sample text, which has information needing categorization.",
-        "This is the second, slightly longer sample, which details a different subject.",
-        "The third sample is focused on a specific topic that has unique characteristics.",
-    ]
-    
-    my_annotation_output_file = "my_project_annotations_gradio.csv" 
-    extra_title = ' - Check data'
-    run_annotator(my_dataframe, save_filename=my_annotation_output_file, extra_title=extra_title)
-    print(f"\nAnnotation process finished. Check the output file: '{my_annotation_output_file}'")
