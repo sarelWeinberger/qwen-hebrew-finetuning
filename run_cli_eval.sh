@@ -1,12 +1,12 @@
 #!/bin/bash
-
 # Default values
 # DATASET_NAME="arc_ai2_heb,hellaswag_heb,mmlu_heb" #"mmlu_heb,copa_heb,hellaswag_heb"
 DATASET_NAME="arc_ai2_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
-MAX_SAMPLES=50
-MODEL_PATH="/home/ec2-user/qwen-hebrew-finetuning/model260000"
+MAX_SAMPLES=3000
+MODEL_PATH="Qwen/Qwen3-14B" #"/home/ec2-user/qwen-hebrew-finetuning/model260000" #"Qwen/Qwen3-30B-A3B-Base" #"/home/ec2-user/qwen-hebrew-finetuning/model260000"
 DEVICE="cuda:0"
-BATCH_SIZE=4
+BATCH_SIZE=1
+PAD_TOKEN_ID=151643 #qwen 151643, 
 DTYPE="bfloat16"
 TOP_K=1
 TEMPERATURE=1.0
@@ -202,6 +202,9 @@ RUN_TIMESTAMP=$(date +%Y-%m-%dT%H-%M-%S)
 OUTPUT_RUN_DIR="$OUTPUT_DIR/scores_sum/$RUN_TIMESTAMP"
 mkdir -p "$OUTPUT_RUN_DIR"
 
+# Start timing
+START_TIME=$(date +%s)
+
 # Accept comma-separated datasets
 IFS=',' read -ra DATASET_LIST <<< "$DATASET_NAME"
 
@@ -239,7 +242,8 @@ for DS_NAME in "${DATASET_LIST[@]}"; do
             --max-samples "$MAX_SAMPLES"
 
     elif [[ "$BACKEND" == "accelerate" ]]; then
-        MODEL_CONFIG="model_name=$MODEL_PATH,device=$DEVICE,batch_size=$BATCH_SIZE,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE}"
+        MODEL_CONFIG="model_name=$MODEL_PATH,model_parallel=True,device=$DEVICE,batch_size=$BATCH_SIZE,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE}"
+        # MODEL_CONFIG="model_name=$MODEL_PATH,model_parallel=True,batch_size=$BATCH_SIZE,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE}"
 
         echo "Using Accelerate backend"
         PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
@@ -271,6 +275,13 @@ for DS_NAME in "${DATASET_LIST[@]}"; do
 
 done
 
+# End timing and save duration
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+echo "Total run duration: ${DURATION} seconds"
+echo "${DURATION}" > "$OUTPUT_RUN_DIR/run_duration_seconds.txt"
+# Summarize results
+python s3_upload.py $OUTPUT_RUN_DIR gepeta-datasets --prefix benchmark_results/heb_benc_results/
 python -c "from extract_benchmark_results import summarize_benchmark_runs; summarize_benchmark_runs('/home/ec2-user/qwen-hebrew-finetuning/hebrew_benchmark_results/scores_sum')"
 
 
