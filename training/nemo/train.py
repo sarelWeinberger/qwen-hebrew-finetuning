@@ -1,5 +1,51 @@
 import argparse
 import tempfile
+import os
+
+def slurm_executor(nodes: int = 1, container_image: str = 'dockerd://nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2'):
+    import nemo_run as run
+
+    # SSH Tunnel
+    # ssh_tunnel = run.SSHTunnel(
+    #     host="your-slurm-host",
+    #     user="your-user",
+    #     job_dir="directory-to-store-runs-on-the-slurm-cluster",
+    #     identity="optional-path-to-your-key-for-auth",
+    # )
+    # Local Tunnel to use if you're already on the cluster
+    local_tunnel = run.LocalTunnel(job_dir=os.path.join(os.environ['NEMORUN_HOME'], "experiments"))
+
+    # packager = GitArchivePackager(
+    #     # This will also be the working directory in your task.
+    #     # If empty, the working directory will be toplevel of your git repo
+    #     subpath="optional-subpath-from-toplevel-of-your-git-repo"
+    # )
+
+    return run.SlurmExecutor(
+        # Most of these parameters are specific to slurm
+        account="your-account",
+        partition="ml.g6e.48xlarge",
+        ntasks_per_node=8,
+        gpus_per_node=8,
+        nodes=nodes,
+        tunnel=local_tunnel,
+        container_image=container_image,
+        time="00:30:00",
+        env_vars=dict(
+            NCCL_SOCKET_IFNAME='enp137s0',
+            NCCL_DEBUG='info',
+            WANDB_API_KEY=os.environ['WANDB_API_KEY']
+        ),
+        container_mounts=[
+            '/fsx:/fsx',
+            '/opt/slurm:/opt/slurm:ro',
+            '/var/run/munge:/var/run/munge:rw',
+            '/var/log/aws:/var/log/aws',
+            f'{os.environ['WORKSPACE_DIR']}:/workspace',
+        ],
+        packager=run.Packager(),
+    )
+
 
 if __name__ == '__main__':
 
@@ -19,28 +65,28 @@ if __name__ == '__main__':
     from nemo.collections.llm.recipes.finetune_default import nemo_resume
     from nemo.collections.llm.gpt.model.qwen3 import Qwen3Model, Qwen3Config30B_A3B
     
-    checkpoint_path = '/home/ubuntu/nvme/checkpoints'
-    seq_length = 2048
-    micro_bs, global_bs = 4, 8
+    checkpoint_path = '/fsx/results/checkpoints'
+    seq_length = 4096
+    micro_bs, global_bs = 4, 256
     tp, cp, pp, ep = 2, 1, 2, 4
     max_lr = 2e-5
     max_steps = 2000
-    wandb_entity = None
+    wandb_entity = 'llm_train_mafat'
     model_name = 'Qwen/Qwen3-30B-A3B-Base'
 
-    pretrain = llm.qwen3_30b_a3b.pretrain_recipe(
+    pretrain = llm.qwen3_1p7b.pretrain_recipe(
         name="pwc_qwen3_30b_cpt",
         dir=checkpoint_path,
-        num_nodes=1,
+        num_nodes=2,
         num_gpus_per_node=8,
         log_every_n_steps=1,
-        tensor_parallelism=tp,
-        pipeline_parallelism=pp,
-        expert_parallelism=ep,
-        context_parallelism=cp,
-        seq_length=seq_length,
-        micro_batch_size=micro_bs,
-        global_batch_size=global_bs,
+        tensor_parallelism=2,
+        # pipeline_parallelism=pp,
+        # expert_parallelism=ep,
+        # context_parallelism=cp,
+        # seq_length=seq_length,
+        # micro_batch_size=micro_bs,
+        # global_batch_size=global_bs,
         max_steps=max_steps,
         max_lr=max_lr,
         min_lr=max_lr / 10
@@ -65,7 +111,7 @@ if __name__ == '__main__':
 
     # Custom data
     pretrain.data = run.Config(PreTrainingDataModule, 
-        paths=['100', './tok-data/hebdata_hewiki_text_document'], # can include lots of segments with different ratios
+        paths=['100', '/workspace/tok-data/hebdata_hewiki_text_document'], # can include lots of segments with different ratios
         tokenizer=tokenizer, 
         seq_length=seq_length, 
         micro_batch_size=micro_bs,
@@ -76,8 +122,8 @@ if __name__ == '__main__':
         split="998,1,1" # train/val/test
     )
 
-    pretrain.resume = nemo_resume(model_name)
+    # pretrain.resume = nemo_resume(model_name)
     # uncomment the next line when you want to resume a run from a checkpoint in the checkpoint_dir
     # pretrain.resume = default_resume(resume_ignore_no_checkpoint=False)
 
-    run.run(pretrain, executor=run.LocalExecutor())
+    run.run(pretrain, executor=slurm_executor(2))

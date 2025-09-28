@@ -76,6 +76,46 @@ python train.py --run_name RUN_NAME [--use_fp8]
 > ps ux | grep 'nemo_run.core.runners.fdl_runner' | awk '{print $2}' | xargs kill -9
 > ```
 
+## Cluster Instructions
+
+> apt update && apt install -y slurm-client && apt purge -y slurm-client
+
+Pull the container on all the nodes
+
+```bash
+srun -N 2 docker pull nvcr.io/nvidia/nemo:dev
+```
+
+Run `ip a`, and find the relevant interface (not lo/docker0/veth...), and run, for example:
+
+```bash
+export NCCL_SOCKET_IFNAME=en6
+```
+
+Run `ip a` on all the nodes, to find the relevant interface:
+```bash
+srun -N 2 ip a
+```
+
+In `train.py`, set it:
+```python
+env_vars=dict(
+    NCCL_SOCKET_IFNAME='enp137s0', # for example
+    ...
+)
+```
+
+Also, set the environment variable:
+```bash
+export WANDB_API_KEY=[WANDB_API_KEY]
+```
+
+> Not sure where this fits in:
+```bash
+mkdir -p /workspace/tok-data/hebdata_hewiki_text_document/cache/
+chmod -R 777 /workspace/tok-data/hebdata_hewiki_text_document/cache/
+```
+
 ## Incomplete TODO list / Next steps
 
 * Tokenize everything (cover all corpora beyond `hewiki-data.jsonl`).
