@@ -162,6 +162,7 @@ def create_tokenize_function(tokenizer, max_seq_length):
             examples["text"],
             truncation=True,
             max_length=max_seq_length,
+            padding='max_length'
             # Remove return_tensors="pt" - let DataCollator handle tensor conversion
         )
     return tokenize_function
@@ -538,7 +539,7 @@ def train():
     print("Loading model...")
     model = AutoModelForCausalLM.from_pretrained(
         config["model_name_or_path"],
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
         use_cache=False,  # Disable KV cache for training
         device_map=None,  # Automatically mapped using accelerate 
         low_cpu_mem_usage=True  # Unsure whether this matters
@@ -793,7 +794,7 @@ def train():
     # Start training
     print("Starting training...")
     try:
-        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+        trainer.train(resume_from_checkpoint=False)
     except Exception as e:
         print(f"Training error: {e}")
         # Create error checkpoint directory if it doesn't exist
