@@ -6,9 +6,10 @@ This directory is dedicated to the translation of various English benchmarks int
 
 ## Directory Structure
 
-*   **`/plots`**: This directory contains various plots generated during the analysis and evaluation of the translations.
-*   **`/prompts`**: This directory stores different prompt templates used for guiding the translation model.
-*   **`/src`**: This directory holds source code and utility functions used across the different notebooks.
+*   **`/plots`**: This directory contains various plots and visualizations generated during the analysis and evaluation of the translations. These include JPEG images that show rating comparisons, distributions of MQM (Machine Quality Metric) scores for benchmarks like MMLU, ARC, and GSM, and confusion matrices for rating overlaps.
+*   **`/prompts`**: This directory stores Python files (`.py`) that define the prompt templates used for guiding the translation model. Each file is named after the benchmark it corresponds to (e.g., `mmlu_prompts.py`, `hellaswag_prompts.py`, `arc_prompts.py`) and contains the specific instructions fed to the model to ensure accurate and consistent translation for that benchmark's format.
+*   **`/src`**: This directory holds source code and utility functions used across the different notebooks. It contains several Python scripts, such as `call_models.py` for interacting with the translation models, `translate_func.py` which holds the core translation logic, `parse_labeling.py` for processing evaluation data, and `gradio_utils.py` for building the labeling application. It also includes subdirectories for more specific code related to benchmarks and instruction data.
+
 
 ## Notebooks
 
