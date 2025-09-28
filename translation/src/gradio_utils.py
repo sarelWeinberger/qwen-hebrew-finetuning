@@ -179,6 +179,7 @@ def get_sample_data(df, index):
     # CHANGE: Return the two text values at the beginning of the list
     return [original_text_to_display, new_text_to_display, rating, gold_text, jump_box_update] + mqm_values
 
+
 def run_annotator(dataframe, save_filename="annotated_data.csv", extra_title=''):
     """Main function to configure and launch the Gradio annotator interface."""
     if not dataframe['text_column'].is_unique:
@@ -274,3 +275,12 @@ def run_annotator(dataframe, save_filename="annotated_data.csv", extra_title='')
     demo.launch(share=True, inline=False)
 
     return demo
+
+
+def run_file(file_name, title_name):
+    labeled_df = pd.read_csv(file_name)
+    labeled_df = labeled_df.fillna('')
+    labeled_df['rating'] = labeled_df['rating'].apply(str).replace('1.0', '1').replace('2.0', '2')
+
+    server = run_annotator(labeled_df, file_name, ' ' + title_name)
+    return server
