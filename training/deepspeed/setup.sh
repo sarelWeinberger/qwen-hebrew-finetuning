@@ -9,16 +9,6 @@ echo "========================================="
 echo "Qwen Hebrew Fine-tuning Setup"
 echo "========================================="
 
-# Get the directory where this script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-echo "Setting up in: $SCRIPT_DIR"
-
-# Create necessary directories
-echo "Creating necessary directories..."
-mkdir -p logs
-mkdir -p datasets
-mkdir -p output
-
 # Check if uv is installed
 if ! command -v uv &> /dev/null; then
     echo "Installing uv..."
@@ -30,22 +20,30 @@ fi
 
 # Create virtual environment if it doesn't exist
 if [ ! -d ".venv" ]; then
-    echo "Creating virtual environment..."
+    echo "Creating virtual environment & installing reqs..."
     uv venv
+    uv pip install -r requirements.txt
 else
+    source .venv/bin/activate
     echo "Virtual environment already exists"
 fi
 
-# Activate virtual environment
-echo "Activating virtual environment..."
-source .venv/bin/activate
+# Log in to huggingface
+if hf auth whoami | grep -q "Not logged in"; then
+  hf auth login
+fi
 
-# Install requirements
-echo "Installing Python dependencies..."
-uv pip install -r requirements.txt
+wandb login 
 
-# Set up HuggingFace transfer for faster downloads
-export HF_HUB_ENABLE_HF_TRANSFER=1
+if aws configure list | grep -q "access_key : <not set>"; then
+    aws configure
+fi
+
+mkdir -p datasets/
+mkdir -p logs/
+
+# save storage & speed up by having the models saved to the NVME
+export HF_HOME=/opt/dlami/nvme/.cache/huggingface
 
 echo ""
 echo "========================================="
@@ -53,27 +51,11 @@ echo "Setup Complete!"
 echo "========================================="
 echo ""
 echo "Next steps:"
-echo "1. Activate the virtual environment:"
-echo "   source .venv/bin/activate"
+echo "1. Place your dataset files in the datasets/ directory"
 echo ""
-echo "2. Login to services:"
-echo "   wandb login"
-echo "   huggingface-cli login"
-echo ""
-echo "3. Set up AWS credentials in ~/.aws/credentials:"
-echo "   [default]"
-echo "   aws_access_key_id = YOUR_ACCESS_KEY"
-echo "   aws_secret_access_key = YOUR_SECRET_KEY"
-echo ""
-echo "4. Download models (optional, will be downloaded automatically if needed):"
-echo "   huggingface-cli download Qwen/Qwen3-30B-A3B-Base"
-echo "   huggingface-cli download Qwen/Qwen3-32B"
-echo ""
-echo "5. Place your dataset files in the datasets/ directory"
-echo ""
-echo "6. Start training:"
+echo "2. Start training:"
 echo "   nohup ./train_all.sh > logs/train.log 2>&1 &"
 echo ""
-echo "7. Monitor training:"
+echo "3. Monitor training:"
 echo "   tail -f logs/train.log"
 echo ""

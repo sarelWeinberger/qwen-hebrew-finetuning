@@ -4,20 +4,12 @@ DEEPSPEED="deepspeed_zero3.yaml"
 S3_BUCKET="s3://gepeta-checkpoints"
 S3_PREFIX="qwen-hebrew-finetuning"
 
-# Python environment setup
-PYTHON_PATH="/home/ec2-user/.venv/bin/python"
-ACCELERATE_PATH="/home/ec2-user/.venv/bin/accelerate"
-
 # Function to sync checkpoints to S3
 sync_to_s3() {
-    local dataset_name=$1
-    local timestamp=$2
+    local s3_path=$1
     local output_dir=$3
     
-    echo "Syncing checkpoints to S3..."
-    local s3_path="${S3_BUCKET}/${S3_PREFIX}/${dataset_name}/${timestamp}"
-    
-    # Create S3 path if it doesn't exist and sync output directory
+        # Create S3 path if it doesn't exist and sync output directory
     if [ -d "$output_dir" ]; then
         echo "Uploading model checkpoints to: $s3_path"
         aws s3 sync "$output_dir" "$s3_path/model" --delete
@@ -98,35 +90,26 @@ fi
 for DATASET in datasets/*.jsonl; do
   BASENAME=$(basename "$DATASET" .jsonl)
   WANDB_NAME="qwen-hebrew-finetuning-$BASENAME-with-qwen-30B"
-  LOGFILE="train_all.log"
   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
   ARCHIVE_LOGFILE="train_${BASENAME}_${TIMESTAMP}.log"
-  OUTPUT_DIR="./output"
+  S3_LOC="${S3_BUCKET}/${S3_PREFIX}/${dataset_name}/${timestamp}"
+  OUTPUT_DIR=$(jq -r '.output_dir' "$CONFIG")
+  
 
   echo "================================================"
   echo "Training on $DATASET with wandb run name $WANDB_NAME"
   echo "Timestamp: $TIMESTAMP"
-  echo "S3 Sync Location: ${S3_BUCKET}/${S3_PREFIX}/${BASENAME}/${TIMESTAMP}"
+  echo "S3 Sync Location: $S3_LOC"
   echo "================================================"
 
-  echo "Cleaning GPU memory before training on $DATASET"
-  $PYTHON_PATH clean_cuda.py
-
-  echo "Starting training..."
-  echo "To trace the current log output: tail -f $LOGFILE"
-  $ACCELERATE_PATH launch --config_file=$DEEPSPEED train.py --dataset_path "$DATASET" --wandb_name "$WANDB_NAME" | tee $LOGFILE
+  echo "Starting training, to trace the current log output: tail -f $ARCHIVE_LOGFILE"
+  accelerate launch --config_file=$DEEPSPEED train.py --dataset_path "$DATASET" --wandb_name "$WANDB_NAME" | tee $ARCHIVE_LOGFILE
 
   echo "Training completed for $DATASET"
   
-  echo "Cleaning GPU memory after training on $DATASET"
-  $PYTHON_PATH clean_cuda.py
-
-  # Archive log file
-  cp $LOGFILE $ARCHIVE_LOGFILE
-  
   # Sync to S3
   echo "Syncing results to S3..."
-  sync_to_s3 "$BASENAME" "$TIMESTAMP" "$OUTPUT_DIR"
+  sync_to_s3 "$S3_LOC" "$OUTPUT_DIR"
   
   echo "Completed processing $DATASET"
   echo "================================================"
