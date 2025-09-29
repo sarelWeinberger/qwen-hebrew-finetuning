@@ -52,6 +52,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Script to train a Qwen3 model.")
     parser.add_argument("--run_name", required=True, type=str, help="Name of the run for the WandB")
     parser.add_argument("--use_fp8", action='store_true', help="Use the FP8 precision module")
+    parser.add_argument("--num_nodes", type=int, required=False, default=0, help="Number of nodes to train on - set to 0 (default) for local executor")
 
     args = parser.parse_args()
 
@@ -68,25 +69,25 @@ if __name__ == '__main__':
     checkpoint_path = '/fsx/results/checkpoints'
     seq_length = 4096
     micro_bs, global_bs = 4, 256
-    tp, cp, pp, ep = 2, 1, 2, 4
+    tp, cp, pp, ep = 1, 1, 1, 4
     max_lr = 2e-5
     max_steps = 2000
     wandb_entity = 'llm_train_mafat'
-    model_name = 'Qwen/Qwen3-30B-A3B-Base'
+    model_name = 'Qwen/Qwen3-1.7B-Base'
 
     pretrain = llm.qwen3_1p7b.pretrain_recipe(
         name="pwc_qwen3_30b_cpt",
         dir=checkpoint_path,
-        num_nodes=2,
+        num_nodes=max([args.num_nodes, 1]),
         num_gpus_per_node=8,
         log_every_n_steps=1,
-        tensor_parallelism=2,
-        # pipeline_parallelism=pp,
+        tensor_parallelism=tp,
+        pipeline_parallelism=pp,
         # expert_parallelism=ep,
-        # context_parallelism=cp,
-        # seq_length=seq_length,
-        # micro_batch_size=micro_bs,
-        # global_batch_size=global_bs,
+        context_parallelism=cp,
+        seq_length=seq_length,
+        micro_batch_size=micro_bs,
+        global_batch_size=global_bs,
         max_steps=max_steps,
         max_lr=max_lr,
         min_lr=max_lr / 10
@@ -122,8 +123,10 @@ if __name__ == '__main__':
         split="998,1,1" # train/val/test
     )
 
-    # pretrain.resume = nemo_resume(model_name)
-    # uncomment the next line when you want to resume a run from a checkpoint in the checkpoint_dir
-    # pretrain.resume = default_resume(resume_ignore_no_checkpoint=False)
-
-    run.run(pretrain, executor=slurm_executor(2))
+    pretrain.resume = nemo_resume(model_name)
+    pretrain.resume.resume_if_exists = True
+    
+    if not args.num_nodes:
+        run.run(pretrain, executor=run.LocalExecutor())
+    else:
+        run.run(pretrain, executor=slurm_executor(args.num_nodes))
