@@ -161,7 +161,7 @@ bash launch_docker.sh
 Set up: 
 
 ```bash
-pip install -U huggingface_hub
+pip install -U huggingface_hub git+https://github.com/NVIDIA-NeMo/Run
 apt update && apt install -y libmunge2 && adduser --disabled-password --gecos "" slurm
 export PATH="$PATH:/opt/slurm/bin"
 ```
