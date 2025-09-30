@@ -34,15 +34,23 @@ Investigating how MoE routing patterns differ between Hebrew and English languag
 pip install -r requirements.txt
 ```
 
-### 2. Run Complete Layer Analysis
+### 2. Create Relevant Data
+
+Use the **`1 - create_moe_data`** notebook.
+
+### 3. Run Complete Layer Analysis
 ```bash
 python3 all_layers_moe_analysis.py
 ```
 
-### 3. Run Efficient Sampling Analysis
+### 4. Run Efficient Sampling Analysis
 ```bash
 python3 sample_moe_analysis.py
 ```
+
+### 5. Analyse the Results
+
+Use the **`2 - analysis_results`** notebook.
 
 ## 📊 Key Findings
 
