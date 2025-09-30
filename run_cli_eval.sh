@@ -1,11 +1,11 @@
 #!/bin/bash
 # Default values
-# DATASET_NAME="arc_ai2_heb,hellaswag_heb,mmlu_heb" #"mmlu_heb,copa_heb,hellaswag_heb"
-DATASET_NAME="arc_ai2_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
+# DATASET_NAME="arc_ai2_heb"
+DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
 MAX_SAMPLES=3000
-MODEL_PATH="Qwen/Qwen3-14B" #"/home/ec2-user/qwen-hebrew-finetuning/model260000" #"Qwen/Qwen3-30B-A3B-Base" #"/home/ec2-user/qwen-hebrew-finetuning/model260000"
+MODEL_PATH="/home/ec2-user/models/aya-23-8B" #"/home/ec2-user/qwen-hebrew-finetuning/model260000" #"Qwen/Qwen3-30B-A3B-Base" #"/home/ec2-user/qwen-hebrew-finetuning/model260000"
 DEVICE="cuda:0"
-BATCH_SIZE=1
+BATCH_SIZE=8
 PAD_TOKEN_ID=151643 #qwen 151643, 
 DTYPE="bfloat16"
 TOP_K=1
@@ -13,11 +13,23 @@ TEMPERATURE=1.0
 OUTPUT_DIR="./hebrew_benchmark_results"
 RESULTS_PATH_TEMPLATE="$OUTPUT_DIR/scores_sum"
 PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/heb_bnch"
-CUSTOM_TASKS="custom_tasks"
+HEB_BENCHMARKS_DIR_PATH="/home/ec2-user/qwen-hebrew-finetuning/heb_bnch"
+# export to env variable
+export HEB_BENCHMARKS_DIR_PATH
+echo "HEB_BENCHMARKS_DIR_PATH is set to: $HEB_BENCHMARKS_DIR_PATH"
+# CUSTOM_TASKS="/home/ec2-user/noam/heb_bnch/custom_tasks" #tried to be suitable for new lighteval version
+# CUSTOM_TASKS="custom_tasks"
 TASK_CONFIG="community|$DATASET_NAME|5|0"
-BACKEND="accelerate"  # Options: "vllm" or "accelerate"
+BACKEND="vllm"  # Options: "vllm" or "accelerate"
 # TASK_CONFIG="community|mmlu_heb|5|0,community|copa_heb|5|0,community|hellaswag_heb|5|0"
+if [[ "$BACKEND" == "vllm" ]]; then
+    CUSTOM_TASKS="custom_tasks_new_version"
+elif [[ "$BACKEND" == "accelerate" ]]; then
+    echo "Using Accelerate backend"
+    CUSTOM_TASKS="custom_tasks"
+fi
 # Function to display usage
+which python
 usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
@@ -33,7 +45,6 @@ usage() {
     echo "  -o, --output-dir DIR              Output directory (default: $OUTPUT_DIR)"
     echo "  -r, --results-template TEMPLATE   Results path template (default: $RESULTS_PATH_TEMPLATE)"
     echo "  --pythonpath PATH                 Python path (default: $PYTHONPATH_DIR)"
-    echo "  --custom-tasks TASKS              Custom tasks (default: $CUSTOM_TASKS)"
     echo "  -h, --help                        Show this help message"
     echo ""
     echo "Example:"
@@ -227,7 +238,7 @@ for DS_NAME in "${DATASET_LIST[@]}"; do
         echo "Using VLLM backend"
         export VLLM_CACHE_DIR="$OUTPUT_RUN_DIR/vllm_cache"
         mkdir -p "$VLLM_CACHE_DIR"
-        MODEL_CONFIG="model_name=$MODEL_PATH,tensor_parallel_size=4,gpu_memory_utilization=0.9,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=2048"
+        MODEL_CONFIG="model_name=$MODEL_PATH,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=2048"
 
         PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
         VLLM_WORKER_MULTIPROC_METHOD=spawn \

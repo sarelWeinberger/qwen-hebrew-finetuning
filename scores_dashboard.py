@@ -6,12 +6,25 @@ from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime
 import re
+import os
+from extract_benchmark_results import summarize_benchmark_runs
+
 print("Starting Gradio app code...")
 # Load and process the data
+local_save_directory = "/home/ubuntu/qwen-hebrew-finetuning/evaluation/runs"  # Will save to current directory
+csv_filename = 'benchmark_results_summary.csv'
+def generate_runs_table():
+    # Use the original local path as default
+    scores_sum_directory = 's3://gepeta-datasets/benchmark_results/heb_benc_results/'
+    print("Summarizing benchmark runs from:", scores_sum_directory)
+    # You can specify a custom local directory to save the CSV
+    summarize_benchmark_runs(scores_sum_directory, local_save_directory,csv_filename)
+    
 def load_data():
     # Load your CSV file
     # df = pd.read_csv('benchmark_results_summary.csv')
-    df = pd.read_csv('/home/ec2-user/qwen-hebrew-finetuning/hebrew_benchmark_results/scores_sum/benchmark_results_summary.csv')
+
+    df = pd.read_csv(os.path.join(local_save_directory, csv_filename))
 
     # Clean the data - remove rows with missing model names or timestamps
     df = df.dropna(subset=['model_name', 'timestamp'])
@@ -84,6 +97,7 @@ def get_available_runs():
 
 def create_data_table():
     try:
+        generate_runs_table()  # Refresh data before loading
         df, _ = load_data()
         # Format timestamp for display
         df_display = df.copy()
@@ -503,15 +517,26 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
             refresh_heatmap_btn.click(fn=create_model_performance_heatmap, outputs=heatmap_plot)
 
 # Launch the app
-# if __name__ == "__main__":
-print("Starting Gradio app...")
-demo.launch(
-    share=True,
-    server_name="0.0.0.0",
-    server_port=7860,
-    show_error=True,
-    prevent_thread_lock=False
-)
+if __name__ == "__main__":
+    print("Starting Gradio app...")
+    # generate_runs_table()  # Initial data generation
+    demo.launch(
+        share=True,
+        server_name="0.0.0.0",
+        server_port=7680,
+        show_error=True,
+        debug=False,
+        prevent_thread_lock=False
+    )
+# check if the protocol is avaliable
+# netstat -tlnp | grep 7680
+# start server in background
+# sudo systemctl daemon-reload
+# sudo systemctl enable gradio
+# sudo systemctl start gradio
+# monitor logs
+# sudo journalctl -u gradio -f
+
 # nohup python scores_dashboard.py > gradio.log 2>&1 &
 # import gradio as gr
 # import pandas as pd
