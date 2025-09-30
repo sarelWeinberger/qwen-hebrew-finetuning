@@ -1,8 +1,15 @@
 #!/bin/bash
 # Default values
+# pip install lighteval[vllm] emoji boto3
+## check s3 
+# python /home/ec2-user/qwen-hebrew-finetuning/evaluation/s3_utils.py
 # DATASET_NAME="arc_ai2_heb"
-DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
-MAX_SAMPLES=3000
+# DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
+DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew"
+# TODO: activate those benchmarks:
+# DATASET_NAME="gsm8k_heb,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
+# TODO: call all tasks togther will save a lot of time - currently each task is called separately and the backend uploading in each task the model to gpu
+MAX_SAMPLES=30
 MODEL_PATH="/home/ec2-user/models/aya-23-8B" #"/home/ec2-user/qwen-hebrew-finetuning/model260000" #"Qwen/Qwen3-30B-A3B-Base" #"/home/ec2-user/qwen-hebrew-finetuning/model260000"
 DEVICE="cuda:0"
 BATCH_SIZE=8
@@ -12,8 +19,8 @@ TOP_K=1
 TEMPERATURE=1.0
 OUTPUT_DIR="./hebrew_benchmark_results"
 RESULTS_PATH_TEMPLATE="$OUTPUT_DIR/scores_sum"
-PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/heb_bnch"
-HEB_BENCHMARKS_DIR_PATH="/home/ec2-user/qwen-hebrew-finetuning/heb_bnch"
+PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/evaluation/heb_bnch"
+HEB_BENCHMARKS_DIR_PATH="/home/ec2-user/qwen-hebrew-finetuning/evaluation/heb_bnch"
 # export to env variable
 export HEB_BENCHMARKS_DIR_PATH
 echo "HEB_BENCHMARKS_DIR_PATH is set to: $HEB_BENCHMARKS_DIR_PATH"
@@ -238,7 +245,7 @@ for DS_NAME in "${DATASET_LIST[@]}"; do
         echo "Using VLLM backend"
         export VLLM_CACHE_DIR="$OUTPUT_RUN_DIR/vllm_cache"
         mkdir -p "$VLLM_CACHE_DIR"
-        MODEL_CONFIG="model_name=$MODEL_PATH,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=2048"
+        MODEL_CONFIG="model_name=$MODEL_PATH,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=2047"
 
         PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
         VLLM_WORKER_MULTIPROC_METHOD=spawn \
@@ -292,7 +299,9 @@ DURATION=$((END_TIME - START_TIME))
 echo "Total run duration: ${DURATION} seconds"
 echo "${DURATION}" > "$OUTPUT_RUN_DIR/run_duration_seconds.txt"
 # Summarize results
+PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/evaluation"
+export PYTHONPATH="$PYTHONPATH_DIR"
 python s3_upload.py $OUTPUT_RUN_DIR gepeta-datasets --prefix benchmark_results/heb_benc_results/
-python -c "from extract_benchmark_results import summarize_benchmark_runs; summarize_benchmark_runs('/home/ec2-user/qwen-hebrew-finetuning/hebrew_benchmark_results/scores_sum')"
+python -c "from extract_benchmark_results import summarize_benchmark_runs; summarize_benchmark_runs('$OUTPUT_DIR/scores_sum')"
 
 
