@@ -17,14 +17,26 @@ def slurm_executor(nodes: int = 1, container_image: str = 'dockerd://nvcr.io/nvi
         container_image=container_image,
         time="00:30:00",
         env_vars=dict(
+            FI_PROVIDER="efa",
+            FI_EFA_USE_DEVICE_RDMA="1",
+            WANDB_API_KEY=os.environ['WANDB_API_KEY'],
             NCCL_SOCKET_IFNAME='ens,enp',
-            WANDB_API_KEY=os.environ['WANDB_API_KEY']
+            LD_LIBRARY_PATH="/opt/amazon/efa/lib:/opt/amazon/aws-ofi-nccl/lib:" + os.environ.get("LD_LIBRARY_PATH",""),
+            LD_PRELOAD="/opt/amazon/efa/lib/libfabric.so.1",
+            ENROOT_MOUNTS="tmpfs:/dev/shm:rw,size=64G,x-create=dir"            
         ),
+        container_env=[
+            'LD_LIBRARY_PATH',
+            'LD_PRELOAD'
+        ],
         container_mounts=[
             '/fsx:/fsx',
             '/opt/slurm:/opt/slurm:ro',
             '/var/run/munge:/var/run/munge:rw',
             '/var/log/aws:/var/log/aws',
+            '/opt/amazon/efa:/opt/amazon/efa:ro',
+            '/opt/amazon/ofi-nccl:/opt/amazon/ofi-nccl:ro',
+            "/dev/infiniband:/dev/infiniband",
             f'{os.environ['WORKSPACE_DIR']}:/workspace',
         ],
         packager=run.Packager(),
@@ -56,7 +68,7 @@ if __name__ == '__main__':
     seq_length = 4096
     global_bs = 256
     max_lr = 2e-5
-    max_steps = 2000
+    max_steps = 6500
     wandb_entity = 'llm_train_mafat'
 
     if args.model == 'Qwen3_8B':
@@ -106,11 +118,13 @@ if __name__ == '__main__':
         model_name=model_name
     )
     pretrain.data = run.Config(PreTrainingDataModule, 
-        paths=['100', '/workspace/tok-data/hebdata_hewiki_text_document'], # can include lots of segments with different ratios
+        # paths=['100', '/workspace/tok-data/hebdata_hewiki_text_document'], # can include lots of segments with different ratios
+        paths=['100', '/workspace/tok-data/low_text_document'], # can include lots of segments with different ratios
         tokenizer=tokenizer, 
         seq_length=seq_length, 
         micro_batch_size=micro_bs,
         global_batch_size=global_bs,
+        num_workers=0,
         reset_position_ids=True, # for packing
         reset_attention_mask=True, # for packing
         eod_mask_loss=True, # do we want to predict the eod?
