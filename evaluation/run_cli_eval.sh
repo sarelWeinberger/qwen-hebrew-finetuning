@@ -14,6 +14,7 @@ OUTPUT_DIR="./hebrew_benchmark_results"
 RESULTS_PATH_TEMPLATE="$OUTPUT_DIR/scores_sum"
 PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/heb_bnch"
 HEB_BENCHMARKS_DIR_PATH="/home/ec2-user/qwen-hebrew-finetuning/heb_bnch"
+# benchmarks paths  s3://gepeta-datasets/benchmarks/final_benchmarks_data/
 # export to env variable
 export HEB_BENCHMARKS_DIR_PATH
 echo "HEB_BENCHMARKS_DIR_PATH is set to: $HEB_BENCHMARKS_DIR_PATH"

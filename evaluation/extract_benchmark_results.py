@@ -90,7 +90,7 @@ def summarize_benchmark_runs(scores_sum_dir, local_save_dir=None,csv_filename='b
             print(f"Removed existing file: {csv_path}")
 
         # Save the new CSV file
-        df.to_csv(csv_path, index=False)
+        df.round(3).to_csv(csv_path, index=False)
         print(f"Saved summary to {csv_path}")
 
         return df
