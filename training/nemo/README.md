@@ -48,7 +48,7 @@ python /opt/NeMo/scripts/nlp_language_modeling/preprocess_data_for_megatron.py \
   --input ./data \
   --keep-newlines \
   --tokenizer-library huggingface \
-  --tokenizer-type Qwen/Qwen3-30B-A3B-Base \
+  --tokenizer-type Qwen/Qwen3-8B \
   --append-eod \
   --output-prefix ./tok-data/hebdata_hewiki \
   --workers 128 \
@@ -57,7 +57,7 @@ python /opt/NeMo/scripts/nlp_language_modeling/preprocess_data_for_megatron.py \
   --log-interval 50000
 ```
 
-Outputs: `hebdata_hewiki_text_document.bin` and `.idx` (under the created preprocess folder).
+Outputs: `hebdata_hewiki_text_document.bin` and `.idx` (under the created preprocess folder). You can change the output prefix as you wish, to help distinguish the different corpora. 
 
 ### Import the model (inside the container)
 
@@ -87,62 +87,99 @@ python train.py --run_name RUN_NAME [--use_fp8]
 
 ## Cluster Instructions
 
-```bash
-docker run \
-  -e HF_HOME=/workspace/.cache/huggingface/ \
-  -e NEMO_HOME=/workspace/.cache/nemo/ \
-  -e SLURM_CONF=/opt/slurm/etc/slurm.conf \
-  -e NEMORUN_HOME=/fsx/.nemo_run \
-  -e WORKSPACE_DIR=$(pwd) \
-  -it --shm-size=10gb --ipc=host \
-  --ulimit memlock=-1 --ulimit stack=67108864 \
-  --network host \
-  -v /fsx:/fsx \
-  -v /opt/slurm:/opt/slurm:ro \
-  -v /var/run/munge:/var/run/munge:rw \
-  -v /var/log/aws:/var/log/aws \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2 \ 
-  adduser slurm && bash
-```
+### Home Directory
 
-> apt update && apt install -y slurm-client && apt purge -y slurm-client
-
-Pull the container on all the nodes
+Whenever you open a shell, navigate to the home directory (this will change once we move to FSx for Lustre on S3):
 
 ```bash
-srun -N 2 docker pull nvcr.io/nvidia/nemo:dev
+export HOME_DIR=/fsx/ubuntu/qwen-hebrew-finetuning/training/nemo
+cd $HOME_DIR
 ```
 
-Run `ip a`, and find the relevant interface (not lo/docker0/veth...), and run, for example:
+### Set up the containers
+
+On the controller node, run (replace the *2* without the actual number of nodes in the cluster):
 
 ```bash
-export NCCL_SOCKET_IFNAME=ens6
+srun -N 2 docker pull nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2
+docker pull nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2
 ```
 
-Run `ip a` on all the nodes, to find the relevant interface:
+### Data
+
+It is *not* recommended to tokenize on these machines - these are heavy compute machines which aren't utilized well. Ideally, just copy the data into the data directory (once we move to FSx for Lustre - you can just point it to the other directory):
+
 ```bash
-srun -N 2 ip a
+export DATA_DIR=$HOME_DIR/data
+cp ... $DATA_DIR/
 ```
 
-In `train.py`, set it:
-```python
-env_vars=dict(
-    NCCL_SOCKET_IFNAME='enp137s0', # for example
-    ...
-)
-```
+Important: Once you copy all the data in, make sure to run this command:
 
-Also, set the environment variable:
 ```bash
-export WANDB_API_KEY=[WANDB_API_KEY]
+sudo chmod -R 777 $DATA_DIR
 ```
 
-> Not sure where this fits in:
+### Importing a model 
+
+As we are running continuous pre-training, we want to import the model from HuggingFace to NeMo. This should only be done once per `HOME_DIR`, since the models will be stored in the cache in the fsx. 
+
+This process needs *a* GPU to do, so we will run it from one of the workers:
+
 ```bash
-mkdir -p /workspace/tok-data/hebdata_hewiki_text_document/cache/
-chmod -R 777 /workspace/tok-data/hebdata_hewiki_text_document/cache/
+sinfo
+# pick one of the nodes -> e.g., ip-10-1-1-1
+ssh -t ip-10-1-1-1 "HOME_DIR='$HOME_DIR' bash"
+
+# navigate to the our home dir & launch the container 
+cd $HOME_DIR
+bash launch_docker.sh 
+```
+
+From here, follow along from the section in single node [here](#import-the-model-inside-the-container)
+
+Once done, exit back to the default node. 
+
+### Running the actual training!
+
+#### Prerequisites
+
+Let's just go over the prerequisites:
+
+1. You set the value of `HOME_DIR` [here](#home-directory)
+
+2. You have a directory with the data files (.bin/.idx), as instructed [here](#data-1). You also need to update [train.py](./train.py) under `pretrain.data = run.Config(PreTrainingDataModule, ....` - make sure all the paths there point to the relevant data directory. If it's under the `HOME_DIR`, then you can use `/workspace/...`. Otherwise, you can use the full `/fsx/..` path. 
+
+#### Launching & setting up the container
+
+Start by launching the docker, and then setting it up for slurm run:
+
+```bash
+bash launch_docker.sh
+```
+
+Set up: 
+
+```bash
+pip install -U huggingface_hub
+apt update && apt install -y libmunge2 && adduser --disabled-password --gecos "" slurm
+export PATH="$PATH:/opt/slurm/bin"
+```
+
+Set up WandB:
+
+```bash
+export WANDB_API_KEY=[insert the api key here]
+```
+
+#### Start the training! 
+
+> NOTE: It by default resumes training if there is a checkpoint in the specified directory. 
+
+Just run the python script, and let the magic work! (Perhaps run this inside a screen, so it never quits):
+
+```bash
+python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen3-8b-nemo-mn-test --use_fp8 --num_nodes 2 --model Qwen3_8B
 ```
 
 ## Incomplete TODO list / Next steps
@@ -150,6 +187,3 @@ chmod -R 777 /workspace/tok-data/hebdata_hewiki_text_document/cache/
 * Tokenize everything (cover all corpora beyond `hewiki-data.jsonl`).
 * Export checkpoints script.
 * Connect to S3 for saving/export (credentials + sync strategy).
-* Multinode training.
-* SageMaker (TBD).
-* Resuming (handle timestamped output dirs like `./2025-xxxx` and point trainer to the right checkpoint).
