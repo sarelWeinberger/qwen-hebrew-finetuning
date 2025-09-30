@@ -17,7 +17,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-model_name = "Qwen/Qwen3-30B-A3B-Instruct-2507"
+model_name = "Qwen/Qwen3-30B-A3B-Base"
 
 print(f"Starting comprehensive MoE analysis... Results will be saved to: {log_filename}")
 logger.info("=== Comprehensive MoE Analysis Started ===")
@@ -26,7 +26,7 @@ logger.info("Loading model and tokenizer...")
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
-    dtype="auto",
+    torch_dtype="auto",
     device_map="auto",
     output_router_logits=True
 )

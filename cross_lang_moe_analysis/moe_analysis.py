@@ -17,7 +17,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-model_name = "Qwen/Qwen3-30B-A3B-Instruct-2507"
+model_name = "Qwen/Qwen3-30B-A3B-Base"
 
 logger.info("Loading model and tokenizer...")
 tokenizer = AutoTokenizer.from_pretrained(model_name)

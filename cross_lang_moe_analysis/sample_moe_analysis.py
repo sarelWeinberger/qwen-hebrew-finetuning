@@ -5,6 +5,9 @@ import logging
 from datetime import datetime
 import json
 
+# clean the GPU cache
+torch.cuda.empty_cache()
+
 # Setup logging to file only
 log_filename = f"moe_sample_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 logging.basicConfig(
@@ -17,7 +20,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-model_name = "Qwen/Qwen3-30B-A3B-Instruct-2507"
+model_name = "Qwen/Qwen3-30B-A3B-Base"
 
 print(f"Starting sample MoE analysis... Results will be saved to: {log_filename}")
 logger.info("=== Sample MoE Analysis Started ===")
@@ -26,7 +29,7 @@ logger.info("Loading model and tokenizer...")
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
-    dtype="auto",
+    torch_dtype="auto",
     device_map="auto",
     output_router_logits=True
 )
