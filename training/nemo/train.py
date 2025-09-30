@@ -15,7 +15,7 @@ def slurm_executor(nodes: int = 1, container_image: str = 'dockerd://nvcr.io/nvi
         nodes=nodes,
         tunnel=local_tunnel,
         container_image=container_image,
-        time="00:30:00",
+        time="0", # unlimited
         env_vars=dict(
             FI_PROVIDER="efa",
             FI_EFA_USE_DEVICE_RDMA="1",
