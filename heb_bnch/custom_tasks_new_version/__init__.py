@@ -7,15 +7,25 @@ from Levenshtein import distance
 import numpy as np
 from lighteval.tasks.lighteval_task import LightevalTaskConfig
 from lighteval.tasks.requests import Doc
-from lighteval.metrics.metrics import Metric, Metrics
-from lighteval.metrics.utils.metric_utils import SamplingMethod
+from lighteval.metrics.metrics import  Metrics
+# from lighteval.metrics.utils.metric_utils import MetricCategory, MetricUseCase
+# from lighteval.metrics.utils.metric_utils import (
+#     CorpusLevelMetric,
+#     CorpusLevelMetricGrouping,
+#     Metric,
+#     MetricCategory,
+#     MetricGrouping,
+#     MetricUseCase,
+#     SampleLevelMetric,
+#     SampleLevelMetricGrouping,
+# )
 
 # ============================================================
 # Custom HEQ Evaluation Functions (Shaltiel Shmidman version)
 # ============================================================
 
 ARTICLES_REGEX = re.compile(r"\b(a|an|the)\b", re.UNICODE)
-
+HEB_BENCHMARKS_DIR_PATH = os.getenv("HEB_BENCHMARKS_DIR_PATH", "/home/ec2-user/noam/heb_bnch")
 def normalize_answer(s):
     def remove_articles(text):
         return ARTICLES_REGEX.sub(" ", text)
@@ -166,7 +176,7 @@ def gsm8k_final_acc_eval_fn(**kwargs):
 
     return float(exact_match)
 
-FEW_SHOT_PATH_gsm8k = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/gsm8k_heb/train.jsonl"
+FEW_SHOT_PATH_gsm8k = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/gsm8k_heb/train.jsonl"
 
 few_shots_list = []
 with open(FEW_SHOT_PATH_gsm8k, "r", encoding="utf-8") as f:
@@ -174,20 +184,21 @@ with open(FEW_SHOT_PATH_gsm8k, "r", encoding="utf-8") as f:
         if i >= 5:  # take only 5 few-shots
             break
         data = json.loads(line)
-        few_shots_list.append({"qwery": data["qwery"], "gold": data["gold"]})
+        few_shots_list.append({"query": data["query"], "gold": data["gold"]})
 
 
 # ============================================================
 # Wrap HEQ as a Lighteval Metric
 # ============================================================
-
-GSM8KFinalAccMetric = Metric(
-    metric_name="gsm8k_final_acc",
-    higher_is_better=True,
-    category=SamplingMethod.GENERATIVE,
-    sample_level_fn=gsm8k_final_acc_eval_fn,
-    corpus_level_fn=np.mean,
-)
+# need to chHANGE TO CorpusLevelMetric FOR NEW VERSION OF LIGHTEVAL
+# GSM8KFinalAccMetric = Metric( 
+#     metric_name="gsm8k_final_acc",
+#     higher_is_better=True,
+#     category=MetricCategory.GENERATIVE,
+#     use_case=MetricUseCase.ACCURACY,
+#     sample_level_fn=gsm8k_final_acc_eval_fn,
+#     corpus_level_fn=np.mean,
+# )
 # ============================================================
 # Prompt functions
 # ============================================================
@@ -199,11 +210,11 @@ def gsm8k_heb_fewshot_prompt(line, task_name="gsm8k_heb"):
     
     few_shot_text = ""
     for i, shot in enumerate(few_shots_list):
-        qs = shot["qwery"].replace('\n', ' ').strip()
+        qs = shot["query"].replace('\n', ' ').strip()
         ans = shot["gold"].replace('\n', ' ').strip()
         few_shot_text += f"שאלה {i+1}: {qs}\nפתור שלב אחר שלב ותן את התשובה הסופית: {ans}[ANSWER_END]\n\n"
 
-    target_q = line["qwery"].replace('\n', ' ').strip()
+    target_q = line["query"].replace('\n', ' ').strip()
     full_prompt = few_shot_text + f"על סמך השאלות שניתנו פתור את בעיית המתמטיקה הבאה שלב אחר שלב וספק את התשובה הסופית: {target_q}"
 
     if not printed_prompt:
@@ -225,7 +236,7 @@ def gsm8k_heb_fewshot_prompt(line, task_name="gsm8k_heb"):
 # ============================================================
 # ARC 
 # ============================================================
-ARC_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/arc_ai2_heb/train.jsonl"
+ARC_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/arc_ai2_heb/train.jsonl"
 
 arc_few_shots_list = []
 
@@ -239,7 +250,7 @@ with open(ARC_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
         gold_choice = choices[answer_index] if choices else ""  # extract correct answer string
 
         arc_few_shots_list.append({
-            "qwery": data.get("qwery", ""),  # use 'qwery', not 'question'
+            "query": data.get("query", ""),  # use 'query', not 'question'
             "choices": choices,
             "gold": gold_choice,
             "answer_index": answer_index
@@ -252,7 +263,7 @@ def arc_ai2_heb_prompt(line, task_name: str = "arc_ai2_heb"):
 
     few_shot_text = ""
     for i, shot in enumerate(arc_few_shots_list):
-        qs = shot["qwery"].replace('\n', ' ').strip()
+        qs = shot["query"].replace('\n', ' ').strip()
         choices = shot.get("choices", [])
         ans_index = shot.get("answer_index", 0)
         choices_text = ", ".join(choices)
@@ -262,7 +273,7 @@ def arc_ai2_heb_prompt(line, task_name: str = "arc_ai2_heb"):
             f"Right Index: {ans_index}\n\n"
         )
 
-    target_q = line["qwery"].replace('\n', ' ').strip()
+    target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
     target_choices_text = ", ".join(target_choices)
 
@@ -294,7 +305,7 @@ def arc_ai2_heb_prompt(line, task_name: str = "arc_ai2_heb"):
 #  MMLU 
 # ============================================================
 
-MMLU_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/mmlu_heb/train.jsonl"
+MMLU_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/mmlu_heb/train.jsonl"
 mmlu_few_shots_list = []
 
 with open(MMLU_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
@@ -307,7 +318,7 @@ with open(MMLU_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
         choices = data.get("choices", [])
         gold_choice = choices[answer_index] if choices else ""
         mmlu_few_shots_list.append({
-            "qwery": data.get("qwery", ""),
+            "query": data.get("query", ""),
             "choices": choices,
             "gold": gold_choice,
             "answer_index": answer_index
@@ -320,7 +331,7 @@ def mmlu_heb_fewshot_prompt(line, task_name: str = "mmlu_heb"):
     # Build few-shot examples - show the pattern of question -> direct choice
     few_shot_text = ""
     for i, shot in enumerate(mmlu_few_shots_list):
-        qs = shot["qwery"].replace('\n', ' ').strip()
+        qs = shot["query"].replace('\n', ' ').strip()
         choices = shot.get("choices", [])
         ans_index = shot.get("answer_index", 0)
         correct_choice = choices[ans_index] if ans_index < len(choices) else choices[0]
@@ -335,7 +346,7 @@ def mmlu_heb_fewshot_prompt(line, task_name: str = "mmlu_heb"):
             f"תשובה: {correct_letter}\n\n"
         )
 
-    target_q = line["qwery"].replace('\n', ' ').strip()
+    target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
     
     # Format target choices
@@ -348,7 +359,7 @@ def mmlu_heb_fewshot_prompt(line, task_name: str = "mmlu_heb"):
         f"שאלה: {target_q}\n"
         f"{target_choices_formatted}\n"
         f"תשובה:"
-    )
+    ).strip()
 
     if not printed_mmlu_prompt:
         print("="*50)
@@ -372,7 +383,7 @@ def mmlu_heb_fewshot_prompt(line, task_name: str = "mmlu_heb"):
 # COPA
 # ============================================================
 
-COPA_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/copa_heb/train.jsonl"
+COPA_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/copa_heb/train.jsonl"
 
 copa_few_shots_list = []
 
@@ -410,7 +421,7 @@ with open(COPA_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
             gold_choice = choices[answer_index]
 
             copa_few_shots_list.append({
-                "qwery": data.get("qwery", ""),
+                "query": data.get("query", ""),
                 "choices": choices,
                 "gold": gold_choice,
                 "answer_index": answer_index,
@@ -435,7 +446,7 @@ def full_copa_prompt(line, task_name: str = "copa"):
 
     few_shot_text = ""
     for i, shot in enumerate(copa_few_shots_list):
-        qs = shot["qwery"].replace('\n', ' ').strip()
+        qs = shot["query"].replace('\n', ' ').strip()
         choices = shot.get("choices", [])
         ans_index = shot.get("answer_index", 0)
         
@@ -449,7 +460,7 @@ def full_copa_prompt(line, task_name: str = "copa"):
             f"תשובה: {correct_letter}\n\n"
         )
 
-    target_q = line["qwery"].replace('\n', ' ').strip()
+    target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
 
     if not target_choices:
@@ -504,7 +515,7 @@ def full_copa_prompt(line, task_name: str = "copa"):
 # HellaSwag Hebrew Section - 2-Choice A-B Format
 # ============================================================
 
-HELLASWAG_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/hellaswag_heb/train.jsonl"
+HELLASWAG_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/hellaswag_heb/train.jsonl"
 
 hellaswag_few_shots_list = []
 
@@ -542,7 +553,7 @@ with open(HELLASWAG_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
             gold_choice = choices[answer_index]
 
             hellaswag_few_shots_list.append({
-                "qwery": data.get("qwery", ""),
+                "query": data.get("query", ""),
                 "choices": choices,
                 "gold": gold_choice,
                 "answer_index": answer_index,
@@ -567,7 +578,7 @@ def hellaswag_heb_prompt(line, task_name: str = "hellaswag_heb"):
 
     few_shot_text = ""
     for i, shot in enumerate(hellaswag_few_shots_list):
-        qs = shot["qwery"].replace('\n', ' ').strip()
+        qs = shot["query"].replace('\n', ' ').strip()
         choices = shot.get("choices", [])
         ans_index = shot.get("answer_index", 0)
         
@@ -581,7 +592,7 @@ def hellaswag_heb_prompt(line, task_name: str = "hellaswag_heb"):
             f"תשובה: {correct_letter}\n\n"
         )
 
-    target_q = line["qwery"].replace('\n', ' ').strip()
+    target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
 
     if not target_choices:
@@ -638,7 +649,7 @@ def hellaswag_heb_prompt(line, task_name: str = "hellaswag_heb"):
 # Psychometric Math Section
 # ============================================================
 
-PSYCHOMETRIC_MATH_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/psychometric_heb/math/train.jsonl"
+PSYCHOMETRIC_MATH_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/math/train.jsonl"
 
 psychometric_math_few_shots_list = []
 
@@ -739,7 +750,7 @@ def psychometric_test_math_prompt(line, task_name: str = "psychometric_test_math
 # Psychometric Analogies Section
 # ============================================================
 
-PSYCHOMETRIC_ANALOGIES_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/psychometric_heb/analogies/train.jsonl"
+PSYCHOMETRIC_ANALOGIES_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/analogies/train.jsonl"
 
 psychometric_analogies_few_shots_list = []
 
@@ -838,7 +849,7 @@ def psychometric_test_analogies_prompt(line, task_name: str = "psychometric_test
 # Psychometric Restatement Section
 # ============================================================
 
-PSYCHOMETRIC_RESTATEMENT_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/psychometric_heb/restatement/train.jsonl"
+PSYCHOMETRIC_RESTATEMENT_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/restatement/train.jsonl"
 
 psychometric_restatement_few_shots_list = []
 
@@ -937,7 +948,7 @@ def psychometric_test_restatement_prompt(line, task_name: str = "psychometric_te
 # Psychometric Sentence Complete English Section
 # ============================================================
 
-PSYCHOMETRIC_SENTENCE_COMPLETE_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/psychometric_heb/sentence_complete_english/train.jsonl"
+PSYCHOMETRIC_SENTENCE_COMPLETE_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/sentence_complete_english/train.jsonl"
 
 psychometric_sentence_complete_few_shots_list = []
 
@@ -1036,7 +1047,7 @@ def psychometric_test_sentence_complete_english_prompt(line, task_name: str = "p
 # Psychometric Sentence Complete Hebrew Section
 # ============================================================
 
-PSYCHOMETRIC_SENTENCE_COMPLETE_HEBREW_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/psychometric_heb/sentence_complete_hebrew/train.jsonl"
+PSYCHOMETRIC_SENTENCE_COMPLETE_HEBREW_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/sentence_complete_hebrew/train.jsonl"
 
 psychometric_sentence_complete_hebrew_few_shots_list = []
 
@@ -1135,7 +1146,7 @@ def psychometric_test_sentence_complete_hebrew_prompt(line, task_name: str = "ps
 # Psychometric Text English Section
 # ============================================================
 
-PSYCHOMETRIC_TEXT_ENGLISH_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/psychometric_heb/text_english/train.jsonl"
+PSYCHOMETRIC_TEXT_ENGLISH_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/text_english/train.jsonl"
 
 psychometric_text_english_few_shots_list = []
 
@@ -1234,7 +1245,7 @@ def psychometric_test_text_english_prompt(line, task_name: str = "psychometric_t
 # Psychometric Text Hebrew Section
 # ============================================================
 
-PSYCHOMETRIC_TEXT_HEBREW_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/psychometric_heb/text_hebrew/train.jsonl"
+PSYCHOMETRIC_TEXT_HEBREW_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/text_hebrew/train.jsonl"
 
 psychometric_text_hebrew_few_shots_list = []
 
@@ -1333,7 +1344,7 @@ def psychometric_test_text_hebrew_prompt(line, task_name: str = "psychometric_te
 # Psychometric Understanding Hebrew Section
 # ============================================================
 
-PSYCHOMETRIC_UNDERSTANDING_HEBREW_FEW_SHOT_PATH = "/home/ec2-user/qwen-hebrew-finetuning/heb_bnch/bnch_data/psychometric_heb/understanding_hebrew/train.jsonl"
+PSYCHOMETRIC_UNDERSTANDING_HEBREW_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/understanding_hebrew/train.jsonl"
 
 psychometric_understanding_hebrew_few_shots_list = []
 
@@ -1435,25 +1446,26 @@ def psychometric_test_understanding_hebrew_prompt(line, task_name: str = "psycho
 _CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 
 _TASKS = [
-    LightevalTaskConfig(
-        name="gsm8k_heb",
-        suite=["community"],
-        prompt_function=gsm8k_heb_fewshot_prompt,  # <-- updated to few-shot version
-        hf_subset="default",
-        metrics=[GSM8KFinalAccMetric],
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "gsm8k_heb/"),
-        evaluation_splits=["validation"],
-        stop_sequence=['[ANSWER_END]'],
-        generation_size=512
-    ),
+    # LightevalTaskConfig(
+    #     name="gsm8k_heb",
+    #     suite=["community"],
+    #     prompt_function=gsm8k_heb_fewshot_prompt,  # <-- updated to few-shot version
+    #     hf_subset="default",
+    #     metric=[GSM8KFinalAccMetric],
+    #     hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "gsm8k_heb/"),
+    #     evaluation_splits=["validation"],
+    #     stop_sequence=['[ANSWER_END]'],
+    #     generation_size=512
+    # ),
     LightevalTaskConfig(
         name="arc_ai2_heb",
         suite=["community"],
         prompt_function=arc_ai2_heb_prompt,
         hf_subset="default",
         metrics=[Metrics.loglikelihood_acc],
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "arc_ai2_heb/"),
+        hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "arc_ai2_heb/"),
         evaluation_splits=["validation"],
+        few_shots_split="train",
         generation_size=32
     ),
 LightevalTaskConfig(
@@ -1462,8 +1474,9 @@ LightevalTaskConfig(
     prompt_function=mmlu_heb_fewshot_prompt,
     hf_subset="default",
     metrics=[Metrics.loglikelihood_acc],  # Use loglikelihood_acc
-    hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "mmlu_heb/"),
+    hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "mmlu_heb/"),
     evaluation_splits=["validation"],
+    few_shots_split="train",
     # No generation_size or stop_sequence needed for loglikelihood
 ),
     LightevalTaskConfig(
@@ -1472,7 +1485,7 @@ LightevalTaskConfig(
         prompt_function=psychometric_test_math_prompt,
         hf_subset="default",
         metrics=[Metrics.loglikelihood_acc],  # multiple choice accuracy
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "psychometric_heb", "math"),
+        hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "psychometric_heb", "math"),
         evaluation_splits=["validation"],
     ),
        LightevalTaskConfig(
@@ -1481,8 +1494,9 @@ LightevalTaskConfig(
         prompt_function=psychometric_test_analogies_prompt,
         hf_subset="default",
         metrics=[Metrics.loglikelihood_acc],  # multiple choice accuracy
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "psychometric_heb", "analogies"),
+        hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "psychometric_heb", "analogies"),
         evaluation_splits=["validation"],
+        few_shots_split="train",
     ),
        LightevalTaskConfig(
         name="psychometric_heb_restatement",
@@ -1490,8 +1504,9 @@ LightevalTaskConfig(
         prompt_function=psychometric_test_restatement_prompt,
         hf_subset="default",
         metrics=[Metrics.loglikelihood_acc],  # multiple choice accuracy
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "psychometric_heb", "restatement"),
+        hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "psychometric_heb", "restatement"),
         evaluation_splits=["validation"],
+        few_shots_split="train",
     ),
        LightevalTaskConfig(
         name="psychometric_heb_sentence_complete_english",
@@ -1499,8 +1514,9 @@ LightevalTaskConfig(
         prompt_function=psychometric_test_sentence_complete_english_prompt,
         hf_subset="default",
         metrics=[Metrics.loglikelihood_acc],  # multiple choice accuracy
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "psychometric_heb", "sentence_complete_english"),
+        hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "psychometric_heb", "sentence_complete_english"),
         evaluation_splits=["validation"],
+        few_shots_split="train",
     ),
 LightevalTaskConfig(
         name="psychometric_heb_sentence_complete_hebrew",
@@ -1508,8 +1524,9 @@ LightevalTaskConfig(
         prompt_function=psychometric_test_sentence_complete_hebrew_prompt,
         hf_subset="default",
         metrics=[Metrics.loglikelihood_acc],  # multiple choice accuracy
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "psychometric_heb", "sentence_complete_hebrew"),
+        hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "psychometric_heb", "sentence_complete_hebrew"),
         evaluation_splits=["validation"],
+        few_shots_split="train",
     ),
     LightevalTaskConfig(
         name="psychometric_heb_sentence_text_english",
@@ -1517,8 +1534,9 @@ LightevalTaskConfig(
         prompt_function=psychometric_test_text_english_prompt,
         hf_subset="default",
         metrics=[Metrics.loglikelihood_acc],  # multiple choice accuracy
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "psychometric_heb", "text_english"),
+        hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "psychometric_heb", "text_english"),
         evaluation_splits=["validation"],
+        few_shots_split="train",
     ),
      LightevalTaskConfig(
         name="psychometric_heb_sentence_text_hebrew",
@@ -1526,8 +1544,9 @@ LightevalTaskConfig(
         prompt_function=psychometric_test_text_hebrew_prompt,
         hf_subset="default",
         metrics=[Metrics.loglikelihood_acc],  # multiple choice accuracy
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "psychometric_heb", "text_hebrew"),
+        hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "psychometric_heb", "text_hebrew"),
         evaluation_splits=["validation"],
+        few_shots_split="train",
     ),
     LightevalTaskConfig(
         name="psychometric_heb_understanding_hebrew",
@@ -1535,8 +1554,9 @@ LightevalTaskConfig(
         prompt_function=psychometric_test_understanding_hebrew_prompt,
         hf_subset="default",
         metrics=[Metrics.loglikelihood_acc],  # multiple choice accuracy
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "psychometric_heb", "understanding_hebrew"),
+        hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "psychometric_heb", "understanding_hebrew"),
         evaluation_splits=["validation"],
+        few_shots_split="train",
     ),
        LightevalTaskConfig(
         name="copa_heb",
@@ -1544,8 +1564,9 @@ LightevalTaskConfig(
         prompt_function= full_copa_prompt,
         hf_subset="default",
         metrics=[Metrics.loglikelihood_acc],  # multiple choice accuracy
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "copa_heb/"),
+        hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "copa_heb/"),
         evaluation_splits=["validation"],
+        few_shots_split="train",
     ),
      LightevalTaskConfig(
         name="hellaswag_heb",
@@ -1553,8 +1574,9 @@ LightevalTaskConfig(
         prompt_function= hellaswag_heb_prompt,
         hf_subset="default",
         metrics=[Metrics.loglikelihood_acc],  # multiple choice accuracy
-        hf_repo=os.path.join(_CURR_DIR, "..", "bnch_data", "hellaswag_heb/"),
+        hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "hellaswag_heb/"),
         evaluation_splits=["validation"],
+        few_shots_split="train",
     ),
 
 ]

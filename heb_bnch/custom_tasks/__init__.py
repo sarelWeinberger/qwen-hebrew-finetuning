@@ -176,7 +176,7 @@ with open(FEW_SHOT_PATH_gsm8k, "r", encoding="utf-8") as f:
         if i >= 5:  # take only 5 few-shots
             break
         data = json.loads(line)
-        few_shots_list.append({"qwery": data["qwery"], "gold": data["gold"]})
+        few_shots_list.append({"query": data["query"], "gold": data["gold"]})
 
 
 # ============================================================
@@ -201,11 +201,11 @@ def gsm8k_heb_fewshot_prompt(line, task_name="gsm8k_heb"):
     
     few_shot_text = ""
     for i, shot in enumerate(few_shots_list):
-        qs = shot["qwery"].replace('\n', ' ').strip()
+        qs = shot["query"].replace('\n', ' ').strip()
         ans = shot["gold"].replace('\n', ' ').strip()
         few_shot_text += f"שאלה {i+1}: {qs}\nפתור שלב אחר שלב ותן את התשובה הסופית: {ans}[ANSWER_END]\n\n"
 
-    target_q = line["qwery"].replace('\n', ' ').strip()
+    target_q = line["query"].replace('\n', ' ').strip()
     full_prompt = few_shot_text + f"על סמך השאלות שניתנו פתור את בעיית המתמטיקה הבאה שלב אחר שלב וספק את התשובה הסופית: {target_q}"
 
     if not printed_prompt:
@@ -233,7 +233,7 @@ arc_few_shots_list = []
 
 with open(ARC_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
     for i, line in enumerate(f):
-        if i >= 5:  # take only 25 few-shots
+        if i >= 5:  # take only 5 few-shots
             break
         data = json.loads(line)
         choices = data.get("choices", [])
@@ -241,7 +241,7 @@ with open(ARC_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
         gold_choice = choices[answer_index] if choices else ""  # extract correct answer string
 
         arc_few_shots_list.append({
-            "qwery": data.get("qwery", ""),  # use 'qwery', not 'question'
+            "query": data.get("query", ""),  # use 'query', not 'question'
             "choices": choices,
             "gold": gold_choice,
             "answer_index": answer_index
@@ -254,7 +254,7 @@ def arc_ai2_heb_prompt(line, task_name: str = "arc_ai2_heb"):
 
     few_shot_text = ""
     for i, shot in enumerate(arc_few_shots_list):
-        qs = shot["qwery"].replace('\n', ' ').strip()
+        qs = shot["query"].replace('\n', ' ').strip()
         choices = shot.get("choices", [])
         ans_index = shot.get("answer_index", 0)
         choices_text = ", ".join(choices)
@@ -264,7 +264,7 @@ def arc_ai2_heb_prompt(line, task_name: str = "arc_ai2_heb"):
             f"Right Index: {ans_index}\n\n"
         )
 
-    target_q = line["qwery"].replace('\n', ' ').strip()
+    target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
     target_choices_text = ", ".join(target_choices)
 
@@ -309,7 +309,7 @@ with open(MMLU_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
         choices = data.get("choices", [])
         gold_choice = choices[answer_index] if choices else ""
         mmlu_few_shots_list.append({
-            "qwery": data.get("qwery", ""),
+            "query": data.get("query", ""),
             "choices": choices,
             "gold": gold_choice,
             "answer_index": answer_index
@@ -322,7 +322,7 @@ def mmlu_heb_fewshot_prompt(line, task_name: str = "mmlu_heb"):
     # Build few-shot examples - show the pattern of question -> direct choice
     few_shot_text = ""
     for i, shot in enumerate(mmlu_few_shots_list):
-        qs = shot["qwery"].replace('\n', ' ').strip()
+        qs = shot["query"].replace('\n', ' ').strip()
         choices = shot.get("choices", [])
         ans_index = shot.get("answer_index", 0)
         correct_choice = choices[ans_index] if ans_index < len(choices) else choices[0]
@@ -337,7 +337,7 @@ def mmlu_heb_fewshot_prompt(line, task_name: str = "mmlu_heb"):
             f"תשובה: {correct_letter}\n\n"
         )
 
-    target_q = line["qwery"].replace('\n', ' ').strip()
+    target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
     
     # Format target choices
@@ -412,7 +412,7 @@ with open(COPA_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
             gold_choice = choices[answer_index]
 
             copa_few_shots_list.append({
-                "qwery": data.get("qwery", ""),
+                "query": data.get("query", ""),
                 "choices": choices,
                 "gold": gold_choice,
                 "answer_index": answer_index,
@@ -437,7 +437,7 @@ def full_copa_prompt(line, task_name: str = "copa"):
 
     few_shot_text = ""
     for i, shot in enumerate(copa_few_shots_list):
-        qs = shot["qwery"].replace('\n', ' ').strip()
+        qs = shot["query"].replace('\n', ' ').strip()
         choices = shot.get("choices", [])
         ans_index = shot.get("answer_index", 0)
         
@@ -451,7 +451,7 @@ def full_copa_prompt(line, task_name: str = "copa"):
             f"תשובה: {correct_letter}\n\n"
         )
 
-    target_q = line["qwery"].replace('\n', ' ').strip()
+    target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
 
     if not target_choices:
@@ -544,7 +544,7 @@ with open(HELLASWAG_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
             gold_choice = choices[answer_index]
 
             hellaswag_few_shots_list.append({
-                "qwery": data.get("qwery", ""),
+                "query": data.get("query", ""),
                 "choices": choices,
                 "gold": gold_choice,
                 "answer_index": answer_index,
@@ -569,7 +569,7 @@ def hellaswag_heb_prompt(line, task_name: str = "hellaswag_heb"):
 
     few_shot_text = ""
     for i, shot in enumerate(hellaswag_few_shots_list):
-        qs = shot["qwery"].replace('\n', ' ').strip()
+        qs = shot["query"].replace('\n', ' ').strip()
         choices = shot.get("choices", [])
         ans_index = shot.get("answer_index", 0)
         
@@ -583,7 +583,7 @@ def hellaswag_heb_prompt(line, task_name: str = "hellaswag_heb"):
             f"תשובה: {correct_letter}\n\n"
         )
 
-    target_q = line["qwery"].replace('\n', ' ').strip()
+    target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
 
     if not target_choices:
