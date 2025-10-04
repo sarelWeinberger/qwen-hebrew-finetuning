@@ -21,6 +21,8 @@ docker run \
   -v /opt/slurm:/opt/slurm:ro \
   -v /var/run/munge:/var/run/munge:rw \
   -v /var/log/aws:/var/log/aws \
+  -v /usr/local/share/pyxis:/usr/local/share/pyxis:ro \
+  -v /usr/local/lib/slurm:/usr/local/lib/slurm:ro \
   -v $(pwd):/workspace \
   -w /workspace \
   nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2

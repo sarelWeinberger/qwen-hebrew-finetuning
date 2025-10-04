@@ -16,6 +16,7 @@ def slurm_executor(nodes: int = 1, container_image: str = 'dockerd://nvcr.io/nvi
         tunnel=local_tunnel,
         container_image=container_image,
         time="0", # unlimited
+        mem="0",
         env_vars=dict(
             FI_PROVIDER="efa",
             FI_EFA_USE_DEVICE_RDMA="1",
@@ -23,7 +24,7 @@ def slurm_executor(nodes: int = 1, container_image: str = 'dockerd://nvcr.io/nvi
             NCCL_SOCKET_IFNAME='ens,enp',
             LD_LIBRARY_PATH="/opt/amazon/efa/lib:/opt/amazon/aws-ofi-nccl/lib:" + os.environ.get("LD_LIBRARY_PATH",""),
             LD_PRELOAD="/opt/amazon/efa/lib/libfabric.so.1",
-            ENROOT_MOUNTS="tmpfs:/dev/shm:rw,size=64G,x-create=dir"            
+            ENROOT_MOUNTS="tmpfs:/dev/shm:rw,size=64G,x-create=dir"
         ),
         container_env=[
             'LD_LIBRARY_PATH',
@@ -34,6 +35,8 @@ def slurm_executor(nodes: int = 1, container_image: str = 'dockerd://nvcr.io/nvi
             '/opt/slurm:/opt/slurm:ro',
             '/var/run/munge:/var/run/munge:rw',
             '/var/log/aws:/var/log/aws',
+            '/usr/local/share/pyxis:/usr/local/share/pyxis:ro',
+            '/usr/local/lib/slurm:/usr/local/lib/slurm:ro',
             '/opt/amazon/efa:/opt/amazon/efa:ro',
             '/opt/amazon/ofi-nccl:/opt/amazon/ofi-nccl:ro',
             "/dev/infiniband:/dev/infiniband",
@@ -124,7 +127,7 @@ if __name__ == '__main__':
         seq_length=seq_length, 
         micro_batch_size=micro_bs,
         global_batch_size=global_bs,
-        num_workers=0,
+        num_workers=8,
         reset_position_ids=True, # for packing
         reset_attention_mask=True, # for packing
         eod_mask_loss=True, # do we want to predict the eod?
