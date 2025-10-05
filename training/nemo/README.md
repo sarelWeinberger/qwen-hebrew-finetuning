@@ -193,3 +193,7 @@ python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen
 * Tokenize everything (cover all corpora beyond `hewiki-data.jsonl`).
 * Export checkpoints script.
 * Connect to S3 for saving/export (credentials + sync strategy).
+
+## Diamonds in the Ruff
+
+- Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
