@@ -19,6 +19,8 @@ def slurm_executor(nodes: int = 1, container_image: str = 'dockerd://nvcr.io/nvi
         mem="0",
         env_vars=dict(
             FI_PROVIDER="efa",
+            FI_EFA_FORK_SAFE="1",    
+            FI_EFA_USE_HUGE_PAGE="0",
             FI_EFA_USE_DEVICE_RDMA="1",
             WANDB_API_KEY=os.environ['WANDB_API_KEY'],
             NCCL_SOCKET_IFNAME='ens,enp',
@@ -38,6 +40,7 @@ def slurm_executor(nodes: int = 1, container_image: str = 'dockerd://nvcr.io/nvi
             '/usr/local/share/pyxis:/usr/local/share/pyxis:ro',
             '/usr/local/lib/slurm:/usr/local/lib/slurm:ro',
             '/opt/amazon/efa:/opt/amazon/efa:ro',
+            '/opt/sagemaker/tmp/enroot:/opt/sagemaker/tmp/enroot:rw',
             '/opt/amazon/ofi-nccl:/opt/amazon/ofi-nccl:ro',
             "/dev/infiniband:/dev/infiniband",
             f'{os.environ['WORKSPACE_DIR']}:/workspace',
@@ -122,7 +125,7 @@ if __name__ == '__main__':
     )
     pretrain.data = run.Config(PreTrainingDataModule, 
         # paths=['100', '/workspace/tok-data/hebdata_hewiki_text_document'], # can include lots of segments with different ratios
-        paths=['100', '/workspace/tok-data/low_text_document'], # can include lots of segments with different ratios
+        paths=['100', '/workspace/data/low_text_document'], # can include lots of segments with different ratios
         tokenizer=tokenizer, 
         seq_length=seq_length, 
         micro_batch_size=micro_bs,
