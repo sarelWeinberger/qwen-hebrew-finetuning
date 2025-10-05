@@ -8,10 +8,11 @@ from datetime import datetime
 import re
 import os
 from extract_benchmark_results import summarize_benchmark_runs
+from check_port_avaliablity import check_port_or_raise
 
 print("Starting Gradio app code...")
 # Load and process the data
-local_save_directory = "/home/ubuntu/qwen-hebrew-finetuning/evaluation/runs"  # Will save to current directory
+local_save_directory = "/home/ubuntu/qwen-hebrew-finetuning/evaluation"  
 csv_filename = 'benchmark_results_summary.csv'
 def generate_runs_table():
     # Use the original local path as default
@@ -23,7 +24,9 @@ def generate_runs_table():
 def load_data():
     # Load your CSV file
     # df = pd.read_csv('benchmark_results_summary.csv')
-
+    #  check if the file exists
+    if not os.path.exists(os.path.join(local_save_directory, csv_filename)):
+        return f"CSV file not found: {os.path.join(local_save_directory, csv_filename)}",f"CSV file not found: {os.path.join(local_save_directory, csv_filename)}"
     df = pd.read_csv(os.path.join(local_save_directory, csv_filename))
 
     # Clean the data - remove rows with missing model names or timestamps
@@ -515,26 +518,33 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
             
             refresh_heatmap_btn = gr.Button("🔄 Refresh Chart", variant="secondary")
             refresh_heatmap_btn.click(fn=create_model_performance_heatmap, outputs=heatmap_plot)
-
+PORT = 7680
 # Launch the app
 if __name__ == "__main__":
     print("Starting Gradio app...")
     # generate_runs_table()  # Initial data generation
+    check_port_or_raise(PORT, timeout=3,auto_kill=True, retry=True)
     demo.launch(
         share=True,
         server_name="0.0.0.0",
-        server_port=7680,
+        server_port=PORT,
         show_error=True,
         debug=False,
         prevent_thread_lock=False
     )
+
+# kill previous process on port 7680
+# lsof -ti:7680 | xargs kill -9 2>/dev/null || echo "No process found on port 7680"
+
 # check if the protocol is avaliable
 # netstat -tlnp | grep 7680
 # start server in background
 # sudo systemctl daemon-reload
 # sudo systemctl enable gradio
 # sudo systemctl start gradio
-# monitor logs
+## check status
+# sudo systemctl status gradio
+## monitor logs
 # sudo journalctl -u gradio -f
 
 # nohup python scores_dashboard.py > gradio.log 2>&1 &

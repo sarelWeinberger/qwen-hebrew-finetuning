@@ -8,6 +8,8 @@ import numpy as np
 from lighteval.tasks.lighteval_task import LightevalTaskConfig
 from lighteval.tasks.requests import Doc
 from lighteval.metrics.metrics import  Metrics
+from lighteval.metrics.dynamic_metrics import loglikelihood_acc_metric
+from lighteval.metrics.normalizations import LogProbTokenNorm
 # from lighteval.metrics.utils.metric_utils import MetricCategory, MetricUseCase
 # from lighteval.metrics.utils.metric_utils import (
 #     CorpusLevelMetric,
@@ -25,7 +27,10 @@ from lighteval.metrics.metrics import  Metrics
 # ============================================================
 
 ARTICLES_REGEX = re.compile(r"\b(a|an|the)\b", re.UNICODE)
-HEB_BENCHMARKS_DIR_PATH = os.getenv("HEB_BENCHMARKS_DIR_PATH", "/home/ec2-user/noam/heb_bnch")
+HEB_BENCHMARKS_DIR_PATH = os.getenv("HEB_BENCHMARKS_DIR_PATH", "/home/ec2-user/qwen-hebrew-finetuning/evaluation/heb_bnch/bnch_data")
+LETTER_INDICES = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
+INTEGER_INDICES = list(map(str, list(range(1, 27))))
+
 def normalize_answer(s):
     def remove_articles(text):
         return ARTICLES_REGEX.sub(" ", text)
@@ -305,161 +310,93 @@ def arc_ai2_heb_prompt(line, task_name: str = "arc_ai2_heb"):
 #  MMLU 
 # ============================================================
 
-MMLU_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/mmlu_heb/train.jsonl"
-mmlu_few_shots_list = []
 
-with open(MMLU_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take first 5 few-shots
-            break
-        data = json.loads(line)
-        # extract gold answer from answer_index
-        answer_index = data.get("answer_index", 0)
-        choices = data.get("choices", [])
-        gold_choice = choices[answer_index] if choices else ""
-        mmlu_few_shots_list.append({
-            "query": data.get("query", ""),
-            "choices": choices,
-            "gold": gold_choice,
-            "answer_index": answer_index
-        })
-printed_mmlu_prompt = False  # global flag
 def mmlu_heb_fewshot_prompt(line, task_name: str = "mmlu_heb"):
     """Few-shot prompt designed for loglikelihood evaluation"""
-    global printed_mmlu_prompt
-    
-    # Build few-shot examples - show the pattern of question -> direct choice
-    few_shot_text = ""
-    for i, shot in enumerate(mmlu_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
-        correct_choice = choices[ans_index] if ans_index < len(choices) else choices[0]
-        
-        # Format choices as A, B, C, D
-        choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
-        correct_letter = chr(65 + ans_index)  # Convert index to letter
-        
-        few_shot_text += (
-            f"שאלה: {qs}\n"
-            f"{choices_formatted}\n"
-            f"תשובה: {correct_letter}\n\n"
-        )
+
 
     target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
+    topic = line.get("subject", "") # we dont use it now, becuase using it require fewshot per topic
     
     # Format target choices
     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
 
     # For loglikelihood, we want a simple prompt that ends where the model should complete
-    full_prompt = (
-        f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-        f"{few_shot_text}"
+    # the instruction in English:
+    # query = f"The following are multiple choice questions (with answers) about  {topic.replace('_', ' ')}.\n\n"
+
+    # instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+    instruction = f"להלן שאלות רב-ברירה (עם תשובות)\n\n"
+    prompt = (
+        instruction +
+        # f"{few_shot_text}"
         f"שאלה: {target_q}\n"
         f"{target_choices_formatted}\n"
         f"תשובה:"
     ).strip()
 
-    if not printed_mmlu_prompt:
-        print("="*50)
-        print("MMLU FEW-SHOT PROMPT FOR LOGLIKELIHOOD:")
-        print(full_prompt)
-        print("="*50)
-        printed_mmlu_prompt = True
+    is_few_shots = line.get("__few_shots", False)  # We are adding few shots
 
     # CRITICAL: For loglikelihood_acc, choices should be the completion options (A, B, C, D)
     letter_choices = [chr(65 + i) for i in range(len(target_choices))]
     
     return Doc(
         task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
-        choices=letter_choices,  # This should be ["A", "B", "C", "D"] not the actual answer texts
-        gold_index=line.get("answer_index", 0),
+        query=prompt,
+        # fewshot_samples = [
+        #         Doc(query=shot["query"],
+        #             choices=shot["choices"],
+        #             gold_index=shot["answer_index"]) 
+        #         for shot in mmlu_few_shots_list
+        #     ],
+        instruction=instruction,
+        choices=[" A", " B", " C", " D"] if is_few_shots else ["A", "B", "C", "D"],
+        # choices=letter_choices,  # This should be ["A", "B", "C", "D"] not the actual answer texts
+        gold_index=line["answer_index"],
     )
 
+def mmlu(line, topic, task_name: str = None):
+    query = f"The following are multiple choice questions (with answers) about  {topic.replace('_', ' ')}.\n\n"
+    query += line["question"] + "\n"
+    query += "".join([f"{key}. {choice}\n" for key, choice in zip(LETTER_INDICES, line["choices"])])
+    query += "Answer:"
+
+    gold_ix = LETTER_INDICES.index(line["answer"]) if isinstance(line["answer"], str) else line["answer"]
+    is_few_shots = line.get("__few_shots", False)  # We are adding few shots
+
+    return Doc(
+        task_name=task_name,
+        query=query,
+        choices=[" A", " B", " C", " D"] if is_few_shots else ["A", "B", "C", "D"],
+        gold_index=gold_ix,
+        instruction=f"The following are multiple choice questions (with answers) about  {topic.replace('_', ' ')}.\n\n",
+    )
 # ============================================================
 # COPA
 # ============================================================
 
-COPA_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/copa_heb/train.jsonl"
+def xcopa(line, connectors: dict, task_name: str = None):
+    connector = connectors[line["question"]]
+    return Doc(
+        task_name=task_name,
+        query=f"{line['query'].strip()[:-1]} {connector}",
+        choices=[f" {c}" for c in line["choices"]], 
+        gold_index=int(line["answer_index"]),
+    )
 
-copa_few_shots_list = []
 
-print("Loading COPA few-shot examples...")
-with open(COPA_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    valid_examples = 0
-    for i, line in enumerate(f):
-        if valid_examples >= 5:  # take only 5 valid few-shots
-            break
-        
-        try:
-            data = json.loads(line)
-            choices = data.get("choices", [])
-            
-            if not choices:
-                print(f"COPA Warning: No choices found in line {i}, skipping")
-                continue
-
-            # Get answer_index directly
-            answer_index = data.get("answer_index")
-            
-            if answer_index is None:
-                print(f"COPA Warning: No answer_index found in line {i}, skipping")
-                continue
-            
-            if not isinstance(answer_index, int):
-                print(f"COPA Warning: answer_index must be integer, got {type(answer_index)} in line {i}, skipping")
-                continue
-
-            # Validate the answer index is within range
-            if answer_index >= len(choices) or answer_index < 0:
-                print(f"COPA Warning: Answer index {answer_index} out of range for {len(choices)} choices in line {i}, skipping")
-                continue
-
-            gold_choice = choices[answer_index]
-
-            copa_few_shots_list.append({
-                "query": data.get("query", ""),
-                "choices": choices,
-                "gold": gold_choice,
-                "answer_index": answer_index,
-            })
-            
-            valid_examples += 1
-            print(f"COPA: Added few-shot example {valid_examples}: answer_index={answer_index} -> {chr(65+answer_index)}")
-            
-        except json.JSONDecodeError as e:
-            print(f"COPA Warning: JSON decode error in line {i}: {e}")
-            continue
-        except Exception as e:
-            print(f"COPA Warning: Error processing line {i}: {e}")
-            continue
-
-print(f"COPA: Successfully loaded {len(copa_few_shots_list)} few-shot examples")
-
-copa_prompt = False
+def xcopa_en(line, task_name: str = None):
+    connectors = {"cause": "because", "effect": "therefore"}
+    return xcopa(line, connectors, task_name)
+def xcopa_heb(line, task_name: str = None):
+    connectors = {"cause": "כי", "effect": "לכן"}
+    return xcopa(line, connectors, task_name)
 
 def full_copa_prompt(line, task_name: str = "copa"):
     global copa_prompt
 
-    few_shot_text = ""
-    for i, shot in enumerate(copa_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
-        
-        # Format choices with letters
-        choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
-        correct_letter = chr(65 + ans_index)
-
-        few_shot_text += (
-            f"שאלה {i+1}: {qs}\n"
-            f"{choices_text}\n"
-            f"תשובה: {correct_letter}\n\n"
-        )
-
+    
     target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
 
@@ -468,21 +405,14 @@ def full_copa_prompt(line, task_name: str = "copa"):
         target_choices = ["A", "B"]  # fallback
 
     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-
+    instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A או B).\n\n"
     full_prompt = (
-        f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A או B).\n\n"
-        f"{few_shot_text}"
+        instruction,
         f"שאלה: {target_q}\n"
         f"{target_choices_formatted}\n"
         f"תשובה:"
     )
 
-    if not copa_prompt:
-        print("="*50)
-        print("FULL PSYCHOMETRIC COPA PROMPT WITH FEW-SHOTS:")
-        print(full_prompt)
-        print("="*50)
-        copa_prompt = True
 
     # Get answer_index directly for validation data
     gold_index = line.get("answer_index")
@@ -506,8 +436,8 @@ def full_copa_prompt(line, task_name: str = "copa"):
 
     return Doc(
         task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
+        query=full_prompt,
+        instruction=instruction,
         choices=letter_choices,
         gold_index=gold_index,
     )
@@ -1477,6 +1407,7 @@ LightevalTaskConfig(
     hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "mmlu_heb/"),
     evaluation_splits=["validation"],
     few_shots_split="train",
+    must_remove_duplicate_docs=True,
     # No generation_size or stop_sequence needed for loglikelihood
 ),
     LightevalTaskConfig(
@@ -1567,6 +1498,10 @@ LightevalTaskConfig(
         hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "copa_heb/"),
         evaluation_splits=["validation"],
         few_shots_split="train",
+        generation_size=-1,
+        metric=[
+            loglikelihood_acc_metric(normalization=LogProbTokenNorm()),
+        ],
     ),
      LightevalTaskConfig(
         name="hellaswag_heb",

@@ -74,6 +74,7 @@ def summarize_benchmark_runs(scores_sum_dir, local_save_dir=None,csv_filename='b
         print(f"Extracted {len(rows)} runs.")
         print("Columns:", df.columns.tolist())
         print(df)
+        print(df.model_name)
         
         # Determine where to save the CSV
         if local_save_dir is None:
