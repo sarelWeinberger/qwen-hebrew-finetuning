@@ -109,6 +109,8 @@ chmod o+rx /fsx/ubuntu
 
 ### Data
 
+> IMPORTANT: This assumes that you've read and understood the [data](#data) section above, to understand what the tokenized format is. 
+
 It is *not* recommended to tokenize on these machines - these are heavy compute machines which aren't utilized well. Ideally, just copy the data into the data directory (once we move to FSx for Lustre - you can just point it to the other directory):
 
 ```bash
