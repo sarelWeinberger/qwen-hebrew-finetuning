@@ -102,7 +102,9 @@ On the controller node, run (replace the *2* without the actual number of nodes 
 
 ```bash
 srun -N 2 docker pull nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2
+srun -N 2 sudo chmod -R 1777 /opt/sagemaker/tmp/
 docker pull nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2
+chmod o+rx /fsx/ubuntu
 ```
 
 ### Data
@@ -111,6 +113,8 @@ It is *not* recommended to tokenize on these machines - these are heavy compute 
 
 ```bash
 export DATA_DIR=$HOME_DIR/data
+mkdir -p $DATA_DIR
+sudo chmod -R 777 $DATA_DIR
 cp ... $DATA_DIR/
 ```
 
