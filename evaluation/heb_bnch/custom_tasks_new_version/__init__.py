@@ -8,8 +8,8 @@ import numpy as np
 from lighteval.tasks.lighteval_task import LightevalTaskConfig
 from lighteval.tasks.requests import Doc
 from lighteval.metrics.metrics import  Metrics
-from lighteval.metrics.dynamic_metrics import loglikelihood_acc_metric
-from lighteval.metrics.normalizations import LogProbTokenNorm
+# from lighteval.metrics.dynamic_metrics import LogLikelihoodAccMetric as loglikelihood_acc_metric
+# from lighteval.metrics.normalizations import LogProbTokenNorm
 # from lighteval.metrics.utils.metric_utils import MetricCategory, MetricUseCase
 # from lighteval.metrics.utils.metric_utils import (
 #     CorpusLevelMetric,
@@ -27,7 +27,7 @@ from lighteval.metrics.normalizations import LogProbTokenNorm
 # ============================================================
 
 ARTICLES_REGEX = re.compile(r"\b(a|an|the)\b", re.UNICODE)
-HEB_BENCHMARKS_DIR_PATH = os.getenv("HEB_BENCHMARKS_DIR_PATH", "/home/ec2-user/qwen-hebrew-finetuning/evaluation/heb_bnch/bnch_data")
+HEB_BENCHMARKS_DIR_PATH = os.getenv("HEB_BENCHMARKS_DIR_PATH", "/home/ec2-user/qwen-hebrew-finetuning/evaluation/heb_bnch")
 LETTER_INDICES = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
 INTEGER_INDICES = list(map(str, list(range(1, 27))))
 
@@ -243,53 +243,49 @@ def gsm8k_heb_fewshot_prompt(line, task_name="gsm8k_heb"):
 # ============================================================
 ARC_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/arc_ai2_heb/train.jsonl"
 
-arc_few_shots_list = []
+# arc_few_shots_list = []
 
-with open(ARC_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take only 25 few-shots
-            break
-        data = json.loads(line)
-        choices = data.get("choices", [])
-        answer_index = data.get("answer_index", 0)  # default 0 if missing
-        gold_choice = choices[answer_index] if choices else ""  # extract correct answer string
+# with open(ARC_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
+#     for i, line in enumerate(f):
+#         if i >= 5:  # take only 25 few-shots
+#             break
+#         data = json.loads(line)
+#         choices = data.get("choices", [])
+#         answer_index = data.get("answer_index", 0)  # default 0 if missing
+#         gold_choice = choices[answer_index] if choices else ""  # extract correct answer string
 
-        arc_few_shots_list.append({
-            "query": data.get("query", ""),  # use 'query', not 'question'
-            "choices": choices,
-            "gold": gold_choice,
-            "answer_index": answer_index
-        })
+#         arc_few_shots_list.append({
+#             "query": data.get("query", ""),  # use 'query', not 'question'
+#             "choices": choices,
+#             "gold": gold_choice,
+#             "answer_index": answer_index
+#         })
 
 printed_arc_prompt = False  # global flag
 
 def arc_ai2_heb_prompt(line, task_name: str = "arc_ai2_heb"):
     global printed_arc_prompt
 
-    few_shot_text = ""
-    for i, shot in enumerate(arc_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
-        choices_text = ", ".join(choices)
-        few_shot_text += (
-            f"Question {i+1}: {qs}\n"
-            f"Choices: {choices_text}\n"
-            f"Right Index: {ans_index}\n\n"
-        )
+    # few_shot_text = ""
+    # for i, shot in enumerate(arc_few_shots_list):
+    #     qs = shot["query"].replace('\n', ' ').strip()
+    #     choices = shot.get("choices", [])
+    #     ans_index = shot.get("answer_index", 0)
+    #     choices_text = ", ".join(choices)
+    #     few_shot_text += (
+    #         f"Question {i+1}: {qs}\n"
+    #         f"Choices: {choices_text}\n"
+    #         f"Right Index: {ans_index}\n\n"
+    #     )
 
     target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
     target_choices_text = ", ".join(target_choices)
-
-    full_prompt = (
-        f"ניתנו לך 5 שאלות לדוגמה עם התשובות שלהן. עיין בהן כדי להבין את הדפוס, "
-        f"עליך לבחור את תשובה המתאימה ביותר לשאלה האחרונה.\n\n"
-        f"{few_shot_text}"
-        f"Question: {target_q}\n"
-        f"Choices: {target_choices_text}\n"
-        f"Right Index:"
-    )
+    instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+    full_prompt = f"""{instruction}
+Question: {target_q}
+Choices: {target_choices_text}
+Answer:"""
 
     if not printed_arc_prompt:
         print("="*50)
@@ -300,8 +296,8 @@ def arc_ai2_heb_prompt(line, task_name: str = "arc_ai2_heb"):
 
     return Doc(
         task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
+        query=full_prompt,
+        instruction=instruction,
         choices=target_choices,
         gold_index=line.get("answer_index", 0),
     )
@@ -405,13 +401,11 @@ def full_copa_prompt(line, task_name: str = "copa"):
         target_choices = ["A", "B"]  # fallback
 
     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-    instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A או B).\n\n"
-    full_prompt = (
-        instruction,
-        f"שאלה: {target_q}\n"
-        f"{target_choices_formatted}\n"
-        f"תשובה:"
-    )
+    instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A או B).\n"
+    full_prompt = f"""{instruction}
+        שאלה: {target_q}
+{target_choices_formatted}
+תשובה:"""
 
 
     # Get answer_index directly for validation data
@@ -432,113 +426,111 @@ def full_copa_prompt(line, task_name: str = "copa"):
     # Model predicts among A, B, C, D based on number of choices
     letter_choices = [chr(65 + i) for i in range(len(target_choices))]
     
-    print(f"COPA DEBUG: Question='{target_q[:50]}...', Choices={len(target_choices)}, Gold_index={gold_index}, Expected={chr(65+gold_index)}")
+    # print(f"COPA DEBUG: Question='{target_q[:50]}...', Choices={len(target_choices)}, Gold_index={gold_index}, Expected={chr(65+gold_index)}")
 
     return Doc(
         task_name=task_name,
         query=full_prompt,
-        instruction=instruction,
+        instruction=instruction ,
         choices=letter_choices,
         gold_index=gold_index,
     )
 # ============================================================
-# HellaSwag Hebrew Section - 2-Choice A-B Format
+# HellaSwag Hebrew 
 # ============================================================
 
 HELLASWAG_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/hellaswag_heb/train.jsonl"
 
 hellaswag_few_shots_list = []
 
-print("Loading HellaSwag Hebrew few-shot examples...")
-with open(HELLASWAG_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    valid_examples = 0
-    for i, line in enumerate(f):
-        if valid_examples >= 5:  # take only 5 valid few-shots
-            break
+# print("Loading HellaSwag Hebrew few-shot examples...")
+# with open(HELLASWAG_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
+#     valid_examples = 0
+#     for i, line in enumerate(f):
+#         if valid_examples >= 5:  # take only 5 valid few-shots
+#             break
         
-        try:
-            data = json.loads(line)
-            choices = data.get("choices", [])
+#         try:
+#             data = json.loads(line)
+#             choices = data.get("choices", [])
             
-            if not choices:
-                print(f"HellaSwag Warning: No choices found in line {i}, skipping")
-                continue
+#             if not choices:
+#                 print(f"HellaSwag Warning: No choices found in line {i}, skipping")
+#                 continue
 
-            # Get answer_index directly
-            answer_index = data.get("answer_index")
+#             # Get answer_index directly
+#             answer_index = data.get("answer_index")
             
-            if answer_index is None:
-                print(f"HellaSwag Warning: No answer_index found in line {i}, skipping")
-                continue
+#             if answer_index is None:
+#                 print(f"HellaSwag Warning: No answer_index found in line {i}, skipping")
+#                 continue
             
-            if not isinstance(answer_index, int):
-                print(f"HellaSwag Warning: answer_index must be integer, got {type(answer_index)} in line {i}, skipping")
-                continue
+#             if not isinstance(answer_index, int):
+#                 print(f"HellaSwag Warning: answer_index must be integer, got {type(answer_index)} in line {i}, skipping")
+#                 continue
 
-            # Validate the answer index is within range
-            if answer_index >= len(choices) or answer_index < 0:
-                print(f"HellaSwag Warning: Answer index {answer_index} out of range for {len(choices)} choices in line {i}, skipping")
-                continue
+#             # Validate the answer index is within range
+#             if answer_index >= len(choices) or answer_index < 0:
+#                 print(f"HellaSwag Warning: Answer index {answer_index} out of range for {len(choices)} choices in line {i}, skipping")
+#                 continue
 
-            gold_choice = choices[answer_index]
+#             gold_choice = choices[answer_index]
 
-            hellaswag_few_shots_list.append({
-                "query": data.get("query", ""),
-                "choices": choices,
-                "gold": gold_choice,
-                "answer_index": answer_index,
-            })
+#             hellaswag_few_shots_list.append({
+#                 "query": data.get("query", ""),
+#                 "choices": choices,
+#                 "gold": gold_choice,
+#                 "answer_index": answer_index,
+#             })
             
-            valid_examples += 1
-            print(f"HellaSwag: Added few-shot example {valid_examples}: answer_index={answer_index} -> {chr(65+answer_index)}")
+#             valid_examples += 1
+#             print(f"HellaSwag: Added few-shot example {valid_examples}: answer_index={answer_index} -> {chr(65+answer_index)}")
             
-        except json.JSONDecodeError as e:
-            print(f"HellaSwag Warning: JSON decode error in line {i}: {e}")
-            continue
-        except Exception as e:
-            print(f"HellaSwag Warning: Error processing line {i}: {e}")
-            continue
+#         except json.JSONDecodeError as e:
+#             print(f"HellaSwag Warning: JSON decode error in line {i}: {e}")
+#             continue
+#         except Exception as e:
+#             print(f"HellaSwag Warning: Error processing line {i}: {e}")
+#             continue
 
-print(f"HellaSwag: Successfully loaded {len(hellaswag_few_shots_list)} few-shot examples")
+# print(f"HellaSwag: Successfully loaded {len(hellaswag_few_shots_list)} few-shot examples")
 
 hellaswag_prompt = False
 
 def hellaswag_heb_prompt(line, task_name: str = "hellaswag_heb"):
     global hellaswag_prompt
 
-    few_shot_text = ""
-    for i, shot in enumerate(hellaswag_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
+    # few_shot_text = ""
+    # for i, shot in enumerate(hellaswag_few_shots_list):
+    #     qs = shot["query"].replace('\n', ' ').strip()
+    #     choices = shot.get("choices", [])
+    #     ans_index = shot.get("answer_index", 0)
         
-        # Format choices with letters (A, B for 2-choice)
-        choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
-        correct_letter = chr(65 + ans_index)
+    #     # Format choices with letters (A, B for 2-choice)
+    #     choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
+    #     correct_letter = chr(65 + ans_index)
 
-        few_shot_text += (
-            f"שאלה {i+1}: {qs}\n"
-            f"{choices_text}\n"
-            f"תשובה: {correct_letter}\n\n"
-        )
+    #     few_shot_text += (
+    #         f"שאלה {i+1}: {qs}\n"
+    #         f"{choices_text}\n"
+    #         f"תשובה: {correct_letter}\n\n"
+    #     )
 
     target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
 
-    if not target_choices:
-        print(f"HellaSwag Warning: No choices found for target question: {target_q}")
-        target_choices = ["A", "B"]  # fallback
+    # if not target_choices:
+    #     print(f"HellaSwag Warning: No choices found for target question: {target_q}")
+    #     target_choices = ["A", "B"]  # fallback
 
     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
 
     # Use A-D format for HellaSwag Hebrew (4 choices)
-    full_prompt = (
-        f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-        f"{few_shot_text}"
-        f"שאלה: {target_q}\n"
-        f"{target_choices_formatted}\n"
-        f"תשובה:"
-    )
+    instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+    full_prompt = f"""{instruction}
+שאלה: {target_q}
+{target_choices_formatted}
+תשובה:"""
 
     if not hellaswag_prompt:
         print("="*50)
@@ -565,12 +557,12 @@ def hellaswag_heb_prompt(line, task_name: str = "hellaswag_heb"):
     # Model predicts among A, B (or more if your data has more choices)
     letter_choices = [chr(65 + i) for i in range(len(target_choices))]
     
-    print(f"HellaSwag DEBUG: Question='{target_q[:50]}...', Choices={len(target_choices)}, Gold_index={gold_index}, Expected={chr(65+gold_index)}")
+    # print(f"HellaSwag DEBUG: Question='{target_q[:50]}...', Choices={len(target_choices)}, Gold_index={gold_index}, Expected={chr(65+gold_index)}")
 
     return Doc(
         task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
+        query=full_prompt,
+        instruction=instruction,
         choices=letter_choices,
         gold_index=gold_index,
     )
@@ -1498,10 +1490,10 @@ LightevalTaskConfig(
         hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "copa_heb/"),
         evaluation_splits=["validation"],
         few_shots_split="train",
-        generation_size=-1,
-        metric=[
-            loglikelihood_acc_metric(normalization=LogProbTokenNorm()),
-        ],
+        # generation_size=-1,
+        # metric=[
+        #     loglikelihood_acc_metric(normalization=LogProbTokenNorm()),
+        # ],
     ),
      LightevalTaskConfig(
         name="hellaswag_heb",

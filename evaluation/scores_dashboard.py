@@ -6,13 +6,17 @@ from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime
 import re
+import traceback
 import os
 from extract_benchmark_results import summarize_benchmark_runs
 from check_port_avaliablity import check_port_or_raise
-
+from detailed_results_viewer import launch_detailed_viewer, create_viewer_interface
+import webbrowser
+import threading
+from typing import List, Optional, Dict
 print("Starting Gradio app code...")
 # Load and process the data
-local_save_directory = "/home/ubuntu/qwen-hebrew-finetuning/evaluation"  
+local_save_directory = os.path.dirname(os.path.abspath(__file__))  
 csv_filename = 'benchmark_results_summary.csv'
 def generate_runs_table():
     # Use the original local path as default
@@ -26,6 +30,7 @@ def load_data():
     # df = pd.read_csv('benchmark_results_summary.csv')
     #  check if the file exists
     if not os.path.exists(os.path.join(local_save_directory, csv_filename)):
+        print( f"CSV file not found: {os.path.join(local_save_directory, csv_filename)}",f"CSV file not found: {os.path.join(local_save_directory, csv_filename)}")
         return f"CSV file not found: {os.path.join(local_save_directory, csv_filename)}",f"CSV file not found: {os.path.join(local_save_directory, csv_filename)}"
     df = pd.read_csv(os.path.join(local_save_directory, csv_filename))
 
@@ -100,7 +105,7 @@ def get_available_runs():
 
 def create_data_table():
     try:
-        generate_runs_table()  # Refresh data before loading
+        
         df, _ = load_data()
         # Format timestamp for display
         df_display = df.copy()
@@ -108,6 +113,9 @@ def create_data_table():
         return df_display
     except Exception as e:
         print(f"Error creating data table: {e}")
+        #print traceback
+        traceback.print_exc()
+
         # Return empty dataframe with error message
         return pd.DataFrame({'Error': [f'Failed to load data: {str(e)}']})
 
@@ -444,6 +452,109 @@ def create_model_performance_heatmap():
                          xref="paper", yref="paper", x=0.5, y=0.5)
         return fig
 
+
+def get_pickle_path(row_data: Dict, dataset_column: str) -> str:
+    """
+    Construct pickle file path from row data
+    
+    Args:
+        row_data: Dictionary containing row information
+        dataset_column: The name of the dataset column clicked
+    
+    Returns:
+        Path to the pickle file
+    """
+    print("dummy data")
+    return "/home/ec2-user/test_output/hellaswag_heb/scores_sum/2025-10-15T21-51-38/details/home/ec2-user/models/Qwen3-14B/2025-10-15T21-52-23.466806/details_community|hellaswag_heb|3_2025-10-15T21-52-23.466806.parquet"
+    model_name = row_data.get('model_name', '')
+    timestamp = row_data.get('timestamp', '')
+    
+    # Convert timestamp to directory format (if needed)
+    if isinstance(timestamp, str) and 'T' in timestamp:
+        timestamp_dir = timestamp.replace(':', '-').split('.')[0]  # Remove microseconds
+    else:
+        timestamp_dir = str(timestamp)
+    
+    # Extract dataset name from column (e.g., 'arc_ai2_heb_score' -> 'arc_ai2_heb')
+    dataset = dataset_column.replace('_score', '').replace('_std', '')
+    
+    # Construct path
+    pickle_path = os.path.join(
+        local_save_directory,
+        model_name,
+        timestamp_dir,
+        f"{dataset}.pkl"
+    )
+    
+    return pickle_path
+
+def make_clickable_table():
+    """Create an interactive table with clickable cells"""
+    try:
+        df = create_data_table()
+        
+        # Get score columns
+        score_columns = [col for col in df.columns if col.endswith('_score')]
+        
+        return df, score_columns
+    except Exception as e:
+        print(f"Error creating clickable table: {e}")
+        return pd.DataFrame({'Error': [str(e)]}), []
+
+def handle_cell_click(row_idx: int, col_name: str, df: pd.DataFrame):
+    """
+    Handle cell click event and launch detailed viewer
+    
+    Args:
+        row_idx: Index of clicked row
+        col_name: Name of clicked column
+        df: The dataframe
+    """
+    # Check if clicked column is a score column
+    if not col_name.endswith('_score'):
+        return None
+    
+    try:
+        # Get row data
+        row_data = df.iloc[row_idx].to_dict()
+        
+        # Get pickle path
+        pickle_path = get_pickle_path(row_data, col_name)
+        
+        if not os.path.exists(pickle_path):
+            print(f"Pickle file not found: {pickle_path}")
+            return gr.Info(f"Data file not found: {pickle_path}")
+        
+        # Extract metadata
+        model_name = row_data.get('model_name', 'Unknown')
+        timestamp = row_data.get('timestamp', 'Unknown')
+        dataset = col_name.replace('_score', '')
+        
+        # Launch detailed viewer in new window (requires launching as separate Gradio instance)
+        viewer = create_viewer_interface(pickle_path)
+        
+        # Launch on different port
+        import random
+        port = random.randint(7700, 7799)
+        
+        def launch_viewer():
+            viewer.launch(
+                server_port=port,
+                share=True,
+                prevent_thread_lock=True,
+                show_error=True,
+                inbrowser=True
+            )
+        
+        thread = threading.Thread(target=launch_viewer, daemon=True)
+        thread.start()
+        
+        return gr.Info(f"Opening detailed view for {dataset} in new window on port {port}")
+        
+    except Exception as e:
+        print(f"Error handling cell click: {e}")
+        return gr.Warning(f"Error: {str(e)}")
+
 # Create Gradio interface
 with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 🏆 Benchmark Results Visualization Dashboard")
@@ -452,16 +563,67 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
     with gr.Tabs():
         with gr.Tab("📊 Data Table"):
             gr.Markdown("### Raw Benchmark Data")
+            # gr.Markdown("**💡 Tip:** Click on any score cell to view detailed results for that dataset")
+            
+            # Create state to store dataframe
+            df_state = gr.State(value=create_data_table())
+            
             data_table = gr.Dataframe(
-                value=create_data_table(),
+                value=lambda: df_state.value,
                 wrap=True,
                 max_height=600,
-                interactive=False
+                interactive=True
             )
             
+            # Add click handler (Note: Gradio's Dataframe doesn't have built-in click events)
+            # Instead, we'll add a selection-based approach
+            
+            with gr.Row():
+                row_selector = gr.Number(label="Row Index", value=0, precision=0)
+                col_selector = gr.Dropdown(
+                    label="Dataset Column",
+                    choices=[],  # Will be populated dynamically
+                    value=None
+                )
+                view_btn = gr.Button("🔍 View Details", variant="primary")
+            
+            info_box = gr.Textbox(label="Status", interactive=False)
+            
+            def update_col_choices():
+                df, score_cols = make_clickable_table()
+                return gr.Dropdown(choices=score_cols)
+            
+            def refresh_table():
+                generate_runs_table()  # Refresh data
+                df = create_data_table()
+                _, score_cols = make_clickable_table()
+                return df, gr.Dropdown(choices=score_cols)
+            
             refresh_data_btn = gr.Button("🔄 Refresh Data", variant="secondary")
-            refresh_data_btn.click(fn=create_data_table, outputs=data_table)
-        
+            
+            # Handle view button click
+            def on_view_click(row_idx, col_name, df):
+                if col_name is None:
+                    return "Please select a dataset column"
+                try:
+                    result = handle_cell_click(int(row_idx), col_name, df)
+                    return f"Launched viewer for row {row_idx}, column {col_name}"
+                except Exception as e:
+                    return f"Error: {str(e)}"
+            
+            view_btn.click(
+                fn=on_view_click,
+                inputs=[row_selector, col_selector, df_state],
+                outputs=info_box
+            )
+            
+            refresh_data_btn.click(
+                fn=refresh_table,
+                outputs=[data_table, col_selector]
+            )
+            
+            # Initialize column choices on load
+            demo.load(fn=update_col_choices, outputs=col_selector)        
         with gr.Tab("📈 Benchmark Comparison"):
             gr.Markdown("### Compare Scores Across Benchmarks")
             gr.Markdown("Select specific runs to compare, or use 'Latest per model' to compare the most recent results for each model.")

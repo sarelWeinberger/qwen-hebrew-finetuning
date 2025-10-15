@@ -3,13 +3,14 @@
 # pip install lighteval[vllm] emoji boto3
 ## check s3 
 # python /home/ec2-user/qwen-hebrew-finetuning/evaluation/s3_utils.py
-# DATASET_NAME="copa_it_mcf,copa_heb"
+DATASET_NAME="hellaswag_heb" #"mmlu_heb"
 # DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
-DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew"
+# DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew"
 # TODO: activate those benchmarks: gsm8k_heb isn't configured yet and all the psychometric bench below caused content length issue in vllm backend (RuntimeError: Worker failed with error 'Sampled token IDs exceed the max model length. Total number of tokens: 2048 > max_model_len: 2047)
 # DATASET_NAME="gsm8k_heb,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
 # TODO: call all tasks togther will save a lot of time - currently each task is called separately and the backend uploading in each task the model to gpu
-MAX_SAMPLES=30
+MAX_SAMPLES=70
+
 MODEL_PATH="/home/ec2-user/models/Qwen3-14B" #"/home/ec2-user/qwen-hebrew-finetuning/model260000" #"Qwen/Qwen3-30B-A3B-Base" #"/home/ec2-user/qwen-hebrew-finetuning/model260000"
 DEVICE="cuda:0"
 BATCH_SIZE=8
@@ -27,11 +28,12 @@ export HEB_BENCHMARKS_DIR_PATH
 echo "HEB_BENCHMARKS_DIR_PATH is set to: $HEB_BENCHMARKS_DIR_PATH"
 # CUSTOM_TASKS="/home/ec2-user/noam/heb_bnch/custom_tasks" #tried to be suitable for new lighteval version
 # CUSTOM_TASKS="custom_tasks"
-TASK_CONFIG="lighteval|$DATASET_NAME|$FEW_SHOTS"
+# TASK_CONFIG="lighteval|$DATASET_NAME|$FEW_SHOTS"
+# TASK_CONFIG="leaderboard|$DATASET_NAME|$FEW_SHOTS"
 BACKEND="vllm"  # Options: "vllm" or "accelerate"
 # TASK_CONFIG="community|mmlu_heb|5|0,community|copa_heb|5|0,community|hellaswag_heb|5|0"
 if [[ "$BACKEND" == "vllm" ]]; then
-    CUSTOM_TASKS="multilingual/tasks" #"custom_tasks_new_version"
+    CUSTOM_TASKS="custom_tasks_new_version"
 elif [[ "$BACKEND" == "accelerate" ]]; then
     echo "Using Accelerate backend"
     CUSTOM_TASKS="custom_tasks"
