@@ -16,23 +16,54 @@ TOP_K=1
 TEMPERATURE=1.0
 BACKEND="vllm"
 
-# SageMaker paths
-SAGEMAKER_BASE="/opt/ml"
-OUTPUT_DIR="${SAGEMAKER_BASE}/model/benchmark_results"
-CODE_DIR="${SAGEMAKER_BASE}/input/data/code"
-BENCHMARKS_DIR="${SAGEMAKER_BASE}/input/data/benchmarks"
+# Detect environment - SageMaker vs EC2
+if [ -d "/opt/ml/model" ]; then
+    echo "🔍 Detected: SageMaker Training Job"
+    OUTPUT_DIR="/opt/ml/model/benchmark_results"
+    LOCAL_MODEL_DIR="/opt/ml/model/model_cache"
+
+    # Check if custom_tasks were uploaded
+    if [ -d "/opt/ml/input/data/code" ]; then
+        CODE_DIR="/opt/ml/input/data/code"
+    else
+        # No custom code uploaded - will fail if needed
+        CODE_DIR="/opt/ml/code"
+    fi
+
+    # Benchmarks path
+    BENCHMARKS_DIR="${HEB_BENCHMARKS_DIR_PATH:-/opt/ml/input/data/benchmarks}"
+else
+    echo "🔍 Detected: EC2 / Local environment"
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    OUTPUT_DIR="${SCRIPT_DIR}/benchmark_results"
+    CODE_DIR="${SCRIPT_DIR}"
+    BENCHMARKS_DIR="${BENCHMARKS_DIR:-${SCRIPT_DIR}/benchmarks}"
+    LOCAL_MODEL_DIR="/tmp/model_cache"
+fi
+
+mkdir -p "$LOCAL_MODEL_DIR"
+mkdir -p "$OUTPUT_DIR"
+
+echo "📁 Paths configured:"
+echo "   OUTPUT_DIR: $OUTPUT_DIR"
+echo "   CODE_DIR: $CODE_DIR"
+echo "   BENCHMARKS_DIR: $BENCHMARKS_DIR"
+echo "   LOCAL_MODEL_DIR: $LOCAL_MODEL_DIR"
 
 # Model configuration - can be overridden by environment variables
 MODEL_SOURCE="${MODEL_SOURCE:-huggingface}"  # Options: "huggingface" or "s3"
 MODEL_NAME="${MODEL_NAME:-CohereLabs/aya-expanse-8b}"
 S3_MODEL_PATH="${S3_MODEL_PATH:-}"  # Only used if MODEL_SOURCE=s3
 
-# Local model path (will be downloaded to here)
-LOCAL_MODEL_DIR="${SAGEMAKER_BASE}/model_cache"
-mkdir -p "$LOCAL_MODEL_DIR"
+# HuggingFace Token - REQUIRED for gated models
+HF_TOKEN="${HF_TOKEN:-}"  # Add your token here
+
+# Export for Python to use
+export HF_TOKEN
+export HUGGING_FACE_HUB_TOKEN="$HF_TOKEN"
 
 echo "========================================="
-echo "SageMaker LightEval Benchmark Runner"
+echo "Environment Configuration"
 echo "========================================="
 echo "Model Source: $MODEL_SOURCE"
 echo "Model Name/Path: $MODEL_NAME"
@@ -50,28 +81,90 @@ download_from_huggingface() {
 
     echo "📥 Downloading model from HuggingFace: $hf_model_name"
 
-    # Use huggingface-cli to download
-    python3 -c "
+    # Ensure the local path exists
+    mkdir -p "$local_path"
+
+    # Use system Python instead of venv Python
+    # Check if we're in SageMaker and use the appropriate Python
+    if [ -f "/opt/conda/bin/python" ]; then
+        PYTHON_CMD="/opt/conda/bin/python"
+    elif [ -f "/usr/bin/python3" ]; then
+        PYTHON_CMD="/usr/bin/python3"
+    else
+        PYTHON_CMD="python3"
+    fi
+
+    echo "Using Python: $PYTHON_CMD"
+
+    # Install dependencies - try multiple approaches
+    echo "📦 Installing required dependencies..."
+
+    # Try 1: Use --break-system-packages (safe in containers/SageMaker)
+    if $PYTHON_CMD -m pip install --break-system-packages huggingface_hub transformers accelerate --quiet 2>/dev/null; then
+        echo "✅ Dependencies installed with --break-system-packages"
+    # Try 2: Create and use a venv
+    elif $PYTHON_CMD -m venv "$local_path/venv" 2>/dev/null && source "$local_path/venv/bin/activate"; then
+        echo "📦 Created virtual environment"
+        pip install --upgrade pip --quiet
+        pip install huggingface_hub transformers accelerate --quiet
+        PYTHON_CMD="$local_path/venv/bin/python"
+        echo "✅ Dependencies installed in venv"
+    # Try 3: Use conda if available
+    elif command -v conda &> /dev/null; then
+        echo "📦 Using conda to install dependencies"
+        conda install -y -c conda-forge huggingface_hub transformers accelerate --quiet
+        echo "✅ Dependencies installed with conda"
+    else
+        echo "⚠️ Trying fallback installation method..."
+        $PYTHON_CMD -m pip install --user --break-system-packages huggingface_hub transformers accelerate --quiet
+        echo "✅ Dependencies installed successfully"
+    fi
+
+    # Use huggingface_hub to download the model
+    $PYTHON_CMD - <<PYCODE
 from huggingface_hub import snapshot_download
+try:
+    from huggingface_hub import login
+except ImportError:
+    # Fallback for older versions
+    login = None
 import os
 
+hf_model_name = "$hf_model_name"
+local_path = "$local_path"
+
+# Try to authenticate with HuggingFace token
+hf_token = os.environ.get('HF_TOKEN') or os.environ.get('HUGGING_FACE_HUB_TOKEN')
+if hf_token:
+    print("🔐 Authenticating with HuggingFace...")
+    if login:
+        login(token=hf_token)
+        print("✅ Authentication successful")
+    else:
+        print("⚠️  login() not available, passing token directly to download")
+else:
+    print("⚠️  No HF_TOKEN found - trying without authentication...")
+
+print(f"📦 Starting download for: {hf_model_name}")
+
 model_path = snapshot_download(
-    repo_id='$hf_model_name',
-    cache_dir='$local_path',
+    repo_id=hf_model_name,
+    cache_dir=local_path,
     resume_download=True,
-    local_files_only=False
+    local_files_only=False,
+    token=hf_token
 )
-print(f'Model downloaded to: {model_path}')
+print(f"✅ Model downloaded to: {model_path}")
 
 # Create a symlink for easier access
-symlink_path = '$local_path/current_model'
+symlink_path = os.path.join(local_path, "current_model")
 if os.path.exists(symlink_path):
     os.remove(symlink_path)
 os.symlink(model_path, symlink_path)
-print(f'Symlink created at: {symlink_path}')
-"
+print(f"🔗 Symlink created at: {symlink_path}")
+PYCODE
 
-    echo "✅ Model downloaded successfully"
+    echo "✅ Model downloaded and linked successfully"
     MODEL_PATH="$local_path/current_model"
 }
 
@@ -126,14 +219,47 @@ export PYTHONPATH="$CODE_DIR:$PYTHONPATH"
 echo "HEB_BENCHMARKS_DIR_PATH: $HEB_BENCHMARKS_DIR_PATH"
 echo "PYTHONPATH: $PYTHONPATH"
 
-# Determine custom tasks directory based on backend
-if [[ "$BACKEND" == "vllm" ]]; then
-    CUSTOM_TASKS="$CODE_DIR/custom_tasks_new_version"
-elif [[ "$BACKEND" == "accelerate" ]]; then
-    CUSTOM_TASKS="$CODE_DIR/custom_tasks"
-fi
+# Setup Python path for custom tasks
+if [ -d "/opt/ml/input/data/code" ]; then
+    # Add the parent directory to PYTHONPATH so Python can import the module
+    export PYTHONPATH="/opt/ml/input/data:$PYTHONPATH"
+    CUSTOM_TASKS="code"  # This is the module name
 
-echo "Custom Tasks Dir: $CUSTOM_TASKS"
+    echo "========================================="
+    echo "DEBUG: Custom Tasks Module Check"
+    echo "========================================="
+    echo "PYTHONPATH: $PYTHONPATH"
+    echo ""
+    echo "Files in /opt/ml/input/data/code:"
+    ls -la /opt/ml/input/data/code/
+    echo ""
+    echo "Python sys.path:"
+    python3 -c "import sys; import pprint; pprint.pprint(sys.path)"
+    echo ""
+    echo "Trying to import 'code' module:"
+    python3 -c "
+import sys
+try:
+    import code as custom_module
+    print('✅ Module imported successfully')
+    print('Module file:', custom_module.__file__ if hasattr(custom_module, '__file__') else 'No __file__')
+    print('Has TASKS_TABLE:', hasattr(custom_module, 'TASKS_TABLE'))
+    if hasattr(custom_module, 'TASKS_TABLE'):
+        print('TASKS_TABLE type:', type(custom_module.TASKS_TABLE))
+        print('Number of tasks:', len(custom_module.TASKS_TABLE) if hasattr(custom_module.TASKS_TABLE, '__len__') else 'N/A')
+    print('Module attributes:', dir(custom_module))
+except Exception as e:
+    print('❌ Failed to import module')
+    print('Error:', str(e))
+    import traceback
+    traceback.print_exc()
+"
+    echo "========================================="
+    echo ""
+else
+    CUSTOM_TASKS=""
+    echo "⚠️  No custom tasks found at /opt/ml/input/data/code"
+fi
 
 # ==========================================
 # Create Output Structure
@@ -174,19 +300,28 @@ for DS_NAME in "${DATASET_LIST[@]}"; do
 
     RESULTS_PATH_TEMPLATE="$OUTPUT_RUN_DIR/${DS_NAME}"
 
+    # Build lighteval command based on whether we have custom tasks
+    if [ -n "$CUSTOM_TASKS" ]; then
+        CUSTOM_TASKS_ARG="--custom-tasks $CUSTOM_TASKS"
+        echo "Using custom tasks: $CUSTOM_TASKS"
+    else
+        CUSTOM_TASKS_ARG=""
+        echo "No custom tasks - using default tasks"
+    fi
+
     if [[ "$BACKEND" == "vllm" ]]; then
         echo "Using VLLM backend"
         export VLLM_CACHE_DIR="$OUTPUT_RUN_DIR/vllm_cache"
         mkdir -p "$VLLM_CACHE_DIR"
 
-        MODEL_CONFIG="model_name=$MODEL_PATH,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=2048"
+        MODEL_CONFIG="model_name=$MODEL_PATH,tensor_parallel_size=1,gpu_memory_utilization=0.85,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=2048"
 
         PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
         VLLM_WORKER_MULTIPROC_METHOD=spawn \
         python -m lighteval vllm \
             "$MODEL_CONFIG" \
             "$TASK_CONFIG" \
-            --custom-tasks "$CUSTOM_TASKS" \
+            $CUSTOM_TASKS_ARG \
             --output-dir "$OUTPUT_RUN_DIR" \
             --save-details \
             --results-path-template "$RESULTS_PATH_TEMPLATE" \
@@ -200,7 +335,7 @@ for DS_NAME in "${DATASET_LIST[@]}"; do
         python -m lighteval accelerate \
             "$MODEL_CONFIG" \
             "$TASK_CONFIG" \
-            --custom-tasks "$CUSTOM_TASKS" \
+            $CUSTOM_TASKS_ARG \
             --output-dir "$OUTPUT_RUN_DIR" \
             --save-details \
             --results-path-template "$RESULTS_PATH_TEMPLATE" \

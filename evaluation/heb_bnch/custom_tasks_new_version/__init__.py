@@ -3,7 +3,6 @@ import re
 import string
 import collections
 import json
-from Levenshtein import distance
 import numpy as np
 from lighteval.tasks.lighteval_task import LightevalTaskConfig
 from lighteval.tasks.requests import Doc
@@ -1581,3 +1580,4 @@ LightevalTaskConfig(
 
 ]
 TASKS_TABLE = _TASKS
+__all__ = ["TASKS_TABLE"]
