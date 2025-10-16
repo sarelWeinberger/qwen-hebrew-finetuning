@@ -23,21 +23,19 @@ var/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Model files
-qwen_model/model/
-qwen_model/finetuned/
-qwen_model/test_run/
-qwen_model/finetuning/hp_tuning/
-
 # Data files
-qwen_model/data/raw/
-qwen_model/data/dataset/
+training/deepspeed/datasets/
+training/deepspeed/datasets_bkp/
+
+# Output files
+training/deepspeed/output/
 
 # Logs
-qwen_model/logs/
+training/deepspeed/logs/
 wandb/
 lightning_logs/
 runs/
+training/deepspeed/logs/qwen_model_shaltiel/*.log
 
 # Environment
 .env
@@ -70,12 +68,18 @@ Thumbs.db
 
 # Git
 .git/
+.gitignore
+qwen_model_shaltiel/.gitignore
 
 # Other
 =*
+aws-efa-installer/
 
 # csv
 *.csv
 
 # logging
 *.log
+
+# sandbox
+sandbox/

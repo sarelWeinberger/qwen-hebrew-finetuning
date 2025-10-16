@@ -1,0 +1,38 @@
+cluster_name: minihash-ray-cluster
+
+provider:
+    type: aws
+    region: us-east-1
+
+max_workers: 100
+
+auth:
+    ssh_user: ubuntu
+    ssh_private_key: ~/.ssh/ray-key.pem
+
+head_node_type: head_node
+available_node_types:
+    head_node:
+        resources: {}
+        node_config:
+            InstanceType: m5.large
+            ImageId: ami-0f20cc6143e3cdb84
+            KeyName: ray-key
+    worker_node:
+        resources: {}
+        node_config:
+            InstanceType: c5.large
+            ImageId: ami-0f20cc6143e3cdb84
+            KeyName: ray-key
+        min_workers: 2
+        max_workers: 90
+setup_commands:
+  - sudo apt update -y
+  - sudo apt install -y python3 python3-pip python3-venv python3-dev
+  - sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+  - python3 -m pip install --upgrade pip
+  - python3 -m pip install ray[default]
+  - python3 -m pip install datatrove[ray,s3,processing] boto3 s3fs orjson spacy
+  - aws configure set aws_access_key_id ADD HERE YOUR KEY
+  - aws configure set aws_secret_access_key ADD HERE YOUR KEY
+  - aws configure set default.region us-east-1

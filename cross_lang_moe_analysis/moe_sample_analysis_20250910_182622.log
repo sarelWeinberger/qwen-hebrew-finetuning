@@ -1,0 +1,497 @@
+2025-09-10 18:26:22,309 - === Sample MoE Analysis Started ===
+2025-09-10 18:26:22,309 - Loading model and tokenizer...
+2025-09-10 18:26:55,383 - 
+Prompt 1: Explain how neural networks work in machine learning.
+2025-09-10 18:26:55,408 - Input tokens: 18
+2025-09-10 18:26:55,408 - 
+=== MoE Routing Analysis for English - Prompt 1 ===
+2025-09-10 18:26:57,117 - Layer 0: Entropy=4.1875, Variance=0.000425, Gini=0.8741
+2025-09-10 18:26:57,117 - Layer 5: Entropy=4.1250, Variance=0.000911, Gini=0.9401
+2025-09-10 18:26:57,118 - Layer 10: Entropy=4.1250, Variance=0.000813, Gini=0.9349
+2025-09-10 18:26:57,119 - Layer 15: Entropy=4.1250, Variance=0.000619, Gini=0.9158
+2025-09-10 18:26:57,119 - Layer 20: Entropy=4.0312, Variance=0.000959, Gini=0.9436
+2025-09-10 18:26:57,120 - Layer 25: Entropy=3.8125, Variance=0.000862, Gini=0.9358
+2025-09-10 18:26:57,120 - Layer 30: Entropy=4.2188, Variance=0.001056, Gini=0.9497
+2025-09-10 18:26:57,121 - Layer 35: Entropy=3.8438, Variance=0.001397, Gini=0.9618
+2025-09-10 18:26:57,122 - Layer 40: Entropy=3.8281, Variance=0.000813, Gini=0.9297
+2025-09-10 18:26:57,122 - Layer 45: Entropy=4.0312, Variance=0.000862, Gini=0.9314
+2025-09-10 18:26:57,123 - Layer 47: Entropy=3.7500, Variance=0.000862, Gini=0.9314
+2025-09-10 18:26:57,123 - 
+Prompt 2: Write a short story about a robot learning to paint.
+2025-09-10 18:26:57,124 - Input tokens: 19
+2025-09-10 18:26:57,124 - 
+=== MoE Routing Analysis for English - Prompt 2 ===
+2025-09-10 18:26:58,125 - Layer 0: Entropy=4.1562, Variance=0.000484, Gini=0.8910
+2025-09-10 18:26:58,126 - Layer 5: Entropy=4.1250, Variance=0.000789, Gini=0.9297
+2025-09-10 18:26:58,126 - Layer 10: Entropy=4.0625, Variance=0.001574, Gini=0.9618
+2025-09-10 18:26:58,127 - Layer 15: Entropy=4.0312, Variance=0.002360, Gini=0.9618
+2025-09-10 18:26:58,128 - Layer 20: Entropy=4.0000, Variance=0.000527, Gini=0.9009
+2025-09-10 18:26:58,128 - Layer 25: Entropy=3.8281, Variance=0.001007, Gini=0.9453
+2025-09-10 18:26:58,129 - Layer 30: Entropy=4.0625, Variance=0.001749, Gini=0.9667
+2025-09-10 18:26:58,129 - Layer 35: Entropy=3.8594, Variance=0.001051, Gini=0.9461
+2025-09-10 18:26:58,130 - Layer 40: Entropy=3.8594, Variance=0.000746, Gini=0.9289
+2025-09-10 18:26:58,131 - Layer 45: Entropy=3.9844, Variance=0.000615, Gini=0.9157
+2025-09-10 18:26:58,131 - Layer 47: Entropy=3.7031, Variance=0.000484, Gini=0.8910
+2025-09-10 18:26:58,131 - 
+Prompt 3: Analyze the pros and cons of remote work.
+2025-09-10 18:26:58,132 - Input tokens: 18
+2025-09-10 18:26:58,132 - 
+=== MoE Routing Analysis for English - Prompt 3 ===
+2025-09-10 18:26:59,133 - Layer 0: Entropy=4.1875, Variance=0.000425, Gini=0.8741
+2025-09-10 18:26:59,134 - Layer 5: Entropy=4.1250, Variance=0.000619, Gini=0.9158
+2025-09-10 18:26:59,134 - Layer 10: Entropy=4.1875, Variance=0.000813, Gini=0.9349
+2025-09-10 18:26:59,135 - Layer 15: Entropy=4.1562, Variance=0.000619, Gini=0.9158
+2025-09-10 18:26:59,135 - Layer 20: Entropy=4.0312, Variance=0.001105, Gini=0.9505
+2025-09-10 18:26:59,136 - Layer 25: Entropy=3.8594, Variance=0.000959, Gini=0.9436
+2025-09-10 18:26:59,137 - Layer 30: Entropy=4.2188, Variance=0.000716, Gini=0.9262
+2025-09-10 18:26:59,137 - Layer 35: Entropy=3.8750, Variance=0.001299, Gini=0.9575
+2025-09-10 18:26:59,138 - Layer 40: Entropy=3.8750, Variance=0.000813, Gini=0.9297
+2025-09-10 18:26:59,138 - Layer 45: Entropy=4.0938, Variance=0.000668, Gini=0.9193
+2025-09-10 18:26:59,139 - Layer 47: Entropy=3.7969, Variance=0.000765, Gini=0.9219
+2025-09-10 18:26:59,139 - 
+Prompt 4: How was your day today?
+2025-09-10 18:26:59,140 - Input tokens: 14
+2025-09-10 18:26:59,140 - 
+=== MoE Routing Analysis for English - Prompt 4 ===
+2025-09-10 18:27:00,016 - Layer 0: Entropy=4.1875, Variance=0.000662, Gini=0.9174
+2025-09-10 18:27:00,017 - Layer 5: Entropy=4.0312, Variance=0.002028, Gini=0.9710
+2025-09-10 18:27:00,017 - Layer 10: Entropy=4.0938, Variance=0.001224, Gini=0.9542
+2025-09-10 18:27:00,018 - Layer 15: Entropy=3.9844, Variance=0.002269, Gini=0.9676
+2025-09-10 18:27:00,018 - Layer 20: Entropy=4.0625, Variance=0.001063, Gini=0.9408
+2025-09-10 18:27:00,019 - Layer 25: Entropy=3.8125, Variance=0.000903, Gini=0.9386
+2025-09-10 18:27:00,020 - Layer 30: Entropy=4.0625, Variance=0.001063, Gini=0.9498
+2025-09-10 18:27:00,020 - Layer 35: Entropy=3.8906, Variance=0.001947, Gini=0.9721
+2025-09-10 18:27:00,021 - Layer 40: Entropy=3.7969, Variance=0.001867, Gini=0.9699
+2025-09-10 18:27:00,021 - Layer 45: Entropy=3.9844, Variance=0.001224, Gini=0.9565
+2025-09-10 18:27:00,022 - Layer 47: Entropy=3.8750, Variance=0.001063, Gini=0.9408
+2025-09-10 18:27:00,022 - 
+Prompt 5: Explain quantum physics to a 10-year-old.
+2025-09-10 18:27:00,023 - Input tokens: 20
+2025-09-10 18:27:00,023 - 
+=== MoE Routing Analysis for English - Prompt 5 ===
+2025-09-10 18:27:01,077 - Layer 0: Entropy=4.2188, Variance=0.000450, Gini=0.8836
+2025-09-10 18:27:01,077 - Layer 5: Entropy=4.1250, Variance=0.001198, Gini=0.9500
+2025-09-10 18:27:01,078 - Layer 10: Entropy=4.1562, Variance=0.000647, Gini=0.9195
+2025-09-10 18:27:01,078 - Layer 15: Entropy=4.1562, Variance=0.001041, Gini=0.9469
+2025-09-10 18:27:01,079 - Layer 20: Entropy=4.0938, Variance=0.000765, Gini=0.9258
+2025-09-10 18:27:01,080 - Layer 25: Entropy=3.9062, Variance=0.000726, Gini=0.9180
+2025-09-10 18:27:01,080 - Layer 30: Entropy=4.1562, Variance=0.000962, Gini=0.9445
+2025-09-10 18:27:01,081 - Layer 35: Entropy=3.9219, Variance=0.001198, Gini=0.9500
+2025-09-10 18:27:01,081 - Layer 40: Entropy=3.8594, Variance=0.000923, Gini=0.9352
+2025-09-10 18:27:01,082 - Layer 45: Entropy=4.0625, Variance=0.000647, Gini=0.9156
+2025-09-10 18:27:01,083 - Layer 47: Entropy=3.7969, Variance=0.000726, Gini=0.9180
+2025-09-10 18:27:01,083 - 
+Prompt 6: What is artificial intelligence and how does it work?
+2025-09-10 18:27:01,083 - Input tokens: 18
+2025-09-10 18:27:01,083 - 
+=== MoE Routing Analysis for English - Prompt 6 ===
+2025-09-10 18:27:02,038 - Layer 0: Entropy=4.1562, Variance=0.000570, Gini=0.9002
+2025-09-10 18:27:02,039 - Layer 5: Entropy=4.1250, Variance=0.001251, Gini=0.9479
+2025-09-10 18:27:02,039 - Layer 10: Entropy=4.1875, Variance=0.000765, Gini=0.9314
+2025-09-10 18:27:02,040 - Layer 15: Entropy=4.1250, Variance=0.001348, Gini=0.9549
+2025-09-10 18:27:02,041 - Layer 20: Entropy=4.0625, Variance=0.001008, Gini=0.9470
+2025-09-10 18:27:02,041 - Layer 25: Entropy=3.8594, Variance=0.001056, Gini=0.9410
+2025-09-10 18:27:02,042 - Layer 30: Entropy=4.2188, Variance=0.001299, Gini=0.9592
+2025-09-10 18:27:02,042 - Layer 35: Entropy=3.8594, Variance=0.001688, Gini=0.9661
+2025-09-10 18:27:02,043 - Layer 40: Entropy=3.8281, Variance=0.001008, Gini=0.9392
+2025-09-10 18:27:02,044 - Layer 45: Entropy=4.0312, Variance=0.000911, Gini=0.9384
+2025-09-10 18:27:02,044 - Layer 47: Entropy=3.8281, Variance=0.000668, Gini=0.9193
+2025-09-10 18:27:02,044 - 
+Prompt 7: Describe the process of photosynthesis in plants.
+2025-09-10 18:27:02,045 - Input tokens: 17
+2025-09-10 18:27:02,045 - 
+=== MoE Routing Analysis for English - Prompt 7 ===
+2025-09-10 18:27:03,015 - Layer 0: Entropy=4.1875, Variance=0.000511, Gini=0.8948
+2025-09-10 18:27:03,016 - Layer 5: Entropy=4.1562, Variance=0.000892, Gini=0.9407
+2025-09-10 18:27:03,016 - Layer 10: Entropy=4.1562, Variance=0.000892, Gini=0.9407
+2025-09-10 18:27:03,017 - Layer 15: Entropy=4.1250, Variance=0.001056, Gini=0.9389
+2025-09-10 18:27:03,018 - Layer 20: Entropy=4.0000, Variance=0.000729, Gini=0.9260
+2025-09-10 18:27:03,018 - Layer 25: Entropy=3.7969, Variance=0.001001, Gini=0.9444
+2025-09-10 18:27:03,019 - Layer 30: Entropy=4.1875, Variance=0.000838, Gini=0.9370
+2025-09-10 18:27:03,019 - Layer 35: Entropy=3.8594, Variance=0.001274, Gini=0.9573
+2025-09-10 18:27:03,020 - Layer 40: Entropy=3.8594, Variance=0.001165, Gini=0.9499
+2025-09-10 18:27:03,021 - Layer 45: Entropy=4.0312, Variance=0.000838, Gini=0.9370
+2025-09-10 18:27:03,021 - Layer 47: Entropy=3.7500, Variance=0.000892, Gini=0.9297
+2025-09-10 18:27:03,021 - 
+Prompt 8: Write a poem about the ocean.
+2025-09-10 18:27:03,022 - Input tokens: 15
+2025-09-10 18:27:03,022 - 
+=== MoE Routing Analysis for English - Prompt 8 ===
+2025-09-10 18:27:03,925 - Layer 0: Entropy=4.1875, Variance=0.000673, Gini=0.9203
+2025-09-10 18:27:03,926 - Layer 5: Entropy=4.0625, Variance=0.001093, Gini=0.9484
+2025-09-10 18:27:03,927 - Layer 10: Entropy=4.0625, Variance=0.001093, Gini=0.9484
+2025-09-10 18:27:03,927 - Layer 15: Entropy=4.0625, Variance=0.002003, Gini=0.9620
+2025-09-10 18:27:03,928 - Layer 20: Entropy=4.0312, Variance=0.000673, Gini=0.9203
+2025-09-10 18:27:03,928 - Layer 25: Entropy=3.8125, Variance=0.001373, Gini=0.9568
+2025-09-10 18:27:03,929 - Layer 30: Entropy=4.0000, Variance=0.001723, Gini=0.9641
+2025-09-10 18:27:03,929 - Layer 35: Entropy=3.8438, Variance=0.001443, Gini=0.9589
+2025-09-10 18:27:03,930 - Layer 40: Entropy=3.8125, Variance=0.001303, Gini=0.9516
+2025-09-10 18:27:03,931 - Layer 45: Entropy=3.9844, Variance=0.001023, Gini=0.9474
+2025-09-10 18:27:03,931 - Layer 47: Entropy=3.7500, Variance=0.000813, Gini=0.9349
+2025-09-10 18:27:03,931 - 
+Prompt 9: Compare different programming languages.
+2025-09-10 18:27:03,932 - Input tokens: 13
+2025-09-10 18:27:03,932 - 
+=== MoE Routing Analysis for English - Prompt 9 ===
+2025-09-10 18:27:04,786 - Layer 0: Entropy=4.1875, Variance=0.000731, Gini=0.9249
+2025-09-10 18:27:04,787 - Layer 5: Entropy=4.0938, Variance=0.001103, Gini=0.9513
+2025-09-10 18:27:04,788 - Layer 10: Entropy=4.0938, Variance=0.000824, Gini=0.9345
+2025-09-10 18:27:04,788 - Layer 15: Entropy=4.0938, Variance=0.001196, Gini=0.9477
+2025-09-10 18:27:04,789 - Layer 20: Entropy=4.0625, Variance=0.000917, Gini=0.9417
+2025-09-10 18:27:04,790 - Layer 25: Entropy=3.7656, Variance=0.001756, Gini=0.9669
+2025-09-10 18:27:04,790 - Layer 30: Entropy=4.1875, Variance=0.001290, Gini=0.9549
+2025-09-10 18:27:04,791 - Layer 35: Entropy=3.8125, Variance=0.001383, Gini=0.9597
+2025-09-10 18:27:04,791 - Layer 40: Entropy=3.7969, Variance=0.001569, Gini=0.9573
+2025-09-10 18:27:04,792 - Layer 45: Entropy=4.0000, Variance=0.001103, Gini=0.9465
+2025-09-10 18:27:04,793 - Layer 47: Entropy=3.7812, Variance=0.001010, Gini=0.9453
+2025-09-10 18:27:04,793 - 
+Prompt 10: What are the benefits of exercise for health?
+2025-09-10 18:27:04,793 - Input tokens: 17
+2025-09-10 18:27:04,793 - 
+=== MoE Routing Analysis for English - Prompt 10 ===
+2025-09-10 18:27:05,742 - Layer 0: Entropy=4.1250, Variance=0.000456, Gini=0.8819
+2025-09-10 18:27:05,743 - Layer 5: Entropy=4.0938, Variance=0.001056, Gini=0.9389
+2025-09-10 18:27:05,744 - Layer 10: Entropy=4.1562, Variance=0.000838, Gini=0.9352
+2025-09-10 18:27:05,744 - Layer 15: Entropy=4.1562, Variance=0.000674, Gini=0.9223
+2025-09-10 18:27:05,745 - Layer 20: Entropy=4.0312, Variance=0.001165, Gini=0.9545
+2025-09-10 18:27:05,746 - Layer 25: Entropy=3.8125, Variance=0.001927, Gini=0.9701
+2025-09-10 18:27:05,746 - Layer 30: Entropy=4.1875, Variance=0.000674, Gini=0.9223
+2025-09-10 18:27:05,747 - Layer 35: Entropy=3.8438, Variance=0.001873, Gini=0.9701
+2025-09-10 18:27:05,747 - Layer 40: Entropy=3.8125, Variance=0.001165, Gini=0.9499
+2025-09-10 18:27:05,748 - Layer 45: Entropy=3.9688, Variance=0.000947, Gini=0.9416
+2025-09-10 18:27:05,749 - Layer 47: Entropy=3.6719, Variance=0.000838, Gini=0.9352
+2025-09-10 18:27:05,749 - 
+Prompt 1: הסבר איך רשתות נוירליות עובדות בלמידת מכונה.
+2025-09-10 18:27:05,749 - Input tokens: 27
+2025-09-10 18:27:05,749 - 
+=== MoE Routing Analysis for Hebrew - Prompt 1 ===
+2025-09-10 18:27:06,778 - Layer 0: Entropy=4.1875, Variance=0.000489, Gini=0.8869
+2025-09-10 18:27:06,778 - Layer 5: Entropy=4.1875, Variance=0.001008, Gini=0.9418
+2025-09-10 18:27:06,779 - Layer 10: Entropy=4.2188, Variance=0.000662, Gini=0.9216
+2025-09-10 18:27:06,779 - Layer 15: Entropy=4.1875, Variance=0.000662, Gini=0.9129
+2025-09-10 18:27:06,780 - Layer 20: Entropy=4.0938, Variance=0.001375, Gini=0.9546
+2025-09-10 18:27:06,781 - Layer 25: Entropy=3.8594, Variance=0.000749, Gini=0.9314
+2025-09-10 18:27:06,781 - Layer 30: Entropy=4.2812, Variance=0.000857, Gini=0.9389
+2025-09-10 18:27:06,782 - Layer 35: Entropy=3.8438, Variance=0.001267, Gini=0.9511
+2025-09-10 18:27:06,782 - Layer 40: Entropy=3.9375, Variance=0.002239, Gini=0.9748
+2025-09-10 18:27:06,783 - Layer 45: Entropy=3.7031, Variance=0.001310, Gini=0.9534
+2025-09-10 18:27:06,784 - Layer 47: Entropy=3.1875, Variance=0.002390, Gini=0.9708
+2025-09-10 18:27:06,784 - 
+Prompt 2: כתוב סיפור קצר על רובוט הלומד לצייר.
+2025-09-10 18:27:06,784 - Input tokens: 21
+2025-09-10 18:27:06,785 - 
+=== MoE Routing Analysis for Hebrew - Prompt 2 ===
+2025-09-10 18:27:07,741 - Layer 0: Entropy=4.2500, Variance=0.000706, Gini=0.9193
+2025-09-10 18:27:07,741 - Layer 5: Entropy=4.1875, Variance=0.001278, Gini=0.9520
+2025-09-10 18:27:07,742 - Layer 10: Entropy=4.1562, Variance=0.001063, Gini=0.9431
+2025-09-10 18:27:07,743 - Layer 15: Entropy=4.0312, Variance=0.001028, Gini=0.9379
+2025-09-10 18:27:07,743 - Layer 20: Entropy=4.0625, Variance=0.002028, Gini=0.9609
+2025-09-10 18:27:07,744 - Layer 25: Entropy=3.8906, Variance=0.000921, Gini=0.9394
+2025-09-10 18:27:07,744 - Layer 30: Entropy=4.1562, Variance=0.001278, Gini=0.9520
+2025-09-10 18:27:07,745 - Layer 35: Entropy=3.8438, Variance=0.001170, Gini=0.9520
+2025-09-10 18:27:07,746 - Layer 40: Entropy=3.9219, Variance=0.002099, Gini=0.9728
+2025-09-10 18:27:07,746 - Layer 45: Entropy=3.7500, Variance=0.001706, Gini=0.9542
+2025-09-10 18:27:07,747 - Layer 47: Entropy=3.2656, Variance=0.002349, Gini=0.9721
+2025-09-10 18:27:07,747 - 
+Prompt 3: נתח את היתרונות והחסרונות של עבודה מרחוק.
+2025-09-10 18:27:07,748 - Input tokens: 22
+2025-09-10 18:27:07,748 - 
+=== MoE Routing Analysis for Hebrew - Prompt 3 ===
+2025-09-10 18:27:08,763 - Layer 0: Entropy=4.2188, Variance=0.000622, Gini=0.9041
+2025-09-10 18:27:08,764 - Layer 5: Entropy=4.1562, Variance=0.001077, Gini=0.9325
+2025-09-10 18:27:08,765 - Layer 10: Entropy=4.2500, Variance=0.000622, Gini=0.9105
+2025-09-10 18:27:08,765 - Layer 15: Entropy=4.2188, Variance=0.000492, Gini=0.8913
+2025-09-10 18:27:08,766 - Layer 20: Entropy=4.0938, Variance=0.001142, Gini=0.9503
+2025-09-10 18:27:08,767 - Layer 25: Entropy=3.8906, Variance=0.000687, Gini=0.9240
+2025-09-10 18:27:08,767 - Layer 30: Entropy=4.2500, Variance=0.000687, Gini=0.9197
+2025-09-10 18:27:08,768 - Layer 35: Entropy=3.8750, Variance=0.001012, Gini=0.9389
+2025-09-10 18:27:08,768 - Layer 40: Entropy=3.9219, Variance=0.002541, Gini=0.9773
+2025-09-10 18:27:08,769 - Layer 45: Entropy=3.7188, Variance=0.001695, Gini=0.9602
+2025-09-10 18:27:08,770 - Layer 47: Entropy=3.2188, Variance=0.002379, Gini=0.9723
+2025-09-10 18:27:08,770 - 
+Prompt 4: איך היה לך היום?
+2025-09-10 18:27:08,770 - Input tokens: 14
+2025-09-10 18:27:08,770 - 
+=== MoE Routing Analysis for Hebrew - Prompt 4 ===
+2025-09-10 18:27:09,575 - Layer 0: Entropy=4.1875, Variance=0.000903, Gini=0.9386
+2025-09-10 18:27:09,575 - Layer 5: Entropy=4.0000, Variance=0.001786, Gini=0.9699
+2025-09-10 18:27:09,576 - Layer 10: Entropy=4.0938, Variance=0.001224, Gini=0.9542
+2025-09-10 18:27:09,576 - Layer 15: Entropy=3.9688, Variance=0.001947, Gini=0.9688
+2025-09-10 18:27:09,577 - Layer 20: Entropy=4.0625, Variance=0.001465, Gini=0.9576
+2025-09-10 18:27:09,578 - Layer 25: Entropy=3.7969, Variance=0.000903, Gini=0.9386
+2025-09-10 18:27:09,578 - Layer 30: Entropy=4.0938, Variance=0.001224, Gini=0.9542
+2025-09-10 18:27:09,579 - Layer 35: Entropy=3.8750, Variance=0.001385, Gini=0.9609
+2025-09-10 18:27:09,579 - Layer 40: Entropy=3.8281, Variance=0.001947, Gini=0.9721
+2025-09-10 18:27:09,580 - Layer 45: Entropy=3.7656, Variance=0.001545, Gini=0.9632
+2025-09-10 18:27:09,581 - Layer 47: Entropy=3.3906, Variance=0.001465, Gini=0.9621
+2025-09-10 18:27:09,581 - 
+Prompt 5: הסבר פיזיקה קוונטית לילד בן 10.
+2025-09-10 18:27:09,581 - Input tokens: 23
+2025-09-10 18:27:09,581 - 
+=== MoE Routing Analysis for Hebrew - Prompt 5 ===
+2025-09-10 18:27:10,602 - Layer 0: Entropy=4.2188, Variance=0.000638, Gini=0.9134
+2025-09-10 18:27:10,603 - Layer 5: Entropy=4.1875, Variance=0.000817, Gini=0.9344
+2025-09-10 18:27:10,604 - Layer 10: Entropy=4.1875, Variance=0.000608, Gini=0.9059
+2025-09-10 18:27:10,604 - Layer 15: Entropy=4.1562, Variance=0.000757, Gini=0.9317
+2025-09-10 18:27:10,605 - Layer 20: Entropy=4.1250, Variance=0.001025, Gini=0.9474
+2025-09-10 18:27:10,605 - Layer 25: Entropy=3.9062, Variance=0.000817, Gini=0.9168
+2025-09-10 18:27:10,606 - Layer 30: Entropy=4.1875, Variance=0.000757, Gini=0.9310
+2025-09-10 18:27:10,607 - Layer 35: Entropy=3.8906, Variance=0.001114, Gini=0.9440
+2025-09-10 18:27:10,607 - Layer 40: Entropy=3.9062, Variance=0.001769, Gini=0.9657
+2025-09-10 18:27:10,608 - Layer 45: Entropy=3.7031, Variance=0.001263, Gini=0.9426
+2025-09-10 18:27:10,608 - Layer 47: Entropy=3.2188, Variance=0.001799, Gini=0.9582
+2025-09-10 18:27:10,609 - 
+Prompt 6: מה זה בינה מלאכותית ואיך היא עובדת?
+2025-09-10 18:27:10,609 - Input tokens: 21
+2025-09-10 18:27:10,609 - 
+=== MoE Routing Analysis for Hebrew - Prompt 6 ===
+2025-09-10 18:27:11,569 - Layer 0: Entropy=4.2188, Variance=0.000706, Gini=0.9193
+2025-09-10 18:27:11,570 - Layer 5: Entropy=4.1250, Variance=0.001456, Gini=0.9513
+2025-09-10 18:27:11,570 - Layer 10: Entropy=4.2188, Variance=0.000635, Gini=0.9163
+2025-09-10 18:27:11,571 - Layer 15: Entropy=4.1250, Variance=0.001063, Gini=0.9483
+2025-09-10 18:27:11,571 - Layer 20: Entropy=4.0938, Variance=0.001349, Gini=0.9572
+2025-09-10 18:27:11,572 - Layer 25: Entropy=3.8906, Variance=0.000813, Gini=0.9356
+2025-09-10 18:27:11,573 - Layer 30: Entropy=4.2812, Variance=0.001206, Gini=0.9542
+2025-09-10 18:27:11,573 - Layer 35: Entropy=3.8750, Variance=0.000813, Gini=0.9334
+2025-09-10 18:27:11,574 - Layer 40: Entropy=3.9375, Variance=0.001956, Gini=0.9691
+2025-09-10 18:27:11,574 - Layer 45: Entropy=3.7812, Variance=0.001885, Gini=0.9669
+2025-09-10 18:27:11,575 - Layer 47: Entropy=3.2344, Variance=0.002135, Gini=0.9676
+2025-09-10 18:27:11,575 - 
+Prompt 7: תאר את התהליך של פוטוסינתזה בצמחים.
+2025-09-10 18:27:11,576 - Input tokens: 23
+2025-09-10 18:27:11,576 - 
+=== MoE Routing Analysis for Hebrew - Prompt 7 ===
+2025-09-10 18:27:12,584 - Layer 0: Entropy=4.1250, Variance=0.000608, Gini=0.9059
+2025-09-10 18:27:12,584 - Layer 5: Entropy=4.1875, Variance=0.001204, Gini=0.9541
+2025-09-10 18:27:12,585 - Layer 10: Entropy=4.2188, Variance=0.000489, Gini=0.8930
+2025-09-10 18:27:12,586 - Layer 15: Entropy=4.1875, Variance=0.000638, Gini=0.9134
+2025-09-10 18:27:12,586 - Layer 20: Entropy=4.0625, Variance=0.001144, Gini=0.9528
+2025-09-10 18:27:12,587 - Layer 25: Entropy=3.8750, Variance=0.000757, Gini=0.9317
+2025-09-10 18:27:12,587 - Layer 30: Entropy=4.2500, Variance=0.000638, Gini=0.9181
+2025-09-10 18:27:12,588 - Layer 35: Entropy=3.8750, Variance=0.000995, Gini=0.9467
+2025-09-10 18:27:12,588 - Layer 40: Entropy=3.9531, Variance=0.001829, Gini=0.9704
+2025-09-10 18:27:12,589 - Layer 45: Entropy=3.6719, Variance=0.001353, Gini=0.9528
+2025-09-10 18:27:12,590 - Layer 47: Entropy=3.1406, Variance=0.001948, Gini=0.9630
+2025-09-10 18:27:12,590 - 
+Prompt 8: כתוב שיר על הים.
+2025-09-10 18:27:12,590 - Input tokens: 15
+2025-09-10 18:27:12,590 - 
+=== MoE Routing Analysis for Hebrew - Prompt 8 ===
+2025-09-10 18:27:13,447 - Layer 0: Entropy=4.2812, Variance=0.000743, Gini=0.9224
+2025-09-10 18:27:13,447 - Layer 5: Entropy=4.1250, Variance=0.001653, Gini=0.9599
+2025-09-10 18:27:13,448 - Layer 10: Entropy=4.0938, Variance=0.000883, Gini=0.9391
+2025-09-10 18:27:13,449 - Layer 15: Entropy=4.0625, Variance=0.002003, Gini=0.9620
+2025-09-10 18:27:13,449 - Layer 20: Entropy=4.0312, Variance=0.001583, Gini=0.9536
+2025-09-10 18:27:13,450 - Layer 25: Entropy=3.8438, Variance=0.001303, Gini=0.9589
+2025-09-10 18:27:13,450 - Layer 30: Entropy=4.0625, Variance=0.001443, Gini=0.9599
+2025-09-10 18:27:13,451 - Layer 35: Entropy=3.8750, Variance=0.001303, Gini=0.9516
+2025-09-10 18:27:13,452 - Layer 40: Entropy=3.8594, Variance=0.002283, Gini=0.9755
+2025-09-10 18:27:13,452 - Layer 45: Entropy=3.7500, Variance=0.001793, Gini=0.9661
+2025-09-10 18:27:13,453 - Layer 47: Entropy=3.3750, Variance=0.002143, Gini=0.9682
+2025-09-10 18:27:13,453 - 
+Prompt 9: השווה בין שפות תכנות שונות.
+2025-09-10 18:27:13,453 - Input tokens: 18
+2025-09-10 18:27:13,453 - 
+=== MoE Routing Analysis for Hebrew - Prompt 9 ===
+2025-09-10 18:27:14,360 - Layer 0: Entropy=4.2188, Variance=0.000619, Gini=0.9106
+2025-09-10 18:27:14,361 - Layer 5: Entropy=4.1875, Variance=0.001640, Gini=0.9618
+2025-09-10 18:27:14,361 - Layer 10: Entropy=4.2188, Variance=0.000813, Gini=0.9297
+2025-09-10 18:27:14,362 - Layer 15: Entropy=4.1562, Variance=0.000911, Gini=0.9384
+2025-09-10 18:27:14,362 - Layer 20: Entropy=4.0625, Variance=0.001251, Gini=0.9479
+2025-09-10 18:27:14,363 - Layer 25: Entropy=3.8438, Variance=0.000813, Gini=0.9349
+2025-09-10 18:27:14,364 - Layer 30: Entropy=4.2812, Variance=0.000911, Gini=0.9418
+2025-09-10 18:27:14,364 - Layer 35: Entropy=3.8750, Variance=0.001202, Gini=0.9557
+2025-09-10 18:27:14,365 - Layer 40: Entropy=3.9375, Variance=0.002709, Gini=0.9792
+2025-09-10 18:27:14,365 - Layer 45: Entropy=3.7188, Variance=0.001008, Gini=0.9470
+2025-09-10 18:27:14,366 - Layer 47: Entropy=3.2656, Variance=0.002029, Gini=0.9653
+2025-09-10 18:27:14,366 - 
+Prompt 10: מה היתרונות של פעילות גופנית לבריאות?
+2025-09-10 18:27:14,367 - Input tokens: 20
+2025-09-10 18:27:14,367 - 
+=== MoE Routing Analysis for Hebrew - Prompt 10 ===
+2025-09-10 18:27:15,334 - Layer 0: Entropy=4.2500, Variance=0.000608, Gini=0.9133
+2025-09-10 18:27:15,335 - Layer 5: Entropy=4.1562, Variance=0.002616, Gini=0.9711
+2025-09-10 18:27:15,335 - Layer 10: Entropy=4.2188, Variance=0.000726, Gini=0.9281
+2025-09-10 18:27:15,336 - Layer 15: Entropy=4.1562, Variance=0.000805, Gini=0.9320
+2025-09-10 18:27:15,336 - Layer 20: Entropy=4.0625, Variance=0.001198, Gini=0.9555
+2025-09-10 18:27:15,337 - Layer 25: Entropy=3.8594, Variance=0.001001, Gini=0.9445
+2025-09-10 18:27:15,338 - Layer 30: Entropy=4.2188, Variance=0.000805, Gini=0.9352
+2025-09-10 18:27:15,338 - Layer 35: Entropy=3.8750, Variance=0.001198, Gini=0.9547
+2025-09-10 18:27:15,339 - Layer 40: Entropy=3.9062, Variance=0.002301, Gini=0.9758
+2025-09-10 18:27:15,339 - Layer 45: Entropy=3.6719, Variance=0.001198, Gini=0.9516
+2025-09-10 18:27:15,340 - Layer 47: Entropy=3.2656, Variance=0.002340, Gini=0.9719
+2025-09-10 18:27:15,340 - 
+================================================================================
+2025-09-10 18:27:15,340 - CROSS-LANGUAGE ROUTING ANALYSIS
+2025-09-10 18:27:15,340 - ================================================================================
+2025-09-10 18:27:15,340 - 
+PROMPT 1 COMPARISON:
+2025-09-10 18:27:15,340 - EN:  Explain how neural networks work in machine learning.
+2025-09-10 18:27:15,340 - HEB: הסבר איך רשתות נוירליות עובדות בלמידת מכונה.
+2025-09-10 18:27:15,340 - layer_0: Overlap=0.000, ΔEntropy=0.0000, ΔVariance=0.000065
+2025-09-10 18:27:15,340 - layer_5: Overlap=0.500, ΔEntropy=0.0625, ΔVariance=0.000097
+2025-09-10 18:27:15,340 - layer_10: Overlap=0.200, ΔEntropy=0.0938, ΔVariance=0.000151
+2025-09-10 18:27:15,340 - layer_15: Overlap=0.000, ΔEntropy=0.0625, ΔVariance=0.000043
+2025-09-10 18:27:15,340 - layer_20: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.000416
+2025-09-10 18:27:15,340 - layer_25: Overlap=0.200, ΔEntropy=0.0469, ΔVariance=0.000113
+2025-09-10 18:27:15,340 - layer_30: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.000200
+2025-09-10 18:27:15,341 - layer_35: Overlap=0.200, ΔEntropy=0.0000, ΔVariance=0.000130
+2025-09-10 18:27:15,341 - layer_40: Overlap=0.200, ΔEntropy=0.1094, ΔVariance=0.001426
+2025-09-10 18:27:15,341 - layer_45: Overlap=0.200, ΔEntropy=0.3281, ΔVariance=0.000448
+2025-09-10 18:27:15,341 - layer_47: Overlap=0.000, ΔEntropy=0.5625, ΔVariance=0.001528
+2025-09-10 18:27:15,341 - 
+PROMPT 2 COMPARISON:
+2025-09-10 18:27:15,341 - EN:  Write a short story about a robot learning to paint.
+2025-09-10 18:27:15,341 - HEB: כתוב סיפור קצר על רובוט הלומד לצייר.
+2025-09-10 18:27:15,341 - layer_0: Overlap=0.200, ΔEntropy=0.0938, ΔVariance=0.000222
+2025-09-10 18:27:15,341 - layer_5: Overlap=0.500, ΔEntropy=0.0625, ΔVariance=0.000488
+2025-09-10 18:27:15,341 - layer_10: Overlap=0.500, ΔEntropy=0.0938, ΔVariance=0.000511
+2025-09-10 18:27:15,341 - layer_15: Overlap=0.500, ΔEntropy=0.0000, ΔVariance=0.001332
+2025-09-10 18:27:15,341 - layer_20: Overlap=0.000, ΔEntropy=0.0625, ΔVariance=0.001500
+2025-09-10 18:27:15,341 - layer_25: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.000087
+2025-09-10 18:27:15,341 - layer_30: Overlap=0.500, ΔEntropy=0.0938, ΔVariance=0.000471
+2025-09-10 18:27:15,341 - layer_35: Overlap=0.200, ΔEntropy=0.0156, ΔVariance=0.000120
+2025-09-10 18:27:15,341 - layer_40: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.001353
+2025-09-10 18:27:15,341 - layer_45: Overlap=0.200, ΔEntropy=0.2344, ΔVariance=0.001091
+2025-09-10 18:27:15,341 - layer_47: Overlap=0.000, ΔEntropy=0.4375, ΔVariance=0.001865
+2025-09-10 18:27:15,341 - 
+PROMPT 3 COMPARISON:
+2025-09-10 18:27:15,341 - EN:  Analyze the pros and cons of remote work.
+2025-09-10 18:27:15,341 - HEB: נתח את היתרונות והחסרונות של עבודה מרחוק.
+2025-09-10 18:27:15,341 - layer_0: Overlap=0.000, ΔEntropy=0.0312, ΔVariance=0.000197
+2025-09-10 18:27:15,341 - layer_5: Overlap=0.500, ΔEntropy=0.0312, ΔVariance=0.000458
+2025-09-10 18:27:15,341 - layer_10: Overlap=0.500, ΔEntropy=0.0625, ΔVariance=0.000192
+2025-09-10 18:27:15,341 - layer_15: Overlap=0.000, ΔEntropy=0.0625, ΔVariance=0.000127
+2025-09-10 18:27:15,341 - layer_20: Overlap=0.500, ΔEntropy=0.0625, ΔVariance=0.000037
+2025-09-10 18:27:15,341 - layer_25: Overlap=0.000, ΔEntropy=0.0312, ΔVariance=0.000272
+2025-09-10 18:27:15,341 - layer_30: Overlap=0.200, ΔEntropy=0.0312, ΔVariance=0.000029
+2025-09-10 18:27:15,341 - layer_35: Overlap=0.200, ΔEntropy=0.0000, ΔVariance=0.000287
+2025-09-10 18:27:15,341 - layer_40: Overlap=0.200, ΔEntropy=0.0469, ΔVariance=0.001728
+2025-09-10 18:27:15,341 - layer_45: Overlap=0.200, ΔEntropy=0.3750, ΔVariance=0.001028
+2025-09-10 18:27:15,341 - layer_47: Overlap=0.000, ΔEntropy=0.5781, ΔVariance=0.001614
+2025-09-10 18:27:15,341 - 
+PROMPT 4 COMPARISON:
+2025-09-10 18:27:15,341 - EN:  How was your day today?
+2025-09-10 18:27:15,341 - HEB: איך היה לך היום?
+2025-09-10 18:27:15,341 - layer_0: Overlap=0.200, ΔEntropy=0.0000, ΔVariance=0.000241
+2025-09-10 18:27:15,341 - layer_5: Overlap=0.500, ΔEntropy=0.0312, ΔVariance=0.000241
+2025-09-10 18:27:15,342 - layer_10: Overlap=0.500, ΔEntropy=0.0000, ΔVariance=0.000000
+2025-09-10 18:27:15,342 - layer_15: Overlap=0.500, ΔEntropy=0.0156, ΔVariance=0.000321
+2025-09-10 18:27:15,342 - layer_20: Overlap=0.500, ΔEntropy=0.0000, ΔVariance=0.000402
+2025-09-10 18:27:15,342 - layer_25: Overlap=0.200, ΔEntropy=0.0156, ΔVariance=0.000000
+2025-09-10 18:27:15,342 - layer_30: Overlap=0.500, ΔEntropy=0.0312, ΔVariance=0.000161
+2025-09-10 18:27:15,342 - layer_35: Overlap=0.500, ΔEntropy=0.0156, ΔVariance=0.000562
+2025-09-10 18:27:15,342 - layer_40: Overlap=0.500, ΔEntropy=0.0312, ΔVariance=0.000080
+2025-09-10 18:27:15,342 - layer_45: Overlap=0.500, ΔEntropy=0.2188, ΔVariance=0.000321
+2025-09-10 18:27:15,342 - layer_47: Overlap=0.200, ΔEntropy=0.4844, ΔVariance=0.000402
+2025-09-10 18:27:15,342 - 
+PROMPT 5 COMPARISON:
+2025-09-10 18:27:15,342 - EN:  Explain quantum physics to a 10-year-old.
+2025-09-10 18:27:15,342 - HEB: הסבר פיזיקה קוונטית לילד בן 10.
+2025-09-10 18:27:15,342 - layer_0: Overlap=0.200, ΔEntropy=0.0000, ΔVariance=0.000188
+2025-09-10 18:27:15,342 - layer_5: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.000382
+2025-09-10 18:27:15,342 - layer_10: Overlap=0.200, ΔEntropy=0.0312, ΔVariance=0.000039
+2025-09-10 18:27:15,342 - layer_15: Overlap=0.000, ΔEntropy=0.0000, ΔVariance=0.000284
+2025-09-10 18:27:15,342 - layer_20: Overlap=0.500, ΔEntropy=0.0312, ΔVariance=0.000260
+2025-09-10 18:27:15,342 - layer_25: Overlap=0.500, ΔEntropy=0.0000, ΔVariance=0.000091
+2025-09-10 18:27:15,342 - layer_30: Overlap=0.200, ΔEntropy=0.0312, ΔVariance=0.000205
+2025-09-10 18:27:15,342 - layer_35: Overlap=0.200, ΔEntropy=0.0312, ΔVariance=0.000084
+2025-09-10 18:27:15,342 - layer_40: Overlap=0.200, ΔEntropy=0.0469, ΔVariance=0.000847
+2025-09-10 18:27:15,342 - layer_45: Overlap=0.500, ΔEntropy=0.3594, ΔVariance=0.000616
+2025-09-10 18:27:15,342 - layer_47: Overlap=0.000, ΔEntropy=0.5781, ΔVariance=0.001073
+2025-09-10 18:27:15,342 - 
+PROMPT 6 COMPARISON:
+2025-09-10 18:27:15,342 - EN:  What is artificial intelligence and how does it work?
+2025-09-10 18:27:15,342 - HEB: מה זה בינה מלאכותית ואיך היא עובדת?
+2025-09-10 18:27:15,342 - layer_0: Overlap=0.000, ΔEntropy=0.0625, ΔVariance=0.000136
+2025-09-10 18:27:15,342 - layer_5: Overlap=0.200, ΔEntropy=0.0000, ΔVariance=0.000205
+2025-09-10 18:27:15,342 - layer_10: Overlap=0.500, ΔEntropy=0.0312, ΔVariance=0.000130
+2025-09-10 18:27:15,342 - layer_15: Overlap=0.500, ΔEntropy=0.0000, ΔVariance=0.000285
+2025-09-10 18:27:15,342 - layer_20: Overlap=0.500, ΔEntropy=0.0312, ΔVariance=0.000341
+2025-09-10 18:27:15,342 - layer_25: Overlap=0.200, ΔEntropy=0.0312, ΔVariance=0.000243
+2025-09-10 18:27:15,342 - layer_30: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.000093
+2025-09-10 18:27:15,342 - layer_35: Overlap=0.200, ΔEntropy=0.0156, ΔVariance=0.000875
+2025-09-10 18:27:15,342 - layer_40: Overlap=0.200, ΔEntropy=0.1094, ΔVariance=0.000948
+2025-09-10 18:27:15,342 - layer_45: Overlap=0.200, ΔEntropy=0.2500, ΔVariance=0.000974
+2025-09-10 18:27:15,342 - layer_47: Overlap=0.000, ΔEntropy=0.5938, ΔVariance=0.001467
+2025-09-10 18:27:15,342 - 
+PROMPT 7 COMPARISON:
+2025-09-10 18:27:15,343 - EN:  Describe the process of photosynthesis in plants.
+2025-09-10 18:27:15,343 - HEB: תאר את התהליך של פוטוסינתזה בצמחים.
+2025-09-10 18:27:15,343 - layer_0: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.000098
+2025-09-10 18:27:15,343 - layer_5: Overlap=0.200, ΔEntropy=0.0312, ΔVariance=0.000312
+2025-09-10 18:27:15,343 - layer_10: Overlap=0.500, ΔEntropy=0.0625, ΔVariance=0.000403
+2025-09-10 18:27:15,343 - layer_15: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.000417
+2025-09-10 18:27:15,343 - layer_20: Overlap=0.500, ΔEntropy=0.0625, ΔVariance=0.000416
+2025-09-10 18:27:15,343 - layer_25: Overlap=0.500, ΔEntropy=0.0781, ΔVariance=0.000244
+2025-09-10 18:27:15,343 - layer_30: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.000200
+2025-09-10 18:27:15,343 - layer_35: Overlap=0.500, ΔEntropy=0.0156, ΔVariance=0.000278
+2025-09-10 18:27:15,343 - layer_40: Overlap=0.200, ΔEntropy=0.0938, ΔVariance=0.000664
+2025-09-10 18:27:15,343 - layer_45: Overlap=0.200, ΔEntropy=0.3594, ΔVariance=0.000515
+2025-09-10 18:27:15,343 - layer_47: Overlap=0.000, ΔEntropy=0.6094, ΔVariance=0.001056
+2025-09-10 18:27:15,343 - 
+PROMPT 8 COMPARISON:
+2025-09-10 18:27:15,343 - EN:  Write a poem about the ocean.
+2025-09-10 18:27:15,343 - HEB: כתוב שיר על הים.
+2025-09-10 18:27:15,343 - layer_0: Overlap=0.200, ΔEntropy=0.0938, ΔVariance=0.000070
+2025-09-10 18:27:15,343 - layer_5: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.000560
+2025-09-10 18:27:15,343 - layer_10: Overlap=1.000, ΔEntropy=0.0312, ΔVariance=0.000210
+2025-09-10 18:27:15,343 - layer_15: Overlap=0.500, ΔEntropy=0.0000, ΔVariance=0.000000
+2025-09-10 18:27:15,343 - layer_20: Overlap=0.200, ΔEntropy=0.0000, ΔVariance=0.000910
+2025-09-10 18:27:15,343 - layer_25: Overlap=0.500, ΔEntropy=0.0312, ΔVariance=0.000070
+2025-09-10 18:27:15,343 - layer_30: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.000280
+2025-09-10 18:27:15,343 - layer_35: Overlap=0.500, ΔEntropy=0.0312, ΔVariance=0.000140
+2025-09-10 18:27:15,343 - layer_40: Overlap=0.500, ΔEntropy=0.0469, ΔVariance=0.000980
+2025-09-10 18:27:15,343 - layer_45: Overlap=0.500, ΔEntropy=0.2344, ΔVariance=0.000770
+2025-09-10 18:27:15,343 - layer_47: Overlap=0.000, ΔEntropy=0.3750, ΔVariance=0.001330
+2025-09-10 18:27:15,343 - 
+PROMPT 9 COMPARISON:
+2025-09-10 18:27:15,343 - EN:  Compare different programming languages.
+2025-09-10 18:27:15,343 - HEB: השווה בין שפות תכנות שונות.
+2025-09-10 18:27:15,343 - layer_0: Overlap=0.200, ΔEntropy=0.0312, ΔVariance=0.000112
+2025-09-10 18:27:15,343 - layer_5: Overlap=0.500, ΔEntropy=0.0938, ΔVariance=0.000536
+2025-09-10 18:27:15,343 - layer_10: Overlap=0.500, ΔEntropy=0.1250, ΔVariance=0.000010
+2025-09-10 18:27:15,343 - layer_15: Overlap=0.200, ΔEntropy=0.0625, ΔVariance=0.000286
+2025-09-10 18:27:15,343 - layer_20: Overlap=0.500, ΔEntropy=0.0000, ΔVariance=0.000334
+2025-09-10 18:27:15,343 - layer_25: Overlap=0.500, ΔEntropy=0.0781, ΔVariance=0.000942
+2025-09-10 18:27:15,343 - layer_30: Overlap=0.200, ΔEntropy=0.0938, ΔVariance=0.000379
+2025-09-10 18:27:15,343 - layer_35: Overlap=0.500, ΔEntropy=0.0625, ΔVariance=0.000181
+2025-09-10 18:27:15,343 - layer_40: Overlap=0.500, ΔEntropy=0.1406, ΔVariance=0.001140
+2025-09-10 18:27:15,343 - layer_45: Overlap=0.200, ΔEntropy=0.2812, ΔVariance=0.000095
+2025-09-10 18:27:15,344 - layer_47: Overlap=0.000, ΔEntropy=0.5156, ΔVariance=0.001018
+2025-09-10 18:27:15,344 - 
+PROMPT 10 COMPARISON:
+2025-09-10 18:27:15,344 - EN:  What are the benefits of exercise for health?
+2025-09-10 18:27:15,344 - HEB: מה היתרונות של פעילות גופנית לבריאות?
+2025-09-10 18:27:15,344 - layer_0: Overlap=0.000, ΔEntropy=0.1250, ΔVariance=0.000152
+2025-09-10 18:27:15,344 - layer_5: Overlap=0.500, ΔEntropy=0.0625, ΔVariance=0.001560
+2025-09-10 18:27:15,344 - layer_10: Overlap=0.500, ΔEntropy=0.0625, ΔVariance=0.000112
+2025-09-10 18:27:15,344 - layer_15: Overlap=0.000, ΔEntropy=0.0000, ΔVariance=0.000131
+2025-09-10 18:27:15,344 - layer_20: Overlap=0.500, ΔEntropy=0.0312, ΔVariance=0.000034
+2025-09-10 18:27:15,344 - layer_25: Overlap=0.200, ΔEntropy=0.0469, ΔVariance=0.000926
+2025-09-10 18:27:15,344 - layer_30: Overlap=0.200, ΔEntropy=0.0312, ΔVariance=0.000131
+2025-09-10 18:27:15,344 - layer_35: Overlap=0.500, ΔEntropy=0.0312, ΔVariance=0.000675
+2025-09-10 18:27:15,344 - layer_40: Overlap=0.200, ΔEntropy=0.0938, ΔVariance=0.001136
+2025-09-10 18:27:15,344 - layer_45: Overlap=0.500, ΔEntropy=0.2969, ΔVariance=0.000252
+2025-09-10 18:27:15,344 - layer_47: Overlap=0.200, ΔEntropy=0.4062, ΔVariance=0.001502
+2025-09-10 18:27:15,344 - 
+================================================================================
+2025-09-10 18:27:15,344 - AGGREGATE STATISTICS
+2025-09-10 18:27:15,344 - ================================================================================
+2025-09-10 18:27:15,344 - 
+OVERALL LANGUAGE SIMILARITY:
+2025-09-10 18:27:15,344 - Mean Expert Overlap: 0.2891 (±0.1970)
+2025-09-10 18:27:15,344 - Mean Entropy Difference: 0.1115 (±0.1517)
+2025-09-10 18:27:15,344 - Mean Variance Difference: 0.000488 (±0.000471)
+2025-09-10 18:27:15,345 - Mean Gini Difference: 0.0184 (±0.0147)
+2025-09-10 18:27:15,345 - 
+LAYER-WISE PATTERNS:
+2025-09-10 18:27:15,345 - layer_0: Overlap=0.1200, ΔEntropy=0.0500
+2025-09-10 18:27:15,345 - layer_10: Overlap=0.4900, ΔEntropy=0.0594
+2025-09-10 18:27:15,345 - layer_20: Overlap=0.3900, ΔEntropy=0.0344
+2025-09-10 18:27:15,345 - layer_30: Overlap=0.2600, ΔEntropy=0.0563
+2025-09-10 18:27:15,345 - layer_40: Overlap=0.2900, ΔEntropy=0.0781
+2025-09-10 18:27:15,345 - layer_47: Overlap=0.0400, ΔEntropy=0.5141
+2025-09-10 18:27:15,345 - 
+================================================================================
+2025-09-10 18:27:15,345 - === Sample MoE Analysis Complete ===
