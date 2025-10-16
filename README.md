@@ -22,49 +22,53 @@ The project provides a complete workflow for fine-tuning large language models o
 ## Directory Structure
 
 ```
-qwen_model/
-├── data/                  # Data storage and processing
-├── finetuning/            # Fine-tuning configurations and outputs
-├── logs/                  # Training and evaluation logs
-├── model/                 # Model files (downloaded separately)
-├── download_model.py      # Script to download the Qwen model
-├── prepare_for_finetuning.py # Prepare model for fine-tuning
-├── prepare_dataset.py     # Dataset preparation utilities
-├── download_s3_data.py    # Download Hebrew data from S3
-├── train.py               # Main training script
-├── hp_tuning.py           # Hyperparameter tuning with Optuna
-├── evaluate_hebrew.py     # Evaluation on Hebrew LLM Leaderboard
-├── test_pipeline.py       # Test pipeline with small subset of data
-├── run_full_workflow.py   # Run the complete workflow
-├── start_training.sh      # Shell script to start training with nohup
-├── start_hp_tuning.sh     # Shell script to start hyperparameter tuning
-├── start_evaluation.sh    # Shell script to start evaluation
-├── start_test_pipeline.sh # Shell script to test the pipeline
-└── TUNING_AND_EVALUATION.md # Detailed documentation
-
-text_cleaning/             # Advanced text cleaning system
-├── cleaners/              # Text cleaning modules
-│   ├── base_cleaner.py    # Base cleaner class
-│   ├── regex_cleaner.py   # Regex-based text cleaning
-│   ├── spacefix_cleaner.py # Hebrew-specific space fixing
-│   ├── duplicate_remove_cleaner.py # Duplicate removal
-│   ├── quality_cleaner.py # Quality-based filtering
-│   ├── llm_cleaner.py     # LLM-powered cleaning
-│   └── composite_cleaner.py # Composite cleaning pipeline
-├── fetchers/              # Data source modules
-│   ├── base_fetcher.py    # Base fetcher class
-│   ├── s3_source_fetcher.py # S3 data source fetcher
-│   └── local_source_fetcher.py # Local file fetcher
-├── utils/                 # Utilities and configuration
-│   ├── cleaner_constants.py # Cleaning rules and patterns
-│   ├── regex_registry.py  # Regex pattern registry
-│   ├── spacefix_registry.py # Space fixing patterns
-│   ├── cleaner_config.py  # Configuration management
-│   └── logger.py          # Logging utilities
-├── cleaning_pipeline.py   # Main cleaning pipeline
-├── main.py                # Entry point for cleaning operations
-├── simple_word_count_analyzer.py # Word counting analysis
-└── run_benchmark_cleaning.py # Benchmark cleaning performance
+qwen-hebrew-finetuning/
+├── cross_lang_moe_analysis/    # Cross-language MoE (Mixture of Experts) analysis
+│   ├── all_layers_moe_analysis.py
+│   ├── comprehensive_moe_analysis.py
+│   ├── moe_analysis.py
+│   ├── sample_moe_analysis.py
+│   ├── deploy.py
+│   └── README.md
+├── data_preprocess/           # Data preprocessing and cleaning pipeline
+│   ├── content_filtering/     # Content filtering utilities
+│   │   ├── count_tokens.py
+│   │   ├── filter_analysis.py
+│   │   ├── fineweb_filtering_pipeline.py
+│   │   └── run_filtering.py
+│   ├── extract_data/          # Data extraction from various sources
+│   │   ├── clean_gcp_ocr.ipynb
+│   │   ├── load_wikipedia/    # Wikipedia data processing
+│   │   └── pdf_batching.py
+│   ├── minhash/               # MinHash deduplication
+│   │   ├── cluster.yaml
+│   │   └── minhash.py
+│   └── text_cleaning/         # Advanced text cleaning system
+│       ├── cleaners/          # Text cleaning modules
+│       ├── fetchers/          # Data source modules
+│       ├── utils/             # Utilities and configuration
+│       ├── cleaning_pipeline.py
+│       ├── main.py
+│       └── run_benchmark_cleaning.py
+├── evaluation/                # Model evaluation and benchmarking
+│   └── benchmark_results/     # Evaluation results storage
+├── training/                  # Training scripts and configurations
+│   ├── deepspeed/            # DeepSpeed training setup
+│   │   ├── accelerate_config.yaml
+│   │   ├── deepspeed_zero3.yaml
+│   │   ├── train.py
+│   │   ├── train_debug.py
+│   │   └── requirements.txt
+│   └── nemo/                  # NeMo training setup
+│       ├── train.py
+│       └── README.md
+├── translation/               # Translation and benchmark preparation
+│   ├── prompts/              # Benchmark prompts
+│   ├── src/                  # Translation utilities
+│   └── plots/                # Analysis plots
+├── s3_select_processor.py    # S3 data processing utilities
+├── sagemaker-lighteval/      # SageMaker LightEval integration
+└── requirements.txt          # Project dependencies
 ```
 
 ## Text Cleaning System
@@ -285,8 +289,89 @@ The system includes benchmarking tools for evaluating cleaning performance:
 
 #### Usage
 ```bash
+cd data_preprocess/text_cleaning
 python run_benchmark_cleaning.py --source hebrew_text --cleaner regex
 ```
+
+## Project Components
+
+### Cross-Language MoE Analysis (`cross_lang_moe_analysis/`)
+
+This directory contains analysis tools for understanding how Mixture of Experts (MoE) models behave across different languages, particularly focusing on Hebrew language processing.
+
+#### Key Features
+- **Layer-wise Analysis**: Comprehensive analysis of all model layers
+- **Sample Analysis**: Detailed examination of specific model samples
+- **Deployment Tools**: Utilities for deploying and testing MoE models
+- **Logging**: Comprehensive logging for analysis tracking
+
+#### Usage
+```bash
+cd cross_lang_moe_analysis
+python comprehensive_moe_analysis.py
+```
+
+### Data Preprocessing (`data_preprocess/`)
+
+A comprehensive data preprocessing pipeline with multiple specialized components:
+
+#### Content Filtering (`content_filtering/`)
+- **Token Counting**: Analyze dataset token distributions
+- **Filter Analysis**: Evaluate content filtering effectiveness
+- **FineWeb Pipeline**: Process FineWeb datasets with Hebrew-specific filtering
+- **S3 Integration**: Process data directly from S3 buckets
+
+#### Data Extraction (`extract_data/`)
+- **Wikipedia Processing**: Extract and clean Hebrew Wikipedia data
+- **OCR Cleaning**: Process and clean OCR-extracted text
+- **PDF Batching**: Efficient processing of PDF documents
+
+#### MinHash Deduplication (`minhash/`)
+- **Clustering**: Group similar documents using MinHash
+- **Deduplication**: Remove duplicate content across datasets
+- **Scalable Processing**: Handle large-scale deduplication tasks
+
+### Training (`training/`)
+
+Comprehensive training infrastructure supporting multiple frameworks:
+
+#### DeepSpeed Training (`deepspeed/`)
+- **Distributed Training**: Multi-GPU training with DeepSpeed ZeRO-3
+- **Hyperparameter Optimization**: Automated tuning with Optuna
+- **Debug Tools**: Testing and debugging utilities
+- **Configuration Management**: Flexible training configurations
+
+#### NeMo Training (`nemo/`)
+- **NVIDIA NeMo Integration**: Alternative training framework
+- **Model Conversion**: Tools for model format conversion
+- **Training Scripts**: NeMo-specific training implementations
+
+### Translation (`translation/`)
+
+Tools for translating and preparing Hebrew benchmarks:
+
+#### Features
+- **Benchmark Translation**: Translate standard benchmarks to Hebrew
+- **Prompt Engineering**: Hebrew-specific prompt templates
+- **Quality Assessment**: Evaluate translation quality
+- **Visualization**: Generate analysis plots and charts
+
+#### Supported Benchmarks
+- **ARC**: AI2 Reasoning Challenge
+- **GSM8K**: Grade School Math problems
+- **MMLU**: Massive Multitask Language Understanding
+- **HellaSwag**: Commonsense reasoning
+- **COPA**: Choice of Plausible Alternatives
+
+### Evaluation (`evaluation/`)
+
+Model evaluation and benchmarking infrastructure:
+
+#### Features
+- **LightEval Integration**: Standard evaluation framework
+- **Hebrew Benchmarks**: Specialized Hebrew language benchmarks
+- **Result Storage**: Organized storage of evaluation results
+- **Performance Tracking**: Monitor model performance over time
 
 ## Getting Started
 
@@ -331,10 +416,21 @@ wandb login YOUR_API_KEY
 
 ### 4. Data and Model Preparation
 
-The repository includes a comprehensive workflow script that handles downloading the model from Hugging Face and preparing Hebrew data from S3:
+The repository includes comprehensive data preprocessing tools for preparing Hebrew data:
 
+#### Data Preprocessing
 ```bash
-python qwen_model/run_full_workflow.py --aws_access_key_id YOUR_AWS_ACCESS_KEY --aws_secret_access_key YOUR_AWS_SECRET_KEY
+# Process content filtering
+cd data_preprocess/content_filtering
+python run_filtering.py
+
+# Clean text data
+cd data_preprocess/text_cleaning
+python main.py --source hebrew_text --cleaner regex
+
+# Extract Wikipedia data
+cd data_preprocess/extract_data/load_wikipedia
+python wiki_to_jsonl_to_s3.py
 ```
 
 #### Model Download Process
@@ -383,7 +479,7 @@ export AWS_SECRET_ACCESS_KEY=your_secret_key
 
 #### Run Text Cleaning Pipeline
 ```bash
-cd text_cleaning
+cd data_preprocess/text_cleaning
 python main.py --source hebrew_text --cleaner regex
 ```
 
@@ -398,60 +494,63 @@ Before running a full training job, test the pipeline with a small subset of dat
 
 ```bash
 # For single GPU testing
-python qwen_model/test_pipeline.py --dataset_path qwen_model/data/dataset/dataset --max_samples 100
+python training/deepspeed/test_debug.py --dataset_path data/dataset/dataset --max_samples 100
 
 # For multi-GPU testing with DeepSpeed
-deepspeed --num_gpus=8 qwen_model/test_pipeline.py --dataset_path qwen_model/data/dataset/dataset --max_samples 100 --single_device --deepspeed qwen_model/deepspeed_config.json
+deepspeed --num_gpus=8 training/deepspeed/test_debug.py --dataset_path data/dataset/dataset --max_samples 100 --single_device --deepspeed training/deepspeed/deepspeed_zero3.yaml
 ```
 
 ### 7. Run Hyperparameter Tuning
 
 ```bash
-./qwen_model/start_hp_tuning.sh --dataset_path qwen_model/data/dataset/dataset --num_trials 10
+cd training/deepspeed
+python optuna_search.py --dataset_path data/dataset/dataset --num_trials 10
 ```
 
 ### 8. Train the Model
 
 ```bash
-./qwen_model/start_training.sh
+cd training/deepspeed
+python train.py
 ```
 
-### 8. Evaluate the Model
-# Demo
 ### 9. Evaluate the Model
 
 ```bash
-./qwen_model/start_evaluation.sh --model_path qwen_model/finetuned
-```
-# Install LightEval directly from GitHub using uv
-uv pip install 'git+https://github.com/EleutherAI/lighteval.git'
-bash
-# Run LightEval with the desired configuration
+# Using LightEval for evaluation
 python -m lighteval accelerate \
   "model_name=Qwen/Qwen3-30B-A3B-Base" \
   "leaderboard|arc:challenge|0|0" \
-  --output-dir ./subset_test_results_30B_fewshots \
+  --output-dir ./evaluation/benchmark_results \
   --save-details \
-  --results-path-template "subset_test_30B_fewshots.json" \
+  --results-path-template "hebrew_evaluation_results.json" \
   --max-samples 50 \
-  --num-fewshot-seeds 25
+  --num-fewshot-seeds 25
+```
 
 ## Documentation
 
-For detailed information about hyperparameter tuning, training configuration, and evaluation, see [TUNING_AND_EVALUATION.md](qwen_model/TUNING_AND_EVALUATION.md).
+For detailed information about specific components, see the README files in each directory:
+
+- **Training**: `training/deepspeed/README.md` and `training/nemo/README.md`
+- **Cross-Language MoE Analysis**: `cross_lang_moe_analysis/README.md`
+- **Data Preprocessing**: Individual component documentation in `data_preprocess/` subdirectories
 
 ## Features
 
+- **Multi-Framework Training**: Support for both DeepSpeed and NeMo training frameworks
 - **Distributed Training**: Optimized for 8x H100 GPUs using DeepSpeed ZeRO-3
 - **Hyperparameter Optimization**: Automated tuning with Optuna
+- **Cross-Language MoE Analysis**: Comprehensive analysis of Mixture of Experts models
+- **Advanced Data Preprocessing**: Multi-stage data cleaning and preparation pipeline
+- **Content Filtering**: Specialized filtering for Hebrew language content
+- **Deduplication**: MinHash-based deduplication for large-scale datasets
+- **Benchmark Translation**: Tools for translating and adapting benchmarks to Hebrew
+- **Evaluation Infrastructure**: LightEval integration for comprehensive model evaluation
 - **Robust Logging**: Comprehensive metrics tracking with Weights & Biases
-- **Uninterrupted Training**: All scripts use nohup to continue after SSH disconnection
-- **Pipeline Testing**: Test the full pipeline with a small subset before full training
-- **Hebrew Evaluation**: Integration with the Hebrew LLM Leaderboard
-- **Advanced Text Cleaning**: Modular, extensible text processing system
-- **Multi-Source Data Support**: S3, local files, and custom data sources
 - **Hebrew-Specific Processing**: Specialized handling for Hebrew text characteristics
 - **Quality Assurance**: Comprehensive cleaning validation and benchmarking
+- **Multi-Source Data Support**: S3, local files, Wikipedia, and custom data sources
 
 ## License
 
