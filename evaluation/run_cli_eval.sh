@@ -1,26 +1,35 @@
 #!/bin/bash
 # Default values
-# DATASET_NAME="arc_ai2_heb"
-DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
-MAX_SAMPLES=3000
-MODEL_PATH="/home/ec2-user/models/aya-23-8B" #"/home/ec2-user/qwen-hebrew-finetuning/model260000" #"Qwen/Qwen3-30B-A3B-Base" #"/home/ec2-user/qwen-hebrew-finetuning/model260000"
+# pip install lighteval[vllm] emoji boto3
+## check s3 
+# python /home/ec2-user/qwen-hebrew-finetuning/evaluation/s3_utils.py
+DATASET_NAME="hellaswag_heb" #"mmlu_heb"
+# DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
+# DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew"
+# TODO: activate those benchmarks: gsm8k_heb isn't configured yet and all the psychometric bench below caused content length issue in vllm backend (RuntimeError: Worker failed with error 'Sampled token IDs exceed the max model length. Total number of tokens: 2048 > max_model_len: 2047)
+# DATASET_NAME="gsm8k_heb,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
+# TODO: call all tasks togther will save a lot of time - currently each task is called separately and the backend uploading in each task the model to gpu
+MAX_SAMPLES=70
+
+MODEL_PATH="/home/ec2-user/models/Qwen3-14B" #"/home/ec2-user/qwen-hebrew-finetuning/model260000" #"Qwen/Qwen3-30B-A3B-Base" #"/home/ec2-user/qwen-hebrew-finetuning/model260000"
 DEVICE="cuda:0"
 BATCH_SIZE=8
 PAD_TOKEN_ID=151643 #qwen 151643, 
 DTYPE="bfloat16"
 TOP_K=1
 TEMPERATURE=1.0
+FEW_SHOTS=3
 OUTPUT_DIR="./hebrew_benchmark_results"
 RESULTS_PATH_TEMPLATE="$OUTPUT_DIR/scores_sum"
-PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/heb_bnch"
-HEB_BENCHMARKS_DIR_PATH="/home/ec2-user/qwen-hebrew-finetuning/heb_bnch"
-# benchmarks paths  s3://gepeta-datasets/benchmarks/final_benchmarks_data/
+PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/evaluation/heb_bnch"
+HEB_BENCHMARKS_DIR_PATH="/home/ec2-user/qwen-hebrew-finetuning/evaluation/heb_bnch"
 # export to env variable
 export HEB_BENCHMARKS_DIR_PATH
 echo "HEB_BENCHMARKS_DIR_PATH is set to: $HEB_BENCHMARKS_DIR_PATH"
 # CUSTOM_TASKS="/home/ec2-user/noam/heb_bnch/custom_tasks" #tried to be suitable for new lighteval version
 # CUSTOM_TASKS="custom_tasks"
-TASK_CONFIG="community|$DATASET_NAME|5|0"
+# TASK_CONFIG="lighteval|$DATASET_NAME|$FEW_SHOTS"
+# TASK_CONFIG="leaderboard|$DATASET_NAME|$FEW_SHOTS"
 BACKEND="vllm"  # Options: "vllm" or "accelerate"
 # TASK_CONFIG="community|mmlu_heb|5|0,community|copa_heb|5|0,community|hellaswag_heb|5|0"
 if [[ "$BACKEND" == "vllm" ]]; then
@@ -221,7 +230,8 @@ START_TIME=$(date +%s)
 IFS=',' read -ra DATASET_LIST <<< "$DATASET_NAME"
 
 for DS_NAME in "${DATASET_LIST[@]}"; do
-    TASK_CONFIG="community|${DS_NAME}|5|0"
+    # TODO: make sure to call all the tasks together to save time, see https://huggingface.co/docs/lighteval/en/quicktour?utm_source=chatgpt.com#running-multiple-tasks
+    TASK_CONFIG="community|${DS_NAME}|${FEW_SHOTS}"
     echo "\n=== Running LightEval for dataset: $DS_NAME ==="
     echo "Task Config: $TASK_CONFIG"
     echo "==============================="
@@ -239,7 +249,7 @@ for DS_NAME in "${DATASET_LIST[@]}"; do
         echo "Using VLLM backend"
         export VLLM_CACHE_DIR="$OUTPUT_RUN_DIR/vllm_cache"
         mkdir -p "$VLLM_CACHE_DIR"
-        MODEL_CONFIG="model_name=$MODEL_PATH,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=2048"
+        MODEL_CONFIG="model_name=$MODEL_PATH,override_chat_template=false,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=2047"
 
         PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
         VLLM_WORKER_MULTIPROC_METHOD=spawn \
@@ -293,7 +303,36 @@ DURATION=$((END_TIME - START_TIME))
 echo "Total run duration: ${DURATION} seconds"
 echo "${DURATION}" > "$OUTPUT_RUN_DIR/run_duration_seconds.txt"
 # Summarize results
+PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/evaluation"
+export PYTHONPATH="$PYTHONPATH_DIR"
 python s3_upload.py $OUTPUT_RUN_DIR gepeta-datasets --prefix benchmark_results/heb_benc_results/
-python -c "from extract_benchmark_results import summarize_benchmark_runs; summarize_benchmark_runs('/home/ec2-user/qwen-hebrew-finetuning/hebrew_benchmark_results/scores_sum')"
+python -c "from extract_benchmark_results import summarize_benchmark_runs; summarize_benchmark_runs('$OUTPUT_DIR/scores_sum')"
 
+#consider using a loop to eval multiple models
+# echo "Starting batch evaluation for multiple models..."
+# echo make sure you have all these models downloaded locally or change to the model you want to evaluate   
+# MODEL_PATHS=(
+#     "/home/ec2-user/models/aya-23-8B"
+#     "/home/ec2-user/models/aya-23-35B"
+#     "/home/ec2-user/models/aya-expanse-32B"
+#     "/home/ec2-user/models/model260000"
+#     "/home/ec2-user/models/Qwen3-30B-A3B"
+#     "/home/ec2-user/models/Qwen3-32B"
+#     "/home/ec2-user/models/Qwen3-14B"
+#     "/home/ec2-user/models/Qwen3-8B"
+# )
+# check that the model paths exist
+# for MODEL in "${MODEL_PATHS[@]}"; do
+#     if [[ ! -d "$MODEL" ]]; then
+#         echo "Warning: Model path '$MODEL' does not exist. Skipping..."
+#         continue
+#     fi
+# done
 
+# for MODEL in "${MODEL_PATHS[@]}"; do
+#     echo "Running evaluation for model: $MODEL"
+#     /home/ec2-user/qwen-hebrew-finetuning/evaluation/run_cli_eval.sh --model-path "$MODEL"
+# done
+
+# lighteval vllm "model_name=openai-community/gpt2,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=bfloat16,generation_parameters={top_k:1,temperature:1.0},max_model_length=1024" "leaderboard|truthfulqa:mc|0" --max-samples 10 --output-dir ./test_output --save-details --results-path-template ./test_output/truthfulqa_test
+# lighteval vllm "model_name=openai-community/gpt2,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=bfloat16,generation_parameters={top_k:1,temperature:1.0},max_model_length=1024" "leaderboard|mmlu:college_chemistry|5" --max-samples 10 --output-dir ./test_output --save-details --results-path-template ./test_output/mmlu_test
