@@ -1,0 +1,4 @@
+transformers
+torch==2.8.0
+accelerate
+jinja2>=3.0.0

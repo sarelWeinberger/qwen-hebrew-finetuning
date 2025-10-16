@@ -1,0 +1,89 @@
+dup_line_frac: 0.34
+dup_n_grams:
+- - 5
+  - 0.16
+- - 6
+  - 0.151
+- - 7
+  - 0.14
+- - 8
+  - 0.129
+- - 9
+  - 0.118
+- - 10
+  - 0.108
+language_score: 0.9
+line_punct_thr: 0.05 # 0.2
+min_doc_words: 15 #50
+max_doc_words: 100000
+
+max_avg_word_length: 9
+line_punct_exclude_zero: True
+max_non_alpha_words_ratio: 0.6 #0.8
+min_avg_word_length: 2
+new_line_ratio: 0.4 #0.126
+max_ellipsis_lines_ratio: 0.3
+max_bullet_lines_ratio: 0.9
+min_number_of_stopwords: 0 #we are ignoring this filter in Hebrew
+stopwords:
+- "\u05E9\u05DC"
+- "\u05D0\u05EA"
+- "\u05E2\u05DC"
+- "\u05D4\u05D5\u05D0"
+- "\u05E2\u05DD"
+- "\u05D1\u05E9\u05E0\u05EA"
+- "\u05D2\u05DD"
+- "\u05D4\u05D9\u05D4"
+- "\u05D4\u05D9\u05D0"
+- "\u05DC\u05D0\u05D7\u05E8"
+- "\u05DC\u05D0"
+- "\u05D9\u05D3\u05D9"
+- "\u05D1\u05D9\u05DF"
+- "\u05D0\u05D5"
+- "\u05DB\u05D9"
+top_n_grams:
+- - 2
+  - 0.42 #0.239
+- - 3
+  - 0.4 #0.202
+- - 4
+  - 0.35 #0.173 
+# --- Dataset-Specific Overrides ---
+# Values here will override the general parameters above for a matching dataset_name.
+dataset_overrides:
+  SupremeCourtOfIsrael:
+    line_punct_thr: 0
+    new_line_ratio: 1
+    max_doc_words: 550000
+    dup_n_grams:
+    - - 5
+      - 0.4
+  sefaria:
+    max_doc_words: 550000
+    dup_line_frac: 0.98
+  hebrew_tweets:
+    min_doc_words: 10
+  TauDigital:
+    max_doc_words: 350000
+  TauOCR:
+    max_doc_words: 350000
+    max_ellipsis_lines_ratio: 0.7
+    max_non_alpha_words_ratio: 0.4
+  BooksNLI2:
+    max_doc_words: 350000
+  StateComptrollerReports:
+    max_doc_words: 350000
+  YisraelHayomData:
+    max_doc_words: 350000
+    max_bullet_lines_ratio: 0.999
+    dup_n_grams:
+    - - 5
+      - 0.7
+  wikipedia:
+    max_doc_words: 550000
+    max_non_alpha_words_ratio: 0.4
+
+  # You can easily add another dataset here without changing any code!
+  # AnotherSpecialDataset:
+  #   min_doc_words: 100
+  #   new_line_ratio: 0.9
