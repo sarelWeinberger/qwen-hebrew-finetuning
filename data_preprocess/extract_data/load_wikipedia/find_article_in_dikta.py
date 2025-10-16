@@ -57,7 +57,7 @@ def search_article_in_file(bucket_name, filename, article_title):
     print(f"🔍 מחפש '{article_title}' בקובץ: {filename}")
 
     # הגדרת תיקיית ההורדה
-    download_dir = Path(".")
+    download_dir = Path("")
     download_dir.mkdir(exist_ok=True)
 
     local_filename = download_dir / Path(filename).name
