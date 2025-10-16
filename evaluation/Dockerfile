@@ -17,7 +17,8 @@ RUN pip install --no-cache-dir \
     boto3 \
     awscli \
     emoji \
-    nltk
+    nltk \
+    python-Levenshtein
 
 # Download NLTK data (lighteval needs it)
 RUN python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"
