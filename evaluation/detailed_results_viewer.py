@@ -326,19 +326,19 @@ def launch_detailed_viewer(model_name: str, dataset: str, timestamp: str,
             if 'Error' in df_view.columns or 'Message' in df_view.columns:
                 return "No statistics available"
             
-            stats = f"**Total Samples:** {len(df_view)}\n\n"
-            stats += f"**Columns Displayed:** {len(df_view.columns)}\n\n"
+            stats = f"**Total Samples:** {len(df_view)} "
+            stats += f"**Columns Displayed:** {len(df_view.columns)} "
             
             if 'Correct' in df_view.columns:
                 correct_count = (df_view['Correct'] == '✓').sum()
                 total_count = len(df_view)
                 accuracy = (correct_count / total_count * 100) if total_count > 0 else 0
-                stats += f"**Correct:** {correct_count}/{total_count} ({accuracy:.2f}%)\n\n"
+                stats += f"**Correct:** {correct_count}/{total_count} ({accuracy:.2f}%) "
             
             if 'Accuracy' in df_view.columns:
                 avg_acc = df_view['Accuracy'].mean()
                 if not pd.isna(avg_acc):
-                    stats += f"**Average Accuracy:** {avg_acc:.4f}\n\n"
+                    stats += f"**Average Accuracy:** {avg_acc:.4f} "
             
             return stats
         
@@ -359,7 +359,29 @@ def launch_detailed_viewer(model_name: str, dataset: str, timestamp: str,
     
     return viewer
 
-# Standalone function for external launch
+def _update_view_for_path(parquet_path: str, view_mode: str):
+    return create_detailed_viewer(parquet_path, view_mode)
+
+def _get_stats_for_path(parquet_path: str, view_mode: str) -> str:
+    df_view = create_detailed_viewer(parquet_path, view_mode)
+    if 'Error' in df_view.columns or 'Message' in df_view.columns:
+        return "No statistics available"
+    
+    stats = f"**Total Samples:** {len(df_view)} "
+    stats += f"**Columns Displayed:** {len(df_view.columns)} "
+    
+    if 'Correct' in df_view.columns:
+        correct_count = (df_view['Correct'] == '✓').sum()
+        total_count = len(df_view)
+        accuracy = (correct_count / total_count * 100) if total_count > 0 else 0
+        stats += f"**Correct:** {correct_count}/{total_count} ({accuracy:.2f}%) "
+    
+    if 'Accuracy' in df_view.columns:
+        avg_acc = df_view['Accuracy'].mean()
+        if not pd.isna(avg_acc):
+            stats += f"**Average Accuracy:** {avg_acc:.4f} "
+    
+    return stats
 def create_viewer_interface(parquet_path: str) -> gr.Blocks:
     """Create a standalone viewer interface for a parquet file"""
     
@@ -371,21 +393,47 @@ def create_viewer_interface(parquet_path: str) -> gr.Blocks:
         if 'Error' in df_view.columns or 'Message' in df_view.columns:
             return "No statistics available"
         
-        stats = f"**Total Samples:** {len(df_view)}\n\n"
-        stats += f"**Columns Displayed:** {len(df_view.columns)}\n\n"
+        stats = f"**Total Samples:** {len(df_view)} "
+        stats += f"**Columns Displayed:** {len(df_view.columns)} "
         
         if 'Correct' in df_view.columns:
             correct_count = (df_view['Correct'] == '✓').sum()
             total_count = len(df_view)
             accuracy = (correct_count / total_count * 100) if total_count > 0 else 0
-            stats += f"**Correct:** {correct_count}/{total_count} ({accuracy:.2f}%)\n\n"
+            stats += f"**Correct:** {correct_count}/{total_count} ({accuracy:.2f}%) "
         
         if 'Accuracy' in df_view.columns:
             avg_acc = df_view['Accuracy'].mean()
             if not pd.isna(avg_acc):
-                stats += f"**Average Accuracy:** {avg_acc:.4f}\n\n"
+                stats += f"**Average Accuracy:** {avg_acc:.4f} "
         
         return stats
+    
+    def download_csv(view_mode):
+        """Generate CSV file and return the file path"""
+        try:
+            df = create_detailed_viewer(parquet_path, view_mode)
+            
+            # Generate unique filename with timestamp
+            import time
+            timestamp = int(time.time())
+            filename = f"detailed_view_{timestamp}.csv"
+            temp_path = os.path.join("/tmp", filename)
+            
+            # Save to CSV
+            df.to_csv(temp_path, index=False, encoding='utf-8')
+            
+            print(f"CSV saved to: {temp_path}")
+            return temp_path
+        except Exception as e:
+            print(f"Error creating CSV: {e}")
+            import traceback
+            traceback.print_exc()
+            # Return error file
+            error_path = "/tmp/error.txt"
+            with open(error_path, 'w') as f:
+                f.write(f"Error creating CSV: {str(e)}")
+            return error_path
     
     with gr.Blocks(title="Detailed Results Viewer") as viewer:
         gr.Markdown("# 📊 Detailed Results Viewer")
@@ -421,36 +469,8 @@ def create_viewer_interface(parquet_path: str) -> gr.Blocks:
             outputs=[results_table, stats_box]
         )
         
-        # Add download button - FIXED
+        # Download button
         download_btn = gr.Button("💾 Download Current View as CSV", variant="secondary")
-        
-        def download_csv(view_mode):
-            """Generate CSV file and return the file path"""
-            try:
-                df = create_detailed_viewer(parquet_path, view_mode)
-                
-                # Generate unique filename with timestamp
-                import time
-                timestamp = int(time.time())
-                filename = f"detailed_view_{timestamp}.csv"
-                temp_path = os.path.join("/tmp", filename)
-                
-                # Save to CSV
-                df.to_csv(temp_path, index=False, encoding='utf-8')
-                
-                print(f"CSV saved to: {temp_path}")
-                return temp_path
-            except Exception as e:
-                print(f"Error creating CSV: {e}")
-                import traceback
-                traceback.print_exc()
-                # Return error file
-                error_path = "/tmp/error.txt"
-                with open(error_path, 'w') as f:
-                    f.write(f"Error creating CSV: {str(e)}")
-                return error_path
-        
-        # Use gr.File for download
         download_output = gr.File(label="Download CSV", visible=True)
         
         download_btn.click(
@@ -461,8 +481,111 @@ def create_viewer_interface(parquet_path: str) -> gr.Blocks:
     
     return viewer
 
+# # Standalone function for external launch
+# def create_viewer_interface(parquet_path: str) -> gr.Blocks:
+#     """Create a standalone viewer interface for a parquet file"""
+    
+#     def update_view(view_mode):
+#         return create_detailed_viewer(parquet_path, view_mode)
+    
+#     def get_stats(view_mode):
+#         df_view = create_detailed_viewer(parquet_path, view_mode)
+#         if 'Error' in df_view.columns or 'Message' in df_view.columns:
+#             return "No statistics available"
+        
+#         stats = f"**Total Samples:** {len(df_view)} "
+#         stats += f"**Columns Displayed:** {len(df_view.columns)} "
+        
+#         if 'Correct' in df_view.columns:
+#             correct_count = (df_view['Correct'] == '✓').sum()
+#             total_count = len(df_view)
+#             accuracy = (correct_count / total_count * 100) if total_count > 0 else 0
+#             stats += f"**Correct:** {correct_count}/{total_count} ({accuracy:.2f}%) "
+        
+#         if 'Accuracy' in df_view.columns:
+#             avg_acc = df_view['Accuracy'].mean()
+#             if not pd.isna(avg_acc):
+#                 stats += f"**Average Accuracy:** {avg_acc:.4f} "
+        
+#         return stats
+    
+#     with gr.Blocks(title="Detailed Results Viewer") as viewer:
+#         gr.Markdown("# 📊 Detailed Results Viewer")
+#         gr.Markdown(f"**File:** `{parquet_path}`")
+        
+#         view_selector = gr.Radio(
+#             choices=["Simple", "Full"],
+#             value="Simple",
+#             label="View Mode",
+#             info="Simple: Shows doc.query, metric.acc, and model_response.output_tokens | Full: Shows all columns from parquet file"
+#         )
+        
+#         stats_box = gr.Markdown(value=get_stats("Simple"))
+        
+#         results_table = gr.Dataframe(
+#             value=create_detailed_viewer(parquet_path, "Simple"),
+#             wrap=True,
+#             max_height=600,
+#             interactive=False,
+#             line_breaks=True
+#         )
+        
+#         view_selector.change(
+#             fn=lambda vm: (update_view(vm), get_stats(vm)),
+#             inputs=[view_selector],
+#             outputs=[results_table, stats_box]
+#         )
+        
+#         refresh_btn = gr.Button("🔄 Refresh View", variant="secondary")
+#         refresh_btn.click(
+#             fn=lambda vm: (update_view(vm), get_stats(vm)),
+#             inputs=[view_selector],
+#             outputs=[results_table, stats_box]
+#         )
+        
+#         # Add download button - FIXED
+#         download_btn = gr.Button("💾 Download Current View as CSV", variant="secondary")
+        
+#         def download_csv(view_mode):
+#             """Generate CSV file and return the file path"""
+#             try:
+#                 df = create_detailed_viewer(parquet_path, view_mode)
+                
+#                 # Generate unique filename with timestamp
+#                 import time
+#                 timestamp = int(time.time())
+#                 filename = f"detailed_view_{timestamp}.csv"
+#                 temp_path = os.path.join("/tmp", filename)
+                
+#                 # Save to CSV
+#                 df.to_csv(temp_path, index=False, encoding='utf-8')
+                
+#                 print(f"CSV saved to: {temp_path}")
+#                 return temp_path
+#             except Exception as e:
+#                 print(f"Error creating CSV: {e}")
+#                 import traceback
+#                 traceback.print_exc()
+#                 # Return error file
+#                 error_path = "/tmp/error.txt"
+#                 with open(error_path, 'w') as f:
+#                     f.write(f"Error creating CSV: {str(e)}")
+#                 return error_path
+        
+#         # Use gr.File for download
+#         download_output = gr.File(label="Download CSV", visible=True)
+        
+#         download_btn.click(
+#             fn=download_csv,
+#             inputs=[view_selector],
+#             outputs=download_output
+#         )
+    
+#     return viewer
+
 if __name__ == "__main__":
     # Example usage
-    parquet_path = "/home/ec2-user/test_output/hellaswag_heb/scores_sum/2025-10-15T21-51-38/details/home/ec2-user/models/Qwen3-14B/2025-10-15T21-52-23.466806/details_community|hellaswag_heb|3_2025-10-15T21-52-23.466806.parquet"
+    # parquet_path = "/home/ec2-user/test_output/hellaswag_heb/scores_sum/2025-10-15T21-51-38/details/home/ec2-user/models/Qwen3-14B/2025-10-15T21-52-23.466806/details_community|hellaswag_heb|3_2025-10-15T21-52-23.466806.parquet"
+    parquet_path = "/home/ec2-user/qwen-hebrew-finetuning/evaluation/temp_parquets/details_community|mmlu_heb|3_2025-10-05T20-01-57.973968.parquet"
     viewer = create_viewer_interface(parquet_path)
-    viewer.launch(share=True)  # Set share=True to get a public link
+    viewer.launch(share=False)  # Set share=True to get a public link
