@@ -76,10 +76,9 @@ def remove_empty_columns(df: pd.DataFrame) -> pd.DataFrame:
     except Exception as e:
         print(f"Error removing empty columns: {e}")
         return df
-
 def extract_simple_view(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Extract simple view: doc.query, metric.acc, model_response.output_tokens
+    Extract simple view: doc.query, metric.acc, model_response.logprobs
     Each row is a sample, columns are the fields
     """
     try:
@@ -105,35 +104,43 @@ def extract_simple_view(df: pd.DataFrame) -> pd.DataFrame:
             else:
                 record['Query (Input)'] = ''
             
-            # Extract model_response.output_tokens
+            # Extract model_response.logprobs
             if 'model_response' in df.columns:
                 model_response = row['model_response']
                 if isinstance(model_response, dict):
-                    output_tokens = safe_get_value(model_response, 'output_tokens')
+                    logprobs = safe_get_value(model_response, 'logprobs')
                     
-                    if not is_empty(output_tokens):
-                        # Handle different types of output_tokens
-                        if isinstance(output_tokens, (list, tuple, np.ndarray)):
+                    if not is_empty(logprobs):
+                        # Handle different types of logprobs
+                        if isinstance(logprobs, (list, tuple, np.ndarray)):
                             # Convert array/list to readable string
                             try:
-                                if isinstance(output_tokens, np.ndarray):
-                                    if output_tokens.size > 0:
-                                        output_str = str(output_tokens.tolist())
+                                if isinstance(logprobs, np.ndarray):
+                                    if logprobs.size > 0:
+                                        logprobs_str = str(logprobs.tolist())
                                     else:
-                                        output_str = ''
+                                        logprobs_str = ''
                                 else:
-                                    output_str = str(output_tokens)
-                                record['Model Output'] = output_str[:1000]
+                                    logprobs_str = str(logprobs)
+                                record['Log Probabilities'] = logprobs_str[:1000]
                             except:
-                                record['Model Output'] = str(output_tokens)[:1000]
+                                record['Log Probabilities'] = str(logprobs)[:1000]
+                        elif isinstance(logprobs, dict):
+                            # If logprobs is a dict, format it nicely
+                            try:
+                                import json
+                                logprobs_str = json.dumps(logprobs, ensure_ascii=False, indent=2)
+                                record['Log Probabilities'] = logprobs_str[:1000]
+                            except:
+                                record['Log Probabilities'] = str(logprobs)[:1000]
                         else:
-                            record['Model Output'] = str(output_tokens)[:1000]
+                            record['Log Probabilities'] = str(logprobs)[:1000]
                     else:
-                        record['Model Output'] = ''
+                        record['Log Probabilities'] = ''
                 else:
-                    record['Model Output'] = ''
+                    record['Log Probabilities'] = ''
             else:
-                record['Model Output'] = ''
+                record['Log Probabilities'] = ''
             
             # Extract metric.acc
             if 'metric' in df.columns:
@@ -188,7 +195,7 @@ def extract_simple_view(df: pd.DataFrame) -> pd.DataFrame:
         import traceback
         traceback.print_exc()
         return pd.DataFrame({'Error': [f'Failed to create simple view: {str(e)}']})
-
+    
 def safe_convert_to_string(obj: Any, max_length: int = 1000) -> str:
     """Safely convert any object to string representation"""
     try:

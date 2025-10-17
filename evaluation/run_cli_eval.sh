@@ -3,13 +3,13 @@
 # pip install lighteval[vllm] emoji boto3
 ## check s3 
 # python /home/ec2-user/qwen-hebrew-finetuning/evaluation/s3_utils.py
-DATASET_NAME="hellaswag_heb,mmlu_heb,copa_heb,arc_ai2_heb"
+# DATASET_NAME="hellaswag_heb,mmlu_heb,copa_heb,arc_ai2_heb"
 # DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
-# DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew"
+DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew"
 # TODO: activate those benchmarks: gsm8k_heb isn't configured yet and all the psychometric bench below caused content length issue in vllm backend (RuntimeError: Worker failed with error 'Sampled token IDs exceed the max model length. Total number of tokens: 2048 > max_model_len: 2047)
 # DATASET_NAME="gsm8k_heb,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
 # TODO: call all tasks togther will save a lot of time - currently each task is called separately and the backend uploading in each task the model to gpu
-MAX_SAMPLES=70
+MAX_SAMPLES=3000
 
 MODEL_PATH="/home/ec2-user/models/Qwen3-14B" #"/home/ec2-user/qwen-hebrew-finetuning/model260000" #"Qwen/Qwen3-30B-A3B-Base" #"/home/ec2-user/qwen-hebrew-finetuning/model260000"
 DEVICE="cuda:0"
@@ -18,7 +18,7 @@ PAD_TOKEN_ID=151643 #qwen 151643,
 DTYPE="bfloat16"
 TOP_K=1
 TEMPERATURE=1.0
-FEW_SHOTS=3
+FEW_SHOTS=5
 OUTPUT_DIR="./hebrew_benchmark_results"
 RESULTS_PATH_TEMPLATE="$OUTPUT_DIR/scores_sum"
 PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/evaluation/heb_bnch"
@@ -83,7 +83,7 @@ while [[ $# -gt 0 ]]; do
             fi
             ;;
         -p|--model-path)
-            if [[ -n "$2" && ! "$2" =~ ^- ]]; then
+            if [[ -n "$2" && "$2" != -* ]]; then
                 MODEL_PATH="$2"
                 shift 2
             else
@@ -303,9 +303,16 @@ DURATION=$((END_TIME - START_TIME))
 echo "Total run duration: ${DURATION} seconds"
 echo "${DURATION}" > "$OUTPUT_RUN_DIR/run_duration_seconds.txt"
 # Summarize results
-PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/evaluation"
+# PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/evaluation"
+# export PYTHONPATH="$PYTHONPATH_DIR"
+# Ensure we run helper scripts from this script's directory so calls work regardless of current cwd
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# If PYTHONPATH_DIR set earlier, keep it; otherwise default to the evaluation dir (script dir)
+PYTHONPATH_DIR="${PYTHONPATH_DIR:-$SCRIPT_DIR}"
 export PYTHONPATH="$PYTHONPATH_DIR"
-python s3_upload.py $OUTPUT_RUN_DIR gepeta-datasets --prefix benchmark_results/heb_benc_results/
+
+# Run s3 upload and summarizer using absolute paths to the helper scripts
+python "$SCRIPT_DIR/s3_upload.py" "$OUTPUT_RUN_DIR" gepeta-datasets --prefix benchmark_results/heb_benc_results/
 python -c "from extract_benchmark_results import summarize_benchmark_runs; summarize_benchmark_runs('$OUTPUT_DIR/scores_sum')"
 
 #consider using a loop to eval multiple models

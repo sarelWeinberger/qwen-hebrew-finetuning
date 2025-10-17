@@ -11,7 +11,7 @@ import os
 from s3_utils import download_s3_file
 from extract_benchmark_results import summarize_benchmark_runs
 from check_port_avaliablity import check_port_or_raise
-from detailed_results_viewer import launch_detailed_viewer, create_viewer_interface   
+from detailed_results_viewer import create_detailed_viewer   
 import webbrowser
 import threading
 from typing import List, Optional, Dict
@@ -523,7 +523,7 @@ def handle_cell_click(row_idx: int, col_name: str, df: pd.DataFrame):
         print(f"Using local parquet file: {parquet_path}")
         
         # Load the data directly
-        from detailed_results_viewer import create_detailed_viewer
+
         detailed_df = create_detailed_viewer(parquet_path, "Simple")
         
         return detailed_df, gr.update(visible=True)
@@ -641,7 +641,8 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
                 generate_runs_table()  # Refresh data
                 df = create_data_table()
                 _, score_cols = make_clickable_table()
-                return df, gr.Dropdown(choices=score_cols)
+                df = df[[col for col in df_state.value.columns if not col.endswith('_details')]]
+                return df
             
             refresh_data_btn = gr.Button("🔄 Refresh Data", variant="secondary")
             
@@ -747,12 +748,23 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
             # Stats display
             stats_display = gr.Markdown(visible=False)
             
+            # Download button
+            with gr.Row():
+                download_btn = gr.Button("💾 Download Current View as CSV", variant="secondary", visible=False)
+                refresh_detail_btn = gr.Button("🔄 Refresh View", variant="secondary", visible=False)
+            
+            download_output = gr.File(label="Download CSV", visible=False)
+            
             def on_view_click(row_idx, col_name, df):
                 if col_name is None:
                     return (
                         gr.update(visible=False),
                         gr.update(visible=False),
                         gr.update(visible=False),
+                        gr.update(visible=False),
+                        gr.update(visible=False),
+                        gr.update(visible=False),
+                        None,
                         "Please select a dataset column"
                     )
                 try:
@@ -765,6 +777,10 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
                                 gr.update(visible=False),
                                 gr.update(visible=False),
                                 gr.update(visible=False),
+                                gr.update(visible=False),
+                                gr.update(visible=False),
+                                gr.update(visible=False),
+                                None,
                                 f"Model name '{row_name}' not found"
                             )
                     
@@ -784,6 +800,10 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
                             gr.update(visible=False),
                             gr.update(visible=False),
                             gr.update(visible=False),
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            None,
                             f"Failed to download data file: {e}"
                         )
                     
@@ -816,7 +836,11 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
                         gr.update(value=detailed_df, visible=True),
                         gr.update(value=stats, visible=True),
                         gr.update(visible=True),
-                        parquet_path  # Return path for later use
+                        gr.update(visible=True),  # download button
+                        gr.update(visible=True),  # refresh button
+                        gr.update(visible=False), # download output (hide until clicked)
+                        parquet_path,
+                        f"Loaded {len(detailed_df)} samples from {col_name}"
                     )
                     
                 except Exception as e:
@@ -826,6 +850,10 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
                         gr.update(visible=False),
                         gr.update(visible=False),
                         gr.update(visible=False),
+                        gr.update(visible=False),
+                        gr.update(visible=False),
+                        gr.update(visible=False),
+                        None,
                         f"Error: {str(e)}"
                     )
             
@@ -836,7 +864,9 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
             view_btn.click(
                 fn=on_view_click,
                 inputs=[run_selector, col_selector, df_state],
-                outputs=[detailed_results, stats_display, view_mode_selector, current_parquet_path]
+                outputs=[detailed_results, stats_display, view_mode_selector, 
+                        download_btn, refresh_detail_btn, download_output, 
+                        current_parquet_path, info_box]
             )
             
             # Handle view mode changes
@@ -873,8 +903,85 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
                 outputs=[detailed_results, stats_display]
             )
             
-            demo.load(fn=update_col_choices, outputs=col_selector)
+            # Handle download button
+            def download_csv(view_mode, parquet_path):
+                """Generate CSV file and return the file path"""
+                if parquet_path is None:
+                    error_path = "/tmp/error.txt"
+                    with open(error_path, 'w') as f:
+                        f.write("No data loaded. Please view details first.")
+                    return gr.update(value=error_path, visible=True)
+                
+                try:
+                    from detailed_results_viewer import create_detailed_viewer
+                    df = create_detailed_viewer(parquet_path, view_mode)
+                    
+                    # Generate unique filename with timestamp
+                    import time
+                    timestamp = int(time.time())
+                    dataset_name = os.path.basename(parquet_path).replace('.parquet', '').replace('details_', '')
+                    filename = f"detailed_view_{dataset_name}_{timestamp}.csv"
+                    temp_path = os.path.join("/tmp", filename)
+                    
+                    # Save to CSV
+                    df.to_csv(temp_path, index=False, encoding='utf-8')
+                    
+                    print(f"CSV saved to: {temp_path}")
+                    return gr.update(value=temp_path, visible=True)
+                except Exception as e:
+                    print(f"Error creating CSV: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    # Return error file
+                    error_path = "/tmp/error.txt"
+                    with open(error_path, 'w') as f:
+                        f.write(f"Error creating CSV: {str(e)}")
+                    return gr.update(value=error_path, visible=True)
             
+            download_btn.click(
+                fn=download_csv,
+                inputs=[view_mode_selector, current_parquet_path],
+                outputs=download_output
+            )
+            
+            # Handle refresh button
+            def refresh_view(view_mode, parquet_path):
+                if parquet_path is None:
+                    return gr.update(), gr.update(), "No data loaded"
+                
+                try:
+                    from detailed_results_viewer import create_detailed_viewer
+                    detailed_df = create_detailed_viewer(parquet_path, view_mode)
+                    
+                    # Recalculate stats
+                    if 'Error' in detailed_df.columns or 'Message' in detailed_df.columns:
+                        stats = "No statistics available"
+                    else:
+                        stats = f"**Total Samples:** {len(detailed_df)} "
+                        stats += f"**Columns Displayed:** {len(detailed_df.columns)} "
+                        
+                        if 'Correct' in detailed_df.columns:
+                            correct_count = (detailed_df['Correct'] == '✓').sum()
+                            total_count = len(detailed_df)
+                            accuracy = (correct_count / total_count * 100) if total_count > 0 else 0
+                            stats += f"**Correct:** {correct_count}/{total_count} ({accuracy:.2f}%) "
+                        
+                        if 'Accuracy' in detailed_df.columns:
+                            avg_acc = detailed_df['Accuracy'].mean()
+                            if not pd.isna(avg_acc):
+                                stats += f"**Average Accuracy:** {avg_acc:.4f} "
+                    
+                    return gr.update(value=detailed_df), gr.update(value=stats), "View refreshed"
+                except Exception as e:
+                    return gr.update(), gr.update(), f"Error refreshing: {str(e)}"
+            
+            refresh_detail_btn.click(
+                fn=refresh_view,
+                inputs=[view_mode_selector, current_parquet_path],
+                outputs=[detailed_results, stats_display, info_box]
+            )
+            
+            demo.load(fn=update_col_choices, outputs=col_selector)  
 PORT = 7680
 # Launch the app
 if __name__ == "__main__":
