@@ -2,6 +2,19 @@
 
 Minimal steps to preprocess data and launch training in the NVIDIA NeMo 25.07 container.
 
+## Setting up VS-Code Tunneling:
+
+Run this command:
+
+```bash
+sudo apt update && sudo apt install screen curl -y && screen -dmS vscode_tunnel sh -c 'curl -Lk "https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64" --output vscode_cli.tar.gz; tar -xf vscode_cli.tar.gz && ./code tunnel --random-name'
+screen -r
+```
+
+Then, navigate to `GitHub Account` and follow the instructions. Once done, press `Ctrl+a`, then `d` to disconnect from the screen and leave it running in the background.
+
+
+
 ## Links
 
 * Guide: [https://docs.nvidia.com/nemo-framework/user-guide/latest/nemo-2.0/quickstart.html](https://docs.nvidia.com/nemo-framework/user-guide/latest/nemo-2.0/quickstart.html)
@@ -202,4 +215,5 @@ python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
+
 
