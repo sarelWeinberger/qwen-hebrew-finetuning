@@ -11,9 +11,9 @@ sudo apt update && sudo apt install screen curl -y && screen -dmS vscode_tunnel 
 screen -r
 ```
 
-Then, navigate to `GitHub Account` and follow the instructions. Once done, press `Ctrl+a`, then `d` to disconnect from the screen and leave it running in the background.
+Then, navigate to `GitHub Account` and follow the instructions. Once done, press `Ctrl+a`, *and then* `d` (*WITHOUT `Ctrl`) to disconnect from the screen and leave it running in the background.
 
-
+Once set up, go to your local VS-Code, `Connect to Tunnel` -> `GitHub Account` -> Look for one that is online. 
 
 ## Links
 
@@ -215,5 +215,6 @@ python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
+
 
 
