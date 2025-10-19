@@ -39,7 +39,29 @@ def summarize_benchmark_runs(scores_sum_dir, local_save_dir=None,csv_filename='b
             run_info['timestamp'] = os.path.basename(run_dir)
             samples_number = None
             model_name = None
-            
+            #  flatten details parquet files and map benchmark -> parquet path ---
+            details_dir = os.path.join(run_dir, 'details')
+            if os.path.isdir(details_dir):
+                for root, dirs, files in os.walk(details_dir):
+                    for file in files:
+                        if file.endswith('.parquet'):
+                            # Try to parse benchmark name from filename like:
+                            # details_community|arc_ai2_heb|5_2025-09-16T19-47-51.839494.parquet
+                            m = re.search(r'\|([^|]+)\|', file)
+                            if m:
+                                bench_name = m.group(1)
+                            else:
+                                # fallback to basename without extension
+                                bench_name = os.path.splitext(file)[0]
+                            parquet_path = os.path.join(root, file)
+                            # store relative path (relative to the scores_sum_dir root) so it can be used to fetch from S3 later
+                            try:
+                                benchmark_details_rel = os.path.relpath(parquet_path, start=scores_sum_dir)
+                            except Exception:
+                                benchmark_details_rel = parquet_path
+                            run_info[f'{bench_name}_details'] = benchmark_details_rel
+                            all_benchmarks.add(bench_name)
+
             # Search for JSON files in all subdirectories of run_dir
             for subdir in os.listdir(run_dir):
                 subdir_path = os.path.join(run_dir, subdir)
@@ -67,14 +89,12 @@ def summarize_benchmark_runs(scores_sum_dir, local_save_dir=None,csv_filename='b
         for bench in sorted(all_benchmarks):
             columns.append(f'{bench}_score')
             columns.append(f'{bench}_std')
+            columns.append(f'{bench}_details')
         
         df = pd.DataFrame(rows)
-        df = df[columns]
-        
-        print(f"Extracted {len(rows)} runs.")
-        print("Columns:", df.columns.tolist())
-        print(df)
-        print(df.model_name)
+        # keep only the ordered columns that actually exist in the dataframe
+        existing_columns = [c for c in columns if c in df.columns]
+        df = df[existing_columns]
         
         # Determine where to save the CSV
         if local_save_dir is None:
@@ -112,7 +132,7 @@ if __name__ == "__main__":
     scores_sum_directory = 's3://gepeta-datasets/benchmark_results/heb_benc_results/'
     
     # You can specify a custom local directory to save the CSV
-    local_save_directory = None  # Will save to current directory
+    local_save_directory = 'benchmark_results_test'  # Will save to current directory
     
     summarize_benchmark_runs(scores_sum_directory, local_save_directory)
 

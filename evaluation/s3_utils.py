@@ -89,6 +89,51 @@ def cleanup_temp_directory(temp_dir):
     except Exception as e:
         print(f"Warning: Could not clean up temporary directory {temp_dir}: {e}")
 
+def download_s3_file(s3_path, local_path=None, s3_client=None):
+    """
+    Download a single S3 object to a local file.
+
+    Args:
+        s3_path (str): S3 path in format 's3://bucket/key'
+        local_path (str|None): Local file path or directory. If None, uses basename(key) in CWD.
+        s3_client (boto3.client|None): Optional boto3 S3 client to use.
+
+    Returns:
+        str: Path to the downloaded local file.
+    """
+    bucket, key = parse_s3_path(s3_path)
+
+    if not key or key.endswith('/'):
+        raise ValueError("S3 path must point to a file (not a bucket or directory).")
+
+    if s3_client is None:
+        s3_client = boto3.client('s3')
+
+    # Determine local path
+    if local_path is None:
+        local_path = os.path.basename(key) or "downloaded_s3_object"
+
+    # If local_path is a directory path (ends with separator) or an existing dir, place file inside it
+    if local_path.endswith(os.sep) or local_path.endswith('/') or os.path.isdir(local_path):
+        os.makedirs(local_path, exist_ok=True)
+        local_path = os.path.join(local_path, os.path.basename(key))
+
+    # Ensure parent directories exist
+    parent_dir = os.path.dirname(local_path)
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
+
+    try:
+        s3_client.download_file(bucket, key, local_path)
+        print(f"Downloaded s3://{bucket}/{key} -> {local_path}")
+        return local_path
+    except ClientError as e:
+        print(f"Error downloading s3://{bucket}/{key}: {e}")
+        raise
+    except Exception as e:
+        print(f"Unexpected error downloading s3://{bucket}/{key}: {e}")
+        raise
+    
 def is_s3_path(path):
     """Check if a path is an S3 path."""
     return isinstance(path, str) and path.startswith('s3://')

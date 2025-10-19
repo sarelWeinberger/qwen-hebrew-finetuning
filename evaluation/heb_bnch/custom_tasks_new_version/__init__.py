@@ -566,800 +566,881 @@ def hellaswag_heb_prompt(line, task_name: str = "hellaswag_heb"):
         gold_index=gold_index,
     )
 
+# # ============================================================
+# # Psychometric Math Section
+# # ============================================================
+
+# PSYCHOMETRIC_MATH_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/math/train.jsonl"
+
+# # psychometric_math_few_shots_list = []
+
+# # with open(PSYCHOMETRIC_MATH_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
+# #     for i, line in enumerate(f):
+# #         if i >= 5:  # take only 5 few-shots
+# #             break
+# #         data = json.loads(line)
+# #         choices = data.get("choices", [])
+
+# #         # Better answer mapping with validation
+# #         answer_raw = data.get("answer", "A")
+# #         if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+# #             answer_index = ord(answer_raw.upper()) - ord("A")
+# #             # Validate the answer index is within range
+# #             if answer_index >= len(choices):
+# #                 answer_index = 0  # fallback
+# #         elif isinstance(answer_raw, int):
+# #             answer_index = answer_raw
+# #         else:
+# #             answer_index = 0
+
+# #         gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
+
+# #         psychometric_math_few_shots_list.append({
+# #             "query": data.get("query", ""),
+# #             "choices": choices,
+# #             "gold": gold_choice,
+# #             "answer_index": answer_index,
+# #             "raw_answer": answer_raw
+# #         })
+
+# printed_psycho_math_prompt = False
+
+# def psychometric_test_math_prompt(line, task_name: str = "psychometric_test_math"):
+#     global printed_psycho_math_prompt
+
+#     # few_shot_text = ""
+#     # for i, shot in enumerate(psychometric_math_few_shots_list):
+#     #     qs = shot["query"].replace('\n', ' ').strip()
+#     #     choices = shot.get("choices", [])
+#     #     ans_index = shot.get("answer_index", 0)
+#     #     choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
+#     #     correct_letter = chr(65 + ans_index)
+
+#     #     few_shot_text += (
+#     #         f"שאלה {i+1}: {qs}\n"
+#     #         f"{choices_text}\n"
+#     #         f"תשובה: {correct_letter}\n\n"
+#     #     )
+
+#     target_q = line["query"].replace('\n', ' ').strip()
+#     target_choices = line.get("choices", [])
+
+#     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
+
+#     full_prompt = (
+#         f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+#         f"{few_shot_text}"
+#         f"שאלה: {target_q}\n"
+#         f"{target_choices_formatted}\n"
+#         f"תשובה:"
+#     )
+
+#     if not printed_psycho_math_prompt:
+#         print("="*50)
+#         print("FULL PSYCHOMETRIC MATH PROMPT WITH FEW-SHOTS:")
+#         print(full_prompt)
+#         print("="*50)
+#         printed_psycho_math_prompt = True
+
+#     # Better answer processing for validation data
+#     answer_raw = line.get("answer", "A")
+#     if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#         gold_index = ord(answer_raw.upper()) - ord("A")
+#     elif isinstance(answer_raw, int):
+#         gold_index = answer_raw
+#     else:
+#         gold_index = 0
+
+#     # Validate gold index is within range
+#     if gold_index >= len(target_choices):
+#         gold_index = 0
+
+#     # Model predicts among A, B, C, D
+#     letter_choices = [chr(65 + i) for i in range(len(target_choices))]
+
+#     return Doc(
+#         task_name=task_name,
+#         query=target_q,
+#         instruction=full_prompt,
+#         choices=letter_choices,
+#         gold_index=gold_index,
+#     )
+
+
+# # ============================================================
+# # Psychometric Analogies Section
+# # ============================================================
+
+# PSYCHOMETRIC_ANALOGIES_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/analogies/train.jsonl"
+
+# psychometric_analogies_few_shots_list = []
+
+# with open(PSYCHOMETRIC_ANALOGIES_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
+#     for i, line in enumerate(f):
+#         if i >= 5:  # take only 5 few-shots
+#             break
+#         data = json.loads(line)
+#         choices = data.get("choices", [])
+
+#         # Better answer mapping with validation
+#         answer_raw = data.get("answer", "A")
+#         if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#             answer_index = ord(answer_raw.upper()) - ord("A")
+#             # Validate the answer index is within range
+#             if answer_index >= len(choices):
+#                 answer_index = 0  # fallback
+#         elif isinstance(answer_raw, int):
+#             answer_index = answer_raw
+#         else:
+#             answer_index = 0
+
+#         gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
+
+#         psychometric_analogies_few_shots_list.append({
+#             "query": data.get("query", ""),
+#             "choices": choices,
+#             "gold": gold_choice,
+#             "answer_index": answer_index,
+#             "raw_answer": answer_raw
+#         })
+
+# printed_psycho_analogies_prompt = False
+
+# def psychometric_test_analogies_prompt(line, task_name: str = "psychometric_test_analogies"):
+#     global printed_psycho_analogies_prompt
+
+#     few_shot_text = ""
+#     for i, shot in enumerate(psychometric_analogies_few_shots_list):
+#         qs = shot["query"].replace('\n', ' ').strip()
+#         choices = shot.get("choices", [])
+#         ans_index = shot.get("answer_index", 0)
+#         choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
+#         correct_letter = chr(65 + ans_index)
+
+#         few_shot_text += (
+#             f"שאלה {i+1}: {qs}\n"
+#             f"{choices_text}\n"
+#             f"תשובה: {correct_letter}\n\n"
+#         )
+
+#     target_q = line["query"].replace('\n', ' ').strip()
+#     target_choices = line.get("choices", [])
+
+#     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
+
+#     full_prompt = (
+#         f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+#         f"{few_shot_text}"
+#         f"שאלה: {target_q}\n"
+#         f"{target_choices_formatted}\n"
+#         f"תשובה:"
+#     )
+
+#     if not printed_psycho_analogies_prompt:
+#         print("="*50)
+#         print("FULL PSYCHOMETRIC ANALOGIES PROMPT WITH FEW-SHOTS:")
+#         print(full_prompt)
+#         print("="*50)
+#         printed_psycho_analogies_prompt = True
+
+#     # Better answer processing for validation data
+#     answer_raw = line.get("answer", "A")
+#     if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#         gold_index = ord(answer_raw.upper()) - ord("A")
+#     elif isinstance(answer_raw, int):
+#         gold_index = answer_raw
+#     else:
+#         gold_index = 0
+
+#     # Validate gold index is within range
+#     if gold_index >= len(target_choices):
+#         gold_index = 0
+
+#     # Model predicts among A, B, C, D
+#     letter_choices = [chr(65 + i) for i in range(len(target_choices))]
+
+#     return Doc(
+#         task_name=task_name,
+#         query=target_q,
+#         instruction=full_prompt,
+#         choices=letter_choices,
+#         gold_index=gold_index,
+#     )
+# # ============================================================
+# # Psychometric Restatement Section
+# # ============================================================
+
+# PSYCHOMETRIC_RESTATEMENT_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/restatement/train.jsonl"
+
+# psychometric_restatement_few_shots_list = []
+
+# with open(PSYCHOMETRIC_RESTATEMENT_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
+#     for i, line in enumerate(f):
+#         if i >= 5:  # take only 5 few-shots
+#             break
+#         data = json.loads(line)
+#         choices = data.get("choices", [])
+
+#         # Better answer mapping with validation
+#         answer_raw = data.get("answer", "A")
+#         if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#             answer_index = ord(answer_raw.upper()) - ord("A")
+#             # Validate the answer index is within range
+#             if answer_index >= len(choices):
+#                 answer_index = 0  # fallback
+#         elif isinstance(answer_raw, int):
+#             answer_index = answer_raw
+#         else:
+#             answer_index = 0
+
+#         gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
+
+#         psychometric_restatement_few_shots_list.append({
+#             "query": data.get("query", ""),
+#             "choices": choices,
+#             "gold": gold_choice,
+#             "answer_index": answer_index,
+#             "raw_answer": answer_raw
+#         })
+
+# printed_psycho_restatement_prompt = False
+
+# def psychometric_test_restatement_prompt(line, task_name: str = "psychometric_test_restatement"):
+#     global printed_psycho_restatement_prompt
+
+#     few_shot_text = ""
+#     for i, shot in enumerate(psychometric_restatement_few_shots_list):
+#         qs = shot["query"].replace('\n', ' ').strip()
+#         choices = shot.get("choices", [])
+#         ans_index = shot.get("answer_index", 0)
+#         choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
+#         correct_letter = chr(65 + ans_index)
+
+#         few_shot_text += (
+#             f"שאלה {i+1}: {qs}\n"
+#             f"{choices_text}\n"
+#             f"תשובה: {correct_letter}\n\n"
+#         )
+
+#     target_q = line["query"].replace('\n', ' ').strip()
+#     target_choices = line.get("choices", [])
+
+#     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
+
+#     full_prompt = (
+#         f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+#         f"{few_shot_text}"
+#         f"שאלה: {target_q}\n"
+#         f"{target_choices_formatted}\n"
+#         f"תשובה:"
+#     )
+
+#     if not printed_psycho_restatement_prompt:
+#         print("="*50)
+#         print("FULL PSYCHOMETRIC RESTATEMENT PROMPT WITH FEW-SHOTS:")
+#         print(full_prompt)
+#         print("="*50)
+#         printed_psycho_restatement_prompt = True
+
+#     # Better answer processing for validation data
+#     answer_raw = line.get("answer", "A")
+#     if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#         gold_index = ord(answer_raw.upper()) - ord("A")
+#     elif isinstance(answer_raw, int):
+#         gold_index = answer_raw
+#     else:
+#         gold_index = 0
+
+#     # Validate gold index is within range
+#     if gold_index >= len(target_choices):
+#         gold_index = 0
+
+#     # Model predicts among A, B, C, D
+#     letter_choices = [chr(65 + i) for i in range(len(target_choices))]
+
+#     return Doc(
+#         task_name=task_name,
+#         query=target_q,
+#         instruction=full_prompt,
+#         choices=letter_choices,
+#         gold_index=gold_index,
+#     )
+# # ============================================================
+# # Psychometric Sentence Complete English Section
+# # ============================================================
+
+# PSYCHOMETRIC_SENTENCE_COMPLETE_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/sentence_complete_english/train.jsonl"
+
+# psychometric_sentence_complete_few_shots_list = []
+
+# with open(PSYCHOMETRIC_SENTENCE_COMPLETE_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
+#     for i, line in enumerate(f):
+#         if i >= 5:  # take only 5 few-shots
+#             break
+#         data = json.loads(line)
+#         choices = data.get("choices", [])
+
+#         # Better answer mapping with validation
+#         answer_raw = data.get("answer", "A")
+#         if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#             answer_index = ord(answer_raw.upper()) - ord("A")
+#             # Validate the answer index is within range
+#             if answer_index >= len(choices):
+#                 answer_index = 0  # fallback
+#         elif isinstance(answer_raw, int):
+#             answer_index = answer_raw
+#         else:
+#             answer_index = 0
+
+#         gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
+
+#         psychometric_sentence_complete_few_shots_list.append({
+#             "query": data.get("query", ""),
+#             "choices": choices,
+#             "gold": gold_choice,
+#             "answer_index": answer_index,
+#             "raw_answer": answer_raw
+#         })
+
+# printed_psycho_sentence_complete_prompt = False
+
+# def psychometric_test_sentence_complete_english_prompt(line, task_name: str = "psychometric_test_sentence_complete"):
+#     global printed_psycho_sentence_complete_prompt
+
+#     few_shot_text = ""
+#     for i, shot in enumerate(psychometric_sentence_complete_few_shots_list):
+#         qs = shot["query"].replace('\n', ' ').strip()
+#         choices = shot.get("choices", [])
+#         ans_index = shot.get("answer_index", 0)
+#         choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
+#         correct_letter = chr(65 + ans_index)
+
+#         few_shot_text += (
+#             f"שאלה {i+1}: {qs}\n"
+#             f"{choices_text}\n"
+#             f"תשובה: {correct_letter}\n\n"
+#         )
+
+#     target_q = line["query"].replace('\n', ' ').strip()
+#     target_choices = line.get("choices", [])
+
+#     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
+
+#     full_prompt = (
+#         f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+#         f"{few_shot_text}"
+#         f"שאלה: {target_q}\n"
+#         f"{target_choices_formatted}\n"
+#         f"תשובה:"
+#     )
+
+#     if not printed_psycho_sentence_complete_prompt:
+#         print("="*50)
+#         print("FULL PSYCHOMETRIC SENTENCE COMPLETE ENGLISH PROMPT WITH FEW-SHOTS:")
+#         print(full_prompt)
+#         print("="*50)
+#         printed_psycho_sentence_complete_prompt = True
+
+#     # Better answer processing for validation data
+#     answer_raw = line.get("answer", "A")
+#     if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#         gold_index = ord(answer_raw.upper()) - ord("A")
+#     elif isinstance(answer_raw, int):
+#         gold_index = answer_raw
+#     else:
+#         gold_index = 0
+
+#     # Validate gold index is within range
+#     if gold_index >= len(target_choices):
+#         gold_index = 0
+
+#     # Model predicts among A, B, C, D
+#     letter_choices = [chr(65 + i) for i in range(len(target_choices))]
+
+#     return Doc(
+#         task_name=task_name,
+#         query=target_q,
+#         instruction=full_prompt,
+#         choices=letter_choices,
+#         gold_index=gold_index,
+#     )
+# # ============================================================
+# # Psychometric Sentence Complete Hebrew Section
+# # ============================================================
+
+# PSYCHOMETRIC_SENTENCE_COMPLETE_HEBREW_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/sentence_complete_hebrew/train.jsonl"
+
+# psychometric_sentence_complete_hebrew_few_shots_list = []
+
+# with open(PSYCHOMETRIC_SENTENCE_COMPLETE_HEBREW_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
+#     for i, line in enumerate(f):
+#         if i >= 5:  # take only 5 few-shots
+#             break
+#         data = json.loads(line)
+#         choices = data.get("choices", [])
+
+#         # Better answer mapping with validation
+#         answer_raw = data.get("answer", "A")
+#         if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#             answer_index = ord(answer_raw.upper()) - ord("A")
+#             # Validate the answer index is within range
+#             if answer_index >= len(choices):
+#                 answer_index = 0  # fallback
+#         elif isinstance(answer_raw, int):
+#             answer_index = answer_raw
+#         else:
+#             answer_index = 0
+
+#         gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
+
+#         psychometric_sentence_complete_hebrew_few_shots_list.append({
+#             "query": data.get("query", ""),
+#             "choices": choices,
+#             "gold": gold_choice,
+#             "answer_index": answer_index,
+#             "raw_answer": answer_raw
+#         })
+
+# printed_psycho_sentence_complete_hebrew_prompt = False
+
+# def psychometric_test_sentence_complete_hebrew_prompt(line, task_name: str = "psychometric_test_sentence_complete_hebrew"):
+#     global printed_psycho_sentence_complete_hebrew_prompt
+
+#     few_shot_text = ""
+#     for i, shot in enumerate(psychometric_sentence_complete_hebrew_few_shots_list):
+#         qs = shot["query"].replace('\n', ' ').strip()
+#         choices = shot.get("choices", [])
+#         ans_index = shot.get("answer_index", 0)
+#         choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
+#         correct_letter = chr(65 + ans_index)
+
+#         few_shot_text += (
+#             f"שאלה {i+1}: {qs}\n"
+#             f"{choices_text}\n"
+#             f"תשובה: {correct_letter}\n\n"
+#         )
+
+#     target_q = line["query"].replace('\n', ' ').strip()
+#     target_choices = line.get("choices", [])
+
+#     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
+
+#     full_prompt = (
+#         f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+#         f"{few_shot_text}"
+#         f"שאלה: {target_q}\n"
+#         f"{target_choices_formatted}\n"
+#         f"תשובה:"
+#     )
+
+#     if not printed_psycho_sentence_complete_hebrew_prompt:
+#         print("="*50)
+#         print("FULL PSYCHOMETRIC SENTENCE COMPLETE HEBREW PROMPT WITH FEW-SHOTS:")
+#         print(full_prompt)
+#         print("="*50)
+#         printed_psycho_sentence_complete_hebrew_prompt = True
+
+#     # Better answer processing for validation data
+#     answer_raw = line.get("answer", "A")
+#     if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#         gold_index = ord(answer_raw.upper()) - ord("A")
+#     elif isinstance(answer_raw, int):
+#         gold_index = answer_raw
+#     else:
+#         gold_index = 0
+
+#     # Validate gold index is within range
+#     if gold_index >= len(target_choices):
+#         gold_index = 0
+
+#     # Model predicts among A, B, C, D
+#     letter_choices = [chr(65 + i) for i in range(len(target_choices))]
+
+#     return Doc(
+#         task_name=task_name,
+#         query=target_q,
+#         instruction=full_prompt,
+#         choices=letter_choices,
+#         gold_index=gold_index,
+#     )
+# # ============================================================
+# # Psychometric Text English Section
+# # ============================================================
+
+# PSYCHOMETRIC_TEXT_ENGLISH_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/text_english/train.jsonl"
+
+# psychometric_text_english_few_shots_list = []
+
+# with open(PSYCHOMETRIC_TEXT_ENGLISH_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
+#     for i, line in enumerate(f):
+#         if i >= 5:  # take only 5 few-shots
+#             break
+#         data = json.loads(line)
+#         choices = data.get("choices", [])
+
+#         # Better answer mapping with validation
+#         answer_raw = data.get("answer", "A")
+#         if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#             answer_index = ord(answer_raw.upper()) - ord("A")
+#             # Validate the answer index is within range
+#             if answer_index >= len(choices):
+#                 answer_index = 0  # fallback
+#         elif isinstance(answer_raw, int):
+#             answer_index = answer_raw
+#         else:
+#             answer_index = 0
+
+#         gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
+
+#         psychometric_text_english_few_shots_list.append({
+#             "query": data.get("query", ""),
+#             "choices": choices,
+#             "gold": gold_choice,
+#             "answer_index": answer_index,
+#             "raw_answer": answer_raw
+#         })
+
+# printed_psycho_text_english_prompt = False
+
+# def psychometric_test_text_english_prompt(line, task_name: str = "psychometric_test_text_english"):
+#     global printed_psycho_text_english_prompt
+
+#     few_shot_text = ""
+#     for i, shot in enumerate(psychometric_text_english_few_shots_list):
+#         qs = shot["query"].replace('\n', ' ').strip()
+#         choices = shot.get("choices", [])
+#         ans_index = shot.get("answer_index", 0)
+#         choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
+#         correct_letter = chr(65 + ans_index)
+
+#         few_shot_text += (
+#             f"שאלה {i+1}: {qs}\n"
+#             f"{choices_text}\n"
+#             f"תשובה: {correct_letter}\n\n"
+#         )
+
+#     target_q = line["query"].replace('\n', ' ').strip()
+#     target_choices = line.get("choices", [])
+
+#     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
+
+#     full_prompt = (
+#         f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+#         f"{few_shot_text}"
+#         f"שאלה: {target_q}\n"
+#         f"{target_choices_formatted}\n"
+#         f"תשובה:"
+#     )
+
+#     if not printed_psycho_text_english_prompt:
+#         print("="*50)
+#         print("FULL PSYCHOMETRIC TEXT ENGLISH PROMPT WITH FEW-SHOTS:")
+#         print(full_prompt)
+#         print("="*50)
+#         printed_psycho_text_english_prompt = True
+
+#     # Better answer processing for validation data
+#     answer_raw = line.get("answer", "A")
+#     if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#         gold_index = ord(answer_raw.upper()) - ord("A")
+#     elif isinstance(answer_raw, int):
+#         gold_index = answer_raw
+#     else:
+#         gold_index = 0
+
+#     # Validate gold index is within range
+#     if gold_index >= len(target_choices):
+#         gold_index = 0
+
+#     # Model predicts among A, B, C, D
+#     letter_choices = [chr(65 + i) for i in range(len(target_choices))]
+
+#     return Doc(
+#         task_name=task_name,
+#         query=target_q,
+#         instruction=full_prompt,
+#         choices=letter_choices,
+#         gold_index=gold_index,
+#     )
+# # ============================================================
+# # Psychometric Text Hebrew Section
+# # ============================================================
+
+# PSYCHOMETRIC_TEXT_HEBREW_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/text_hebrew/train.jsonl"
+
+# psychometric_text_hebrew_few_shots_list = []
+
+# with open(PSYCHOMETRIC_TEXT_HEBREW_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
+#     for i, line in enumerate(f):
+#         if i >= 5:  # take only 5 few-shots
+#             break
+#         data = json.loads(line)
+#         choices = data.get("choices", [])
+
+#         # Better answer mapping with validation
+#         answer_raw = data.get("answer", "A")
+#         if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#             answer_index = ord(answer_raw.upper()) - ord("A")
+#             # Validate the answer index is within range
+#             if answer_index >= len(choices):
+#                 answer_index = 0  # fallback
+#         elif isinstance(answer_raw, int):
+#             answer_index = answer_raw
+#         else:
+#             answer_index = 0
+
+#         gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
+
+#         psychometric_text_hebrew_few_shots_list.append({
+#             "query": data.get("query", ""),
+#             "choices": choices,
+#             "gold": gold_choice,
+#             "answer_index": answer_index,
+#             "raw_answer": answer_raw
+#         })
+
+# printed_psycho_text_hebrew_prompt = False
+
+# def psychometric_test_text_hebrew_prompt(line, task_name: str = "psychometric_test_text_hebrew"):
+#     global printed_psycho_text_hebrew_prompt
+
+#     few_shot_text = ""
+#     for i, shot in enumerate(psychometric_text_hebrew_few_shots_list):
+#         qs = shot["query"].replace('\n', ' ').strip()
+#         choices = shot.get("choices", [])
+#         ans_index = shot.get("answer_index", 0)
+#         choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
+#         correct_letter = chr(65 + ans_index)
+
+#         few_shot_text += (
+#             f"שאלה {i+1}: {qs}\n"
+#             f"{choices_text}\n"
+#             f"תשובה: {correct_letter}\n\n"
+#         )
+
+#     target_q = line["query"].replace('\n', ' ').strip()
+#     target_choices = line.get("choices", [])
+
+#     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
+
+#     full_prompt = (
+#         f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+#         f"{few_shot_text}"
+#         f"שאלה: {target_q}\n"
+#         f"{target_choices_formatted}\n"
+#         f"תשובה:"
+#     )
+
+#     if not printed_psycho_text_hebrew_prompt:
+#         print("="*50)
+#         print("FULL PSYCHOMETRIC TEXT HEBREW PROMPT WITH FEW-SHOTS:")
+#         print(full_prompt)
+#         print("="*50)
+#         printed_psycho_text_hebrew_prompt = True
+
+#     # Better answer processing for validation data
+#     answer_raw = line.get("answer", "A")
+#     if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#         gold_index = ord(answer_raw.upper()) - ord("A")
+#     elif isinstance(answer_raw, int):
+#         gold_index = answer_raw
+#     else:
+#         gold_index = 0
+
+#     # Validate gold index is within range
+#     if gold_index >= len(target_choices):
+#         gold_index = 0
+
+#     # Model predicts among A, B, C, D
+#     letter_choices = [chr(65 + i) for i in range(len(target_choices))]
+
+#     return Doc(
+#         task_name=task_name,
+#         query=target_q,
+#         instruction=full_prompt,
+#         choices=letter_choices,
+#         gold_index=gold_index,
+#     )
+# # ============================================================
+# # Psychometric Understanding Hebrew Section
+# # ============================================================
+
+# PSYCHOMETRIC_UNDERSTANDING_HEBREW_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/understanding_hebrew/train.jsonl"
+
+# psychometric_understanding_hebrew_few_shots_list = []
+
+# with open(PSYCHOMETRIC_UNDERSTANDING_HEBREW_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
+#     for i, line in enumerate(f):
+#         if i >= 5:  # take only 5 few-shots
+#             break
+#         data = json.loads(line)
+#         choices = data.get("choices", [])
+
+#         # Better answer mapping with validation
+#         answer_raw = data.get("answer", "A")
+#         if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#             answer_index = ord(answer_raw.upper()) - ord("A")
+#             # Validate the answer index is within range
+#             if answer_index >= len(choices):
+#                 answer_index = 0  # fallback
+#         elif isinstance(answer_raw, int):
+#             answer_index = answer_raw
+#         else:
+#             answer_index = 0
+
+#         gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
+
+#         psychometric_understanding_hebrew_few_shots_list.append({
+#             "query": data.get("query", ""),
+#             "choices": choices,
+#             "gold": gold_choice,
+#             "answer_index": answer_index,
+#             "raw_answer": answer_raw
+#         })
+
+# printed_psycho_understanding_hebrew_prompt = False
+
+# def psychometric_test_understanding_hebrew_prompt(line, task_name: str = "psychometric_test_understanding_hebrew"):
+#     global printed_psycho_understanding_hebrew_prompt
+
+#     few_shot_text = ""
+#     for i, shot in enumerate(psychometric_understanding_hebrew_few_shots_list):
+#         qs = shot["query"].replace('\n', ' ').strip()
+#         choices = shot.get("choices", [])
+#         ans_index = shot.get("answer_index", 0)
+#         choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
+#         correct_letter = chr(65 + ans_index)
+
+#         few_shot_text += (
+#             f"שאלה {i+1}: {qs}\n"
+#             f"{choices_text}\n"
+#             f"תשובה: {correct_letter}\n\n"
+#         )
+
+#     target_q = line["query"].replace('\n', ' ').strip()
+#     target_choices = line.get("choices", [])
+
+#     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
+
+#     full_prompt = (
+#         f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+#         f"{few_shot_text}"
+#         f"שאלה: {target_q}\n"
+#         f"{target_choices_formatted}\n"
+#         f"תשובה:"
+#     )
+
+#     if not printed_psycho_understanding_hebrew_prompt:
+#         print("="*50)
+#         print("FULL PSYCHOMETRIC UNDERSTANDING HEBREW PROMPT WITH FEW-SHOTS:")
+#         print(full_prompt)
+#         print("="*50)
+#         printed_psycho_understanding_hebrew_prompt = True
+
+#     # Better answer processing for validation data
+#     answer_raw = line.get("answer", "A")
+#     if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+#         gold_index = ord(answer_raw.upper()) - ord("A")
+#     elif isinstance(answer_raw, int):
+#         gold_index = answer_raw
+#     else:
+#         gold_index = 0
+
+#     # Validate gold index is within range
+#     if gold_index >= len(target_choices):
+#         gold_index = 0
+
+#     # Model predicts among A, B, C, D
+#     letter_choices = [chr(65 + i) for i in range(len(target_choices))]
+
+#     return Doc(
+#         task_name=task_name,
+#         query=target_q,
+#         instruction=full_prompt,
+#         choices=letter_choices,
+#         gold_index=gold_index,
+#     )
 # ============================================================
-# Psychometric Math Section
+# Generic Psychometric Test Function
 # ============================================================
 
-PSYCHOMETRIC_MATH_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/math/train.jsonl"
-
-psychometric_math_few_shots_list = []
-
-with open(PSYCHOMETRIC_MATH_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take only 5 few-shots
-            break
-        data = json.loads(line)
-        choices = data.get("choices", [])
-
-        # Better answer mapping with validation
-        answer_raw = data.get("answer", "A")
+def generic_psychometric_prompt(line, task_name: str):
+    """
+    Generic function to create psychometric test prompts.
+    
+    Args:
+        line: The data line containing query, choices, and answer
+        task_name: Name of the task (e.g., "psychometric_test_math")
+    
+    Returns:
+        Doc object with formatted prompt
+    """
+    target_q = line["query"].replace('\n', ' ').strip()
+    target_choices = line.get("choices", [])
+    
+    target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
+    
+    instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+    full_prompt = f"""{instruction}שאלה: {target_q}
+{target_choices_formatted}
+תשובה:"""
+    
+    # Get answer_index directly for validation data
+    gold_index = line.get("answer_index")
+    
+    # If answer_index is not present, try to parse from "answer" field
+    if gold_index is None:
+        answer_raw = line.get("answer", "A")
         if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-            answer_index = ord(answer_raw.upper()) - ord("A")
-            # Validate the answer index is within range
-            if answer_index >= len(choices):
-                answer_index = 0  # fallback
+            gold_index = ord(answer_raw.upper()) - ord("A")
         elif isinstance(answer_raw, int):
-            answer_index = answer_raw
+            gold_index = answer_raw
         else:
-            answer_index = 0
+            gold_index = 0
+    
+    # Validate gold index is within range
+    if gold_index is None or gold_index >= len(target_choices) or gold_index < 0:
+        gold_index = 0
+    
+    # Model predicts among A, B, C, D based on number of choices
+    letter_choices = [chr(65 + i) for i in range(len(target_choices))]
+    
+    return Doc(
+        task_name=task_name,
+        query=full_prompt,
+        instruction=instruction,
+        choices=letter_choices,
+        gold_index=gold_index,
+    )
 
-        gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
 
-        psychometric_math_few_shots_list.append({
-            "query": data.get("query", ""),
-            "choices": choices,
-            "gold": gold_choice,
-            "answer_index": answer_index,
-            "raw_answer": answer_raw
-        })
-
-printed_psycho_math_prompt = False
+# ============================================================
+# Psychometric Test Specific Functions (using generic function)
+# ============================================================
 
 def psychometric_test_math_prompt(line, task_name: str = "psychometric_test_math"):
-    global printed_psycho_math_prompt
-
-    few_shot_text = ""
-    for i, shot in enumerate(psychometric_math_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
-        choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
-        correct_letter = chr(65 + ans_index)
-
-        few_shot_text += (
-            f"שאלה {i+1}: {qs}\n"
-            f"{choices_text}\n"
-            f"תשובה: {correct_letter}\n\n"
-        )
-
-    target_q = line["query"].replace('\n', ' ').strip()
-    target_choices = line.get("choices", [])
-
-    target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-
-    full_prompt = (
-        f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-        f"{few_shot_text}"
-        f"שאלה: {target_q}\n"
-        f"{target_choices_formatted}\n"
-        f"תשובה:"
-    )
-
-    if not printed_psycho_math_prompt:
-        print("="*50)
-        print("FULL PSYCHOMETRIC MATH PROMPT WITH FEW-SHOTS:")
-        print(full_prompt)
-        print("="*50)
-        printed_psycho_math_prompt = True
-
-    # Better answer processing for validation data
-    answer_raw = line.get("answer", "A")
-    if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        gold_index = ord(answer_raw.upper()) - ord("A")
-    elif isinstance(answer_raw, int):
-        gold_index = answer_raw
-    else:
-        gold_index = 0
-
-    # Validate gold index is within range
-    if gold_index >= len(target_choices):
-        gold_index = 0
-
-    # Model predicts among A, B, C, D
-    letter_choices = [chr(65 + i) for i in range(len(target_choices))]
-
-    return Doc(
-        task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
-        choices=letter_choices,
-        gold_index=gold_index,
-    )
-
-
-# ============================================================
-# Psychometric Analogies Section
-# ============================================================
-
-PSYCHOMETRIC_ANALOGIES_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/analogies/train.jsonl"
-
-psychometric_analogies_few_shots_list = []
-
-with open(PSYCHOMETRIC_ANALOGIES_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take only 5 few-shots
-            break
-        data = json.loads(line)
-        choices = data.get("choices", [])
-
-        # Better answer mapping with validation
-        answer_raw = data.get("answer", "A")
-        if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-            answer_index = ord(answer_raw.upper()) - ord("A")
-            # Validate the answer index is within range
-            if answer_index >= len(choices):
-                answer_index = 0  # fallback
-        elif isinstance(answer_raw, int):
-            answer_index = answer_raw
-        else:
-            answer_index = 0
-
-        gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
-
-        psychometric_analogies_few_shots_list.append({
-            "query": data.get("query", ""),
-            "choices": choices,
-            "gold": gold_choice,
-            "answer_index": answer_index,
-            "raw_answer": answer_raw
-        })
-
-printed_psycho_analogies_prompt = False
+    return generic_psychometric_prompt(line, task_name)
 
 def psychometric_test_analogies_prompt(line, task_name: str = "psychometric_test_analogies"):
-    global printed_psycho_analogies_prompt
-
-    few_shot_text = ""
-    for i, shot in enumerate(psychometric_analogies_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
-        choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
-        correct_letter = chr(65 + ans_index)
-
-        few_shot_text += (
-            f"שאלה {i+1}: {qs}\n"
-            f"{choices_text}\n"
-            f"תשובה: {correct_letter}\n\n"
-        )
-
-    target_q = line["query"].replace('\n', ' ').strip()
-    target_choices = line.get("choices", [])
-
-    target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-
-    full_prompt = (
-        f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-        f"{few_shot_text}"
-        f"שאלה: {target_q}\n"
-        f"{target_choices_formatted}\n"
-        f"תשובה:"
-    )
-
-    if not printed_psycho_analogies_prompt:
-        print("="*50)
-        print("FULL PSYCHOMETRIC ANALOGIES PROMPT WITH FEW-SHOTS:")
-        print(full_prompt)
-        print("="*50)
-        printed_psycho_analogies_prompt = True
-
-    # Better answer processing for validation data
-    answer_raw = line.get("answer", "A")
-    if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        gold_index = ord(answer_raw.upper()) - ord("A")
-    elif isinstance(answer_raw, int):
-        gold_index = answer_raw
-    else:
-        gold_index = 0
-
-    # Validate gold index is within range
-    if gold_index >= len(target_choices):
-        gold_index = 0
-
-    # Model predicts among A, B, C, D
-    letter_choices = [chr(65 + i) for i in range(len(target_choices))]
-
-    return Doc(
-        task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
-        choices=letter_choices,
-        gold_index=gold_index,
-    )
-# ============================================================
-# Psychometric Restatement Section
-# ============================================================
-
-PSYCHOMETRIC_RESTATEMENT_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/restatement/train.jsonl"
-
-psychometric_restatement_few_shots_list = []
-
-with open(PSYCHOMETRIC_RESTATEMENT_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take only 5 few-shots
-            break
-        data = json.loads(line)
-        choices = data.get("choices", [])
-
-        # Better answer mapping with validation
-        answer_raw = data.get("answer", "A")
-        if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-            answer_index = ord(answer_raw.upper()) - ord("A")
-            # Validate the answer index is within range
-            if answer_index >= len(choices):
-                answer_index = 0  # fallback
-        elif isinstance(answer_raw, int):
-            answer_index = answer_raw
-        else:
-            answer_index = 0
-
-        gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
-
-        psychometric_restatement_few_shots_list.append({
-            "query": data.get("query", ""),
-            "choices": choices,
-            "gold": gold_choice,
-            "answer_index": answer_index,
-            "raw_answer": answer_raw
-        })
-
-printed_psycho_restatement_prompt = False
+    return generic_psychometric_prompt(line, task_name)
 
 def psychometric_test_restatement_prompt(line, task_name: str = "psychometric_test_restatement"):
-    global printed_psycho_restatement_prompt
+    return generic_psychometric_prompt(line, task_name)
 
-    few_shot_text = ""
-    for i, shot in enumerate(psychometric_restatement_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
-        choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
-        correct_letter = chr(65 + ans_index)
-
-        few_shot_text += (
-            f"שאלה {i+1}: {qs}\n"
-            f"{choices_text}\n"
-            f"תשובה: {correct_letter}\n\n"
-        )
-
-    target_q = line["query"].replace('\n', ' ').strip()
-    target_choices = line.get("choices", [])
-
-    target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-
-    full_prompt = (
-        f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-        f"{few_shot_text}"
-        f"שאלה: {target_q}\n"
-        f"{target_choices_formatted}\n"
-        f"תשובה:"
-    )
-
-    if not printed_psycho_restatement_prompt:
-        print("="*50)
-        print("FULL PSYCHOMETRIC RESTATEMENT PROMPT WITH FEW-SHOTS:")
-        print(full_prompt)
-        print("="*50)
-        printed_psycho_restatement_prompt = True
-
-    # Better answer processing for validation data
-    answer_raw = line.get("answer", "A")
-    if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        gold_index = ord(answer_raw.upper()) - ord("A")
-    elif isinstance(answer_raw, int):
-        gold_index = answer_raw
-    else:
-        gold_index = 0
-
-    # Validate gold index is within range
-    if gold_index >= len(target_choices):
-        gold_index = 0
-
-    # Model predicts among A, B, C, D
-    letter_choices = [chr(65 + i) for i in range(len(target_choices))]
-
-    return Doc(
-        task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
-        choices=letter_choices,
-        gold_index=gold_index,
-    )
-# ============================================================
-# Psychometric Sentence Complete English Section
-# ============================================================
-
-PSYCHOMETRIC_SENTENCE_COMPLETE_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/sentence_complete_english/train.jsonl"
-
-psychometric_sentence_complete_few_shots_list = []
-
-with open(PSYCHOMETRIC_SENTENCE_COMPLETE_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take only 5 few-shots
-            break
-        data = json.loads(line)
-        choices = data.get("choices", [])
-
-        # Better answer mapping with validation
-        answer_raw = data.get("answer", "A")
-        if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-            answer_index = ord(answer_raw.upper()) - ord("A")
-            # Validate the answer index is within range
-            if answer_index >= len(choices):
-                answer_index = 0  # fallback
-        elif isinstance(answer_raw, int):
-            answer_index = answer_raw
-        else:
-            answer_index = 0
-
-        gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
-
-        psychometric_sentence_complete_few_shots_list.append({
-            "query": data.get("query", ""),
-            "choices": choices,
-            "gold": gold_choice,
-            "answer_index": answer_index,
-            "raw_answer": answer_raw
-        })
-
-printed_psycho_sentence_complete_prompt = False
-
-def psychometric_test_sentence_complete_english_prompt(line, task_name: str = "psychometric_test_sentence_complete"):
-    global printed_psycho_sentence_complete_prompt
-
-    few_shot_text = ""
-    for i, shot in enumerate(psychometric_sentence_complete_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
-        choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
-        correct_letter = chr(65 + ans_index)
-
-        few_shot_text += (
-            f"שאלה {i+1}: {qs}\n"
-            f"{choices_text}\n"
-            f"תשובה: {correct_letter}\n\n"
-        )
-
-    target_q = line["query"].replace('\n', ' ').strip()
-    target_choices = line.get("choices", [])
-
-    target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-
-    full_prompt = (
-        f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-        f"{few_shot_text}"
-        f"שאלה: {target_q}\n"
-        f"{target_choices_formatted}\n"
-        f"תשובה:"
-    )
-
-    if not printed_psycho_sentence_complete_prompt:
-        print("="*50)
-        print("FULL PSYCHOMETRIC SENTENCE COMPLETE ENGLISH PROMPT WITH FEW-SHOTS:")
-        print(full_prompt)
-        print("="*50)
-        printed_psycho_sentence_complete_prompt = True
-
-    # Better answer processing for validation data
-    answer_raw = line.get("answer", "A")
-    if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        gold_index = ord(answer_raw.upper()) - ord("A")
-    elif isinstance(answer_raw, int):
-        gold_index = answer_raw
-    else:
-        gold_index = 0
-
-    # Validate gold index is within range
-    if gold_index >= len(target_choices):
-        gold_index = 0
-
-    # Model predicts among A, B, C, D
-    letter_choices = [chr(65 + i) for i in range(len(target_choices))]
-
-    return Doc(
-        task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
-        choices=letter_choices,
-        gold_index=gold_index,
-    )
-# ============================================================
-# Psychometric Sentence Complete Hebrew Section
-# ============================================================
-
-PSYCHOMETRIC_SENTENCE_COMPLETE_HEBREW_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/sentence_complete_hebrew/train.jsonl"
-
-psychometric_sentence_complete_hebrew_few_shots_list = []
-
-with open(PSYCHOMETRIC_SENTENCE_COMPLETE_HEBREW_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take only 5 few-shots
-            break
-        data = json.loads(line)
-        choices = data.get("choices", [])
-
-        # Better answer mapping with validation
-        answer_raw = data.get("answer", "A")
-        if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-            answer_index = ord(answer_raw.upper()) - ord("A")
-            # Validate the answer index is within range
-            if answer_index >= len(choices):
-                answer_index = 0  # fallback
-        elif isinstance(answer_raw, int):
-            answer_index = answer_raw
-        else:
-            answer_index = 0
-
-        gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
-
-        psychometric_sentence_complete_hebrew_few_shots_list.append({
-            "query": data.get("query", ""),
-            "choices": choices,
-            "gold": gold_choice,
-            "answer_index": answer_index,
-            "raw_answer": answer_raw
-        })
-
-printed_psycho_sentence_complete_hebrew_prompt = False
+def psychometric_test_sentence_complete_english_prompt(line, task_name: str = "psychometric_test_sentence_complete_english"):
+    return generic_psychometric_prompt(line, task_name)
 
 def psychometric_test_sentence_complete_hebrew_prompt(line, task_name: str = "psychometric_test_sentence_complete_hebrew"):
-    global printed_psycho_sentence_complete_hebrew_prompt
-
-    few_shot_text = ""
-    for i, shot in enumerate(psychometric_sentence_complete_hebrew_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
-        choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
-        correct_letter = chr(65 + ans_index)
-
-        few_shot_text += (
-            f"שאלה {i+1}: {qs}\n"
-            f"{choices_text}\n"
-            f"תשובה: {correct_letter}\n\n"
-        )
-
-    target_q = line["query"].replace('\n', ' ').strip()
-    target_choices = line.get("choices", [])
-
-    target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-
-    full_prompt = (
-        f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-        f"{few_shot_text}"
-        f"שאלה: {target_q}\n"
-        f"{target_choices_formatted}\n"
-        f"תשובה:"
-    )
-
-    if not printed_psycho_sentence_complete_hebrew_prompt:
-        print("="*50)
-        print("FULL PSYCHOMETRIC SENTENCE COMPLETE HEBREW PROMPT WITH FEW-SHOTS:")
-        print(full_prompt)
-        print("="*50)
-        printed_psycho_sentence_complete_hebrew_prompt = True
-
-    # Better answer processing for validation data
-    answer_raw = line.get("answer", "A")
-    if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        gold_index = ord(answer_raw.upper()) - ord("A")
-    elif isinstance(answer_raw, int):
-        gold_index = answer_raw
-    else:
-        gold_index = 0
-
-    # Validate gold index is within range
-    if gold_index >= len(target_choices):
-        gold_index = 0
-
-    # Model predicts among A, B, C, D
-    letter_choices = [chr(65 + i) for i in range(len(target_choices))]
-
-    return Doc(
-        task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
-        choices=letter_choices,
-        gold_index=gold_index,
-    )
-# ============================================================
-# Psychometric Text English Section
-# ============================================================
-
-PSYCHOMETRIC_TEXT_ENGLISH_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/text_english/train.jsonl"
-
-psychometric_text_english_few_shots_list = []
-
-with open(PSYCHOMETRIC_TEXT_ENGLISH_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take only 5 few-shots
-            break
-        data = json.loads(line)
-        choices = data.get("choices", [])
-
-        # Better answer mapping with validation
-        answer_raw = data.get("answer", "A")
-        if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-            answer_index = ord(answer_raw.upper()) - ord("A")
-            # Validate the answer index is within range
-            if answer_index >= len(choices):
-                answer_index = 0  # fallback
-        elif isinstance(answer_raw, int):
-            answer_index = answer_raw
-        else:
-            answer_index = 0
-
-        gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
-
-        psychometric_text_english_few_shots_list.append({
-            "query": data.get("query", ""),
-            "choices": choices,
-            "gold": gold_choice,
-            "answer_index": answer_index,
-            "raw_answer": answer_raw
-        })
-
-printed_psycho_text_english_prompt = False
+    return generic_psychometric_prompt(line, task_name)
 
 def psychometric_test_text_english_prompt(line, task_name: str = "psychometric_test_text_english"):
-    global printed_psycho_text_english_prompt
-
-    few_shot_text = ""
-    for i, shot in enumerate(psychometric_text_english_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
-        choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
-        correct_letter = chr(65 + ans_index)
-
-        few_shot_text += (
-            f"שאלה {i+1}: {qs}\n"
-            f"{choices_text}\n"
-            f"תשובה: {correct_letter}\n\n"
-        )
-
-    target_q = line["query"].replace('\n', ' ').strip()
-    target_choices = line.get("choices", [])
-
-    target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-
-    full_prompt = (
-        f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-        f"{few_shot_text}"
-        f"שאלה: {target_q}\n"
-        f"{target_choices_formatted}\n"
-        f"תשובה:"
-    )
-
-    if not printed_psycho_text_english_prompt:
-        print("="*50)
-        print("FULL PSYCHOMETRIC TEXT ENGLISH PROMPT WITH FEW-SHOTS:")
-        print(full_prompt)
-        print("="*50)
-        printed_psycho_text_english_prompt = True
-
-    # Better answer processing for validation data
-    answer_raw = line.get("answer", "A")
-    if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        gold_index = ord(answer_raw.upper()) - ord("A")
-    elif isinstance(answer_raw, int):
-        gold_index = answer_raw
-    else:
-        gold_index = 0
-
-    # Validate gold index is within range
-    if gold_index >= len(target_choices):
-        gold_index = 0
-
-    # Model predicts among A, B, C, D
-    letter_choices = [chr(65 + i) for i in range(len(target_choices))]
-
-    return Doc(
-        task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
-        choices=letter_choices,
-        gold_index=gold_index,
-    )
-# ============================================================
-# Psychometric Text Hebrew Section
-# ============================================================
-
-PSYCHOMETRIC_TEXT_HEBREW_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/text_hebrew/train.jsonl"
-
-psychometric_text_hebrew_few_shots_list = []
-
-with open(PSYCHOMETRIC_TEXT_HEBREW_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take only 5 few-shots
-            break
-        data = json.loads(line)
-        choices = data.get("choices", [])
-
-        # Better answer mapping with validation
-        answer_raw = data.get("answer", "A")
-        if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-            answer_index = ord(answer_raw.upper()) - ord("A")
-            # Validate the answer index is within range
-            if answer_index >= len(choices):
-                answer_index = 0  # fallback
-        elif isinstance(answer_raw, int):
-            answer_index = answer_raw
-        else:
-            answer_index = 0
-
-        gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
-
-        psychometric_text_hebrew_few_shots_list.append({
-            "query": data.get("query", ""),
-            "choices": choices,
-            "gold": gold_choice,
-            "answer_index": answer_index,
-            "raw_answer": answer_raw
-        })
-
-printed_psycho_text_hebrew_prompt = False
+    return generic_psychometric_prompt(line, task_name)
 
 def psychometric_test_text_hebrew_prompt(line, task_name: str = "psychometric_test_text_hebrew"):
-    global printed_psycho_text_hebrew_prompt
-
-    few_shot_text = ""
-    for i, shot in enumerate(psychometric_text_hebrew_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
-        choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
-        correct_letter = chr(65 + ans_index)
-
-        few_shot_text += (
-            f"שאלה {i+1}: {qs}\n"
-            f"{choices_text}\n"
-            f"תשובה: {correct_letter}\n\n"
-        )
-
-    target_q = line["query"].replace('\n', ' ').strip()
-    target_choices = line.get("choices", [])
-
-    target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-
-    full_prompt = (
-        f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-        f"{few_shot_text}"
-        f"שאלה: {target_q}\n"
-        f"{target_choices_formatted}\n"
-        f"תשובה:"
-    )
-
-    if not printed_psycho_text_hebrew_prompt:
-        print("="*50)
-        print("FULL PSYCHOMETRIC TEXT HEBREW PROMPT WITH FEW-SHOTS:")
-        print(full_prompt)
-        print("="*50)
-        printed_psycho_text_hebrew_prompt = True
-
-    # Better answer processing for validation data
-    answer_raw = line.get("answer", "A")
-    if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        gold_index = ord(answer_raw.upper()) - ord("A")
-    elif isinstance(answer_raw, int):
-        gold_index = answer_raw
-    else:
-        gold_index = 0
-
-    # Validate gold index is within range
-    if gold_index >= len(target_choices):
-        gold_index = 0
-
-    # Model predicts among A, B, C, D
-    letter_choices = [chr(65 + i) for i in range(len(target_choices))]
-
-    return Doc(
-        task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
-        choices=letter_choices,
-        gold_index=gold_index,
-    )
-# ============================================================
-# Psychometric Understanding Hebrew Section
-# ============================================================
-
-PSYCHOMETRIC_UNDERSTANDING_HEBREW_FEW_SHOT_PATH = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/psychometric_heb/understanding_hebrew/train.jsonl"
-
-psychometric_understanding_hebrew_few_shots_list = []
-
-with open(PSYCHOMETRIC_UNDERSTANDING_HEBREW_FEW_SHOT_PATH, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take only 5 few-shots
-            break
-        data = json.loads(line)
-        choices = data.get("choices", [])
-
-        # Better answer mapping with validation
-        answer_raw = data.get("answer", "A")
-        if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-            answer_index = ord(answer_raw.upper()) - ord("A")
-            # Validate the answer index is within range
-            if answer_index >= len(choices):
-                answer_index = 0  # fallback
-        elif isinstance(answer_raw, int):
-            answer_index = answer_raw
-        else:
-            answer_index = 0
-
-        gold_choice = choices[answer_index] if 0 <= answer_index < len(choices) else ""
-
-        psychometric_understanding_hebrew_few_shots_list.append({
-            "query": data.get("query", ""),
-            "choices": choices,
-            "gold": gold_choice,
-            "answer_index": answer_index,
-            "raw_answer": answer_raw
-        })
-
-printed_psycho_understanding_hebrew_prompt = False
+    return generic_psychometric_prompt(line, task_name)
 
 def psychometric_test_understanding_hebrew_prompt(line, task_name: str = "psychometric_test_understanding_hebrew"):
-    global printed_psycho_understanding_hebrew_prompt
-
-    few_shot_text = ""
-    for i, shot in enumerate(psychometric_understanding_hebrew_few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        choices = shot.get("choices", [])
-        ans_index = shot.get("answer_index", 0)
-        choices_text = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(choices)])
-        correct_letter = chr(65 + ans_index)
-
-        few_shot_text += (
-            f"שאלה {i+1}: {qs}\n"
-            f"{choices_text}\n"
-            f"תשובה: {correct_letter}\n\n"
-        )
-
-    target_q = line["query"].replace('\n', ' ').strip()
-    target_choices = line.get("choices", [])
-
-    target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-
-    full_prompt = (
-        f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-        f"{few_shot_text}"
-        f"שאלה: {target_q}\n"
-        f"{target_choices_formatted}\n"
-        f"תשובה:"
-    )
-
-    if not printed_psycho_understanding_hebrew_prompt:
-        print("="*50)
-        print("FULL PSYCHOMETRIC UNDERSTANDING HEBREW PROMPT WITH FEW-SHOTS:")
-        print(full_prompt)
-        print("="*50)
-        printed_psycho_understanding_hebrew_prompt = True
-
-    # Better answer processing for validation data
-    answer_raw = line.get("answer", "A")
-    if isinstance(answer_raw, str) and len(answer_raw) == 1 and answer_raw.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        gold_index = ord(answer_raw.upper()) - ord("A")
-    elif isinstance(answer_raw, int):
-        gold_index = answer_raw
-    else:
-        gold_index = 0
-
-    # Validate gold index is within range
-    if gold_index >= len(target_choices):
-        gold_index = 0
-
-    # Model predicts among A, B, C, D
-    letter_choices = [chr(65 + i) for i in range(len(target_choices))]
-
-    return Doc(
-        task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
-        choices=letter_choices,
-        gold_index=gold_index,
-    )
+    return generic_psychometric_prompt(line, task_name)
 # ============================================================
 # Task configs
 # ============================================================
