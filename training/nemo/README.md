@@ -98,11 +98,10 @@ python train.py --run_name RUN_NAME [--use_fp8]
 > ps ux | grep 'nemo_run.core.runners.fdl_runner' | awk '{print $2}' | xargs kill -9
 > ```
 
-## Cluster Instructions
+# Cluster Instructions
 connect to cluster:
 ```bash
-./easy-ssh.sh -c login-group ml-cluster --region us-east-2
-```
+./easy-ssh.sh -r us-east-2 ml-cluster```
 
 
 ### Home Directory
@@ -215,6 +214,7 @@ python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
+
 
 
 
