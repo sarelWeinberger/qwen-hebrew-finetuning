@@ -13,7 +13,7 @@ estimator = Estimator(
     environment={
         'MODEL_SOURCE': 'huggingface',
         'MODEL_NAME': 'CohereLabs/aya-expanse-8b',
-        'HF_TOKEN': '',
+        'HF_TOKEN': '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',
         'BACKEND': 'vllm',
         'MAX_SAMPLES': '3000',
         'GIT_PYTHON_REFRESH': 'quiet'

@@ -1,3 +1,71 @@
+#!/usr/bin/env python3
+"""
+סקריפט לבניית ה-Docker image והרצת Batch Transform Job
+"""
+
+import boto3
+import json
+import time
+import os
+from datetime import datetime
+import subprocess
+
+class SageMakerBatchProcessor:
+    def __init__(self,
+                 region_name="us-east-1",
+                 role_arn=None,
+                 hf_token=None):
+        """
+        Args:
+            region_name: AWS region
+            role_arn: IAM role for SageMaker (צריך permissions לECR, S3, SageMaker)
+            hf_token: Hugging Face token
+        """
+        self.region_name = region_name
+        self.role_arn = role_arn
+        self.hf_token = hf_token
+
+        # AWS clients
+        self.sagemaker = boto3.client('sagemaker', region_name=region_name)
+        self.ecr = boto3.client('ecr', region_name=region_name)
+        self.s3 = boto3.client('s3', region_name=region_name)
+        self.sts = boto3.client('sts', region_name=region_name)
+
+        # Get account ID
+        self.account_id = self.sts.get_caller_identity()['Account']
+
+    def build_and_push_image(self, image_name="text-cleaning-gemma"):
+        """
+        בניית Docker image והעלאה ל-ECR
+        """
+        ecr_repo_name = image_name
+        image_uri = f"{self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com/{ecr_repo_name}:latest"
+
+        print(f"🔨 בונה Docker image: {image_name}")
+
+        # יצירת ECR repository אם לא קיים
+        try:
+            self.ecr.create_repository(repositoryName=ecr_repo_name)
+            print(f"✅ נוצר ECR repository: {ecr_repo_name}")
+        except self.ecr.exceptions.RepositoryAlreadyExistsException:
+            print(f"📦 ECR repository כבר קיים: {ecr_repo_name}")
+
+        # בניית ה-image
+        build_commands = [
+            f"docker build -t {ecr_repo_name} .",
+            f"docker tag {ecr_repo_name}:latest {image_uri}"
+        ]
+
+        for cmd in build_commands:
+            print(f"🔄 מריץ: {cmd}")
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"❌ שגיאה: {result.stderr}")
+                return None
+
+        # התחברות ל-ECR
+        login_cmd = f"aws ecr get-login-password --region {self.region_name} | docker login --username AWS --password-stdin {self.account_id}.dkr.ecr.{self.region_name}.amazonaws.com"
+        subprocess.run(login_cmd, shell=True)
 
         # העלאה ל-ECR
         push_cmd = f"docker push {image_uri}"

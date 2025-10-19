@@ -31,7 +31,7 @@ if [ -d "/opt/ml/model" ]; then
     fi
 
     # Benchmarks path
-    BENCHMARKS_DIR="${HEB_BENCHMARKS_DIR_PATH:-/opt/ml/input/data/benchmarks}"
+    BENCHMARKS_DIR="${HEB_BENCHMARKS_DIR_PATH:-/opt/ml/input/data/benchmarks/final_benchmarks_data}"
 else
     echo "🔍 Detected: EC2 / Local environment"
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
