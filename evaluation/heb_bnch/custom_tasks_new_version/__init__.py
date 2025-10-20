@@ -181,15 +181,15 @@ def gsm8k_final_acc_eval_fn(**kwargs):
 
     return float(exact_match)
 
-FEW_SHOT_PATH_gsm8k = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/gsm8k_heb/train.jsonl"
+# FEW_SHOT_PATH_gsm8k = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/gsm8k_heb/train.jsonl"
 
-few_shots_list = []
-with open(FEW_SHOT_PATH_gsm8k, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take only 5 few-shots
-            break
-        data = json.loads(line)
-        few_shots_list.append({"query": data["query"], "gold": data["gold"]})
+# few_shots_list = []
+# with open(FEW_SHOT_PATH_gsm8k, "r", encoding="utf-8") as f:
+#     for i, line in enumerate(f):
+#         if i >= 5:  # take only 5 few-shots
+#             break
+#         data = json.loads(line)
+#         few_shots_list.append({"query": data["query"], "gold": data["gold"]})
 
 
 # ============================================================
@@ -210,33 +210,84 @@ with open(FEW_SHOT_PATH_gsm8k, "r", encoding="utf-8") as f:
 
 printed_prompt = False  # global flag
 
-def gsm8k_heb_fewshot_prompt(line, task_name="gsm8k_heb"):
-    global printed_prompt
-    
-    few_shot_text = ""
-    for i, shot in enumerate(few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        ans = shot["gold"].replace('\n', ' ').strip()
-        few_shot_text += f"שאלה {i+1}: {qs}\nפתור שלב אחר שלב ותן את התשובה הסופית: {ans}[ANSWER_END]\n\n"
+def gsm8k_heb_prompt(line, task_name="gsm8k_heb"):
 
     target_q = line["query"].replace('\n', ' ').strip()
-    full_prompt = few_shot_text + f"על סמך השאלות שניתנו פתור את בעיית המתמטיקה הבאה שלב אחר שלב וספק את התשובה הסופית: {target_q}"
-
-    if not printed_prompt:
-        print("="*50)
-        print("FULL PROMPT WITH FEW-SHOTS:")
-        print(full_prompt)
-        print("="*50)
-        printed_prompt = True
+    # full_prompt =  f"על סמך השאלות שניתנו פתור את בעיית המתמטיקה הבאה שלב אחר שלב וספק את התשובה הסופית: {target_q}"
 
     return Doc(
         task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
+        query=f"שאלה: {target_q}\nתשובה:",
         gold_index=0,
-        choices=['תשובה: ' + line["gold"].replace('\n', ' ').strip() + '[ANSWER_END]']
+        choices=[" "+line["gold"].replace('\n', ' ').strip()]
+    )
+def gsm8k(line, task_name: str = None):
+    # Has special analysis in metric for number decomposition
+    return Doc(
+        task_name=task_name,
+        query=f"Question: {line['question']}\nAnswer:",
+        choices=[f" {line['answer']}"],
+        gold_index=0,
     )
 
+gsm8k_heb_stop_sequences = ["\n\nשאלה:", "\nשאלה:", "שאלה:"]
+def gsm8k_heb_normalizer(text: str) -> str:
+    """From https://github.com/openai/grade-school-math/blob/3101c7d5072418e28b9008a6636bde82a006892c/grade_school_math/dataset.py#L28
+
+    Args:
+        text (str): input text
+
+    Returns:
+        str: Output text, either the number found in the text or "[invalid]" if
+        no number was found
+    """
+    if gsm8k_heb_stop_sequences[-1] in text:
+        text = text.split(gsm8k_heb_stop_sequences[-1])[0].strip()
+
+    ANS_RE = re.compile(r"#### (\-?[0-9\.\,]+)")
+    INVALID_ANS = "[invalid]"
+
+    match = ANS_RE.search(text)
+    if match:
+        match_str = match.group(1).strip()
+        match_str = match_str.replace(",", "")
+        return match_str
+    else:
+        return INVALID_ANS
+# gsm8k_leaderboard = LightevalTaskConfig(
+#     name="gsm8k",
+#     suite=["leaderboard"],
+#     prompt_function=prompt.gsm8k,
+#     hf_repo="gsm8k",
+#     hf_subset="main",
+#     hf_avail_splits=["train", "test"],
+#     evaluation_splits=["test"],
+#     few_shots_split=None,
+#     few_shots_select="random_sampling_from_train",
+#     generation_size=256,
+    # metrics=[
+    #   Metrics.exact_match(sample_params={"normalize_gold": gsm8k_normalizer, "normalize_pred": gsm8k_normalizer})
+    # ],
+#     stop_sequence=[],
+#     version=0,
+# )
+# gsm8k_lighteval = LightevalTaskConfig(
+#     name="gsm8k",
+#     suite=["lighteval"],
+#     prompt_function=prompt.gsm8k,
+#     hf_repo="openai/gsm8k",
+#     hf_subset="main",
+#     hf_avail_splits=["train", "test"],
+#     evaluation_splits=["test"],
+#     few_shots_split=None,
+#     few_shots_select="random_sampling_from_train",
+#     generation_size=256,
+#     metrics=[
+#         Metrics.expr_gold_metric,
+#     ],
+#     stop_sequence=["Question:"],
+#     version=0,
+# )
 
 # ============================================================
 # ARC 
@@ -1449,17 +1500,21 @@ def psychometric_test_understanding_hebrew_prompt(line, task_name: str = "psycho
 _CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 
 _TASKS = [
-    # LightevalTaskConfig(
-    #     name="gsm8k_heb",
-    #     suite=["community"],
-    #     prompt_function=gsm8k_heb_fewshot_prompt,  # <-- updated to few-shot version
-    #     hf_subset="default",
-    #     metric=[GSM8KFinalAccMetric],
-    #     hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "gsm8k_heb/"),
-    #     evaluation_splits=["validation"],
-    #     stop_sequence=['[ANSWER_END]'],
-    #     generation_size=512
-    # ),
+    LightevalTaskConfig(
+    name="gsm8k_heb",
+    suite=["community"],
+    prompt_function=gsm8k_heb_prompt,
+    hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "gsm8k_heb/"),
+    hf_subset="default",
+    evaluation_splits=["validation"],
+    few_shots_split="train",
+    generation_size=256,
+    metrics=[
+      Metrics.exact_match(sample_params={"normalize_gold": gsm8k_heb_normalizer, "normalize_pred": gsm8k_heb_normalizer})
+    ],
+    stop_sequence=gsm8k_heb_stop_sequences,
+    version=0,
+),
     LightevalTaskConfig(
         name="arc_ai2_heb",
         suite=["community"],

@@ -88,7 +88,7 @@ def load_data():
     
     # Get score columns (excluding std columns and metadata)
     score_columns = [col for col in df.columns if col.endswith('_score')]
-    
+    df = df.reset_index(drop=True)
     return df, score_columns
 
 def get_available_runs():
@@ -124,8 +124,7 @@ def create_data_table():
 
         # Return empty dataframe with error message
         return pd.DataFrame({'Error': [f'Failed to load data: {str(e)}']})
-
-def create_benchmark_comparison(selected_runs):
+def create_benchmark_comparison(selected_runs, plot_mode="Lines + Markers"):
     try:
         df, score_columns = load_data()
         
@@ -157,6 +156,9 @@ def create_benchmark_comparison(selected_runs):
         
         colors = px.colors.qualitative.Set1
         
+        # Determine plot mode
+        mode = 'lines+markers' if plot_mode == "Lines + Markers" else 'markers'
+        
         for i, (_, row) in enumerate(comparison_df.iterrows()):
             model_name = row['model_name']
             run_time = row['timestamp'].strftime('%Y-%m-%d %H:%M')
@@ -172,19 +174,24 @@ def create_benchmark_comparison(selected_runs):
                     valid_benchmarks.append(benchmark_names[j])
             
             if scores:  # Only add if there are valid scores
-                fig.add_trace(go.Scatter(
-                    x=valid_benchmarks,
-                    y=scores,
-                    mode='lines+markers',
-                    name=f'{model_name} ({run_time})',
-                    line=dict(color=colors[i % len(colors)], width=2),
-                    marker=dict(size=8),
-                    text=[f'{score:.3f}' for score in scores],
-                    textposition='top center',
-                    hovertemplate='<b>%{fullData.name}</b><br>' +
-                                'Benchmark: %{x}<br>' +
-                                'Score: %{y:.3f}<extra></extra>'
-                ))
+                trace_config = {
+                    'x': valid_benchmarks,
+                    'y': scores,
+                    'mode': mode,
+                    'name': f'{model_name} ({run_time})',
+                    'marker': dict(size=10 if mode == 'markers' else 8, color=colors[i % len(colors)]),
+                    'text': [f'{score:.3f}' for score in scores],
+                    'textposition': 'top center',
+                    'hovertemplate': '<b>%{fullData.name}</b><br>' +
+                                    'Benchmark: %{x}<br>' +
+                                    'Score: %{y:.3f}<extra></extra>'
+                }
+                
+                # Add line configuration only if in line mode
+                if mode == 'lines+markers':
+                    trace_config['line'] = dict(color=colors[i % len(colors)], width=2)
+                
+                fig.add_trace(go.Scatter(**trace_config))
         
         fig.update_layout(
             title='Benchmark Scores Comparison - Selected Runs',
@@ -214,7 +221,7 @@ def create_benchmark_comparison(selected_runs):
         fig.add_annotation(text=f"Error creating chart: {str(e)}", 
                          xref="paper", yref="paper", x=0.5, y=0.5)
         return fig
-
+    
 def create_score_over_time():
     try:
         df, score_columns = load_data()
@@ -458,41 +465,6 @@ def create_model_performance_heatmap():
                          xref="paper", yref="paper", x=0.5, y=0.5)
         return fig
 
-
-# def get_parquet_path(row_data: Dict, dataset_column: str) -> str:
-#     """
-#     Construct parquet file path from row data
-    
-#     Args:
-#         row_data: Dictionary containing row information
-#         dataset_column: The name of the dataset column clicked
-    
-#     Returns:
-#         Path to the parquet file
-#     """
-#     # print("dummy data")
-#     # return "/home/ec2-user/test_output/hellaswag_heb/scores_sum/2025-10-15T21-51-38/details/home/ec2-user/models/Qwen3-14B/2025-10-15T21-52-23.466806/details_community|hellaswag_heb|3_2025-10-15T21-52-23.466806.parquet"
-#     model_name = row_data.get('model_name', '')
-#     timestamp = row_data.get('timestamp', '')
-    
-#     # Convert timestamp to directory format (if needed)
-#     if isinstance(timestamp, str) and 'T' in timestamp:
-#         timestamp_dir = timestamp.replace(':', '-').split('.')[0]  # Remove microseconds
-#     else:
-#         timestamp_dir = str(timestamp)
-    
-#     # Extract dataset name from column (e.g., 'arc_ai2_heb_score' -> 'arc_ai2_heb')
-#     dataset = dataset_column.replace('_score', '').replace('_std', '')
-    
-#     # Construct path
-#     parquet_path = os.path.join(
-#         local_save_directory,
-#         model_name,
-#         timestamp_dir,
-#         f"{dataset}.pkl"
-#     )
-    
-#     return parquet_path
 def handle_cell_click(row_idx: int, col_name: str, df: pd.DataFrame):
     """
     Handle cell click event and show detailed viewer in the same interface
@@ -545,72 +517,6 @@ def make_clickable_table():
     except Exception as e:
         print(f"Error creating clickable table: {e}")
         return pd.DataFrame({'Error': [str(e)]}), []
-
-# def handle_cell_click(row_idx: int, col_name: str, df: pd.DataFrame):
-#     """
-#     Handle cell click event and launch detailed viewer
-    
-#     Args:
-#         row_idx: Index of clicked row
-#         col_name: Name of clicked column
-#         df: The dataframe
-#     """
-#     # Check if clicked column is a score column
-#     if not col_name.endswith('_score'):
-#         return None
-    
-#     try:
-#         # Get row data
-#         row_data = df.iloc[row_idx].to_dict()
-        
-#         # Get parquet path
-#         parquet_path = f'{scores_sum_directory}{df.at[row_idx, col_name.replace("_score","_details")]}'
-#         print(f"Opening parquet file: {parquet_path}")
-#         # If the path is an S3 path, download it first
-
-#         local_temp_dir = os.path.join(local_save_directory, 'temp_parquets')
-#         os.makedirs(local_temp_dir, exist_ok=True)
-#         local_file_path = os.path.join(local_temp_dir, os.path.basename(parquet_path))
-#         print(f"Downloading from S3: {parquet_path} to {local_file_path}")
-#         try:
-#             download_s3_file(parquet_path, local_file_path)
-#         except Exception as e:
-#             print(f"Failed to download parquet file from S3: {e}")
-#             return gr.Warning(f"Failed to download data file: {e}")
-#         parquet_path = local_file_path
-#         print(f"Using local parquet file: {parquet_path}")
-
-        
-#         # Extract metadata
-#         model_name = row_data.get('model_name', 'Unknown')
-#         timestamp = row_data.get('timestamp', 'Unknown')
-#         dataset = col_name.replace('_score', '')
-        
-#         # Launch detailed viewer in new window (requires launching as separate Gradio instance)
-#         viewer = create_viewer_interface(parquet_path)
-        
-#         # Launch on different port
-#         import random
-#         port = random.randint(7700, 7799)
-        
-#         def launch_viewer():
-#             viewer.launch(
-#                 server_port=port,
-#                 share=True,
-#                 prevent_thread_lock=True,
-#                 show_error=True,
-#                 inbrowser=True
-#             )
-        
-#         thread = threading.Thread(target=launch_viewer, daemon=True)
-#         thread.start()
-        
-#         return gr.Info(f"Opening detailed view for {dataset} in new window on port {port}")
-        
-#     except Exception as e:
-#         print(f"Error handling cell click: {e}")
-#         traceback.print_exc()
-#         return gr.Warning(f"Error: {str(e)}")
 
 # Create Gradio interface
 with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) as demo:
@@ -667,12 +573,29 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
                 info="Choose which runs to display in the comparison chart"
             )
             
-            comparison_plot = gr.Plot(value=create_benchmark_comparison(["Latest per model"]))
+            # Add plot mode toggle
+            with gr.Row():
+                plot_mode = gr.Radio(
+                    choices=["Lines + Markers", "Markers Only"],
+                    value="Lines + Markers",
+                    label="Plot Style",
+                    scale=2
+                )
+                gr.Markdown("")  # Spacer
+            
+            comparison_plot = gr.Plot(value=create_benchmark_comparison(["Latest per model"], "Lines + Markers"))
             
             # Update chart when selection changes
             run_selector.change(
                 fn=create_benchmark_comparison,
-                inputs=[run_selector],
+                inputs=[run_selector, plot_mode],
+                outputs=comparison_plot
+            )
+            
+            # Update chart when plot mode changes
+            plot_mode.change(
+                fn=create_benchmark_comparison,
+                inputs=[run_selector, plot_mode],
                 outputs=comparison_plot
             )
             
@@ -682,14 +605,14 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
             
             refresh_comparison_btn.click(
                 fn=create_benchmark_comparison,
-                inputs=[run_selector],
+                inputs=[run_selector, plot_mode],
                 outputs=comparison_plot
             )
             refresh_runs_btn.click(
                 fn=get_available_runs,
                 outputs=run_selector
             )
-        
+                
         with gr.Tab("⏰ Scores Over Time"):
             gr.Markdown("### Performance Trends Over Time")
             time_plot = gr.Plot(value=create_score_over_time())

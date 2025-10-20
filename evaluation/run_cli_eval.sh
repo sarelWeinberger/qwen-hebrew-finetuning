@@ -3,9 +3,9 @@
 # pip install lighteval[vllm] emoji boto3
 ## check s3 
 # python /home/ec2-user/qwen-hebrew-finetuning/evaluation/s3_utils.py
-# DATASET_NAME="hellaswag_heb,mmlu_heb,copa_heb,arc_ai2_heb"
-# DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
-DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew"
+# DATASET_NAME="gsm8k_heb"
+DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
+# DATASET_NAME="arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies,psychometric_heb_restatement,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew"
 # TODO: activate those benchmarks: gsm8k_heb isn't configured yet and all the psychometric bench below caused content length issue in vllm backend (RuntimeError: Worker failed with error 'Sampled token IDs exceed the max model length. Total number of tokens: 2048 > max_model_len: 2047)
 # DATASET_NAME="gsm8k_heb,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
 # TODO: call all tasks togther will save a lot of time - currently each task is called separately and the backend uploading in each task the model to gpu
@@ -249,7 +249,7 @@ for DS_NAME in "${DATASET_LIST[@]}"; do
         echo "Using VLLM backend"
         export VLLM_CACHE_DIR="$OUTPUT_RUN_DIR/vllm_cache"
         mkdir -p "$VLLM_CACHE_DIR"
-        MODEL_CONFIG="model_name=$MODEL_PATH,override_chat_template=false,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=2047"
+        MODEL_CONFIG="model_name=$MODEL_PATH,override_chat_template=false,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=4096"
 
         PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
         VLLM_WORKER_MULTIPROC_METHOD=spawn \
