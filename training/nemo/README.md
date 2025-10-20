@@ -138,6 +138,11 @@ sudo chmod -R 777 $DATA_DIR
 cp ... $DATA_DIR/
 ```
 
+create enroot folder N2 - means 2 nodes -change it if needed
+```bash
+srun -N2 sudo mkdir -p /opt/sagemaker/tmp/enroot
+srun -N2 sudo chmod 777 /opt/sagemaker/tmp/enroot
+```
 Important: Once you copy all the data in, make sure to run this command:
 
 ```bash
@@ -215,6 +220,7 @@ python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
+
 
 
 
