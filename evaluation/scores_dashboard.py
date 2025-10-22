@@ -86,6 +86,44 @@ def load_data():
     # Add a run identifier (combination of model and timestamp)
     df['run_id'] = df['model_name'] + ' - ' + df['timestamp'].dt.strftime('%Y-%m-%d %H:%M')
     
+    # RENAME COLUMNS TO FIX MISTAKES
+    # Step 1: Merge data from mistaken columns into correct columns
+    # For Ψ_restatement -> Ψ_restatement_english
+    for suffix in ['_score', '_std', '_details']:
+        old_col = f'Ψ_restatement{suffix}'
+        new_col = f'Ψ_restatement_english{suffix}'
+        
+        if old_col in df.columns and new_col in df.columns:
+            # Fill NaN values in new_col with values from old_col
+            df[new_col] = df[new_col].fillna(df[old_col])
+            # Drop the old column
+            df = df.drop(columns=[old_col])
+        elif old_col in df.columns:
+            # If new_col doesn't exist, just rename old_col
+            df = df.rename(columns={old_col: new_col})
+
+    # For Ψ_analogies -> Ψ_analogies_hebrew
+    for suffix in ['_score', '_std', '_details']:
+        old_col = f'Ψ_analogies{suffix}'
+        new_col = f'Ψ_analogies_hebrew{suffix}'
+        
+        if old_col in df.columns and new_col in df.columns:
+            # Fill NaN values in new_col with values from old_col
+            df[new_col] = df[new_col].fillna(df[old_col])
+            # Drop the old column
+            df = df.drop(columns=[old_col])
+        elif old_col in df.columns:
+            # If new_col doesn't exist, just rename old_col
+            df = df.rename(columns={old_col: new_col})
+
+    # Step 2: Replace psychometric_heb with Ψ (Greek Psi character)
+    rename_mapping = {}
+    for col in df.columns:
+        if 'psychometric_heb' in col:
+            rename_mapping[col] = col.replace('psychometric_heb', 'Ψ')
+
+    df = df.rename(columns=rename_mapping)
+
     # Get score columns (excluding std columns and metadata)
     score_columns = [col for col in df.columns if col.endswith('_score')]
     df = df.reset_index(drop=True)
@@ -163,24 +201,24 @@ def create_benchmark_comparison(selected_runs, plot_mode="Lines + Markers"):
             model_name = row['model_name']
             run_time = row['timestamp'].strftime('%Y-%m-%d %H:%M')
             
-            heb_benchmarks = ["psychometric_heb_understanding_hebrew_score",
-                              "psychometric_heb_sentence_text_hebrew_score",
-                              "psychometric_heb_sentence_complete_hebrew_score",
-                              "psychometric_heb_analogies_hebrew_score"]
-            eng_benchmarks = ["psychometric_heb_restatement_english_score",
-                              "psychometric_heb_sentence_text_english_score",
-                              "psychometric_heb_sentence_complete_english_score"]
+            heb_benchmarks = ["Ψ_understanding_hebrew_score",
+                              "Ψ_sentence_text_hebrew_score",
+                              "Ψ_sentence_complete_hebrew_score",
+                              "Ψ_analogies_hebrew_score"]
+            eng_benchmarks = ["Ψ_restatement_english_score",
+                              "Ψ_sentence_text_english_score",
+                              "Ψ_sentence_complete_english_score"]
             GATHER_PSYCHOMETRIC_TOPICS = True
             #change score_columns to gather psychometric topics
             if GATHER_PSYCHOMETRIC_TOPICS:
-                score_columns_dict = {col: [row[col]] for col in score_columns if not col.startswith('psychometric_heb_') and pd.notna(row[col])}
-                if 'psychometric_heb_math_score' in row and pd.notna(row['psychometric_heb_math_score']):
-                    score_columns_dict['psychometric_heb_math_score'] = [row['psychometric_heb_math_score']]
+                score_columns_dict = {col: [row[col]] for col in score_columns if not col.startswith('Ψ_') and pd.notna(row[col])}
+                if 'Ψ_math_score' in row and pd.notna(row['Ψ_math_score']):
+                    score_columns_dict['Ψ_math_score'] = [row['Ψ_math_score']]
             
                 if all(col in row and pd.notna(row[col]) for col in heb_benchmarks):
-                    score_columns_dict['psychometric_heb_hebrew_score'] = [row[col] for col in heb_benchmarks]
+                    score_columns_dict['Ψ_hebrew_score'] = [row[col] for col in heb_benchmarks]
                 if all(col in row and pd.notna(row[col]) for col in eng_benchmarks):
-                    score_columns_dict['psychometric_heb_english_score'] = [row[col] for col in eng_benchmarks]
+                    score_columns_dict['Ψ_english_score'] = [row[col] for col in eng_benchmarks]
             else:
                 score_columns_dict = {}
                 for j, score_col in enumerate(score_columns):
@@ -315,7 +353,7 @@ def create_score_over_time():
                     )
         
         # Plot selected Psychometric scores (average)
-        psychometric_cols = [col for col in score_columns if col.startswith('psychometric_heb')]
+        psychometric_cols = [col for col in score_columns if col.startswith('Ψ')]
         if psychometric_cols:
             for model in unique_models:
                 model_data = df[df['model_name'] == model].sort_values('timestamp')
@@ -360,7 +398,7 @@ def create_psychometric_detailed():
         df, score_columns = load_data()
         
         # Get psychometric columns
-        psychometric_cols = [col for col in score_columns if col.startswith('psychometric_heb')]
+        psychometric_cols = [col for col in score_columns if col.startswith('Ψ')]
         
         if not psychometric_cols:
             fig = go.Figure()
@@ -386,7 +424,7 @@ def create_psychometric_detailed():
             for col in psychometric_cols:
                 score = model_data[col].iloc[0]
                 if pd.notna(score):
-                    categories.append(col.replace('psychometric_heb_', '').replace('_score', '').replace('_', ' ').title())
+                    categories.append(col.replace('Ψ_', '').replace('_score', '').replace('_', ' ').title())
                     values.append(score)
             
             if values:  # Only add trace if there are values
@@ -1153,7 +1191,7 @@ if __name__ == "__main__":
 #                     )
         
 #         # Plot selected Psychometric scores (average)
-#         psychometric_cols = [col for col in score_columns if col.startswith('psychometric_heb')]
+#         psychometric_cols = [col for col in score_columns if col.startswith('Ψ')]
 #         if psychometric_cols:
 #             for model in unique_models:
 #                 model_data = df[df['model_name'] == model].sort_values('timestamp')
@@ -1198,7 +1236,7 @@ if __name__ == "__main__":
 #         df, score_columns = load_data()
         
 #         # Get psychometric columns
-#         psychometric_cols = [col for col in score_columns if col.startswith('psychometric_heb')]
+#         psychometric_cols = [col for col in score_columns if col.startswith('Ψ')]
         
 #         if not psychometric_cols:
 #             fig = go.Figure()
@@ -1224,7 +1262,7 @@ if __name__ == "__main__":
 #             for col in psychometric_cols:
 #                 score = model_data[col].iloc[0]
 #                 if pd.notna(score):
-#                     categories.append(col.replace('psychometric_heb_', '').replace('_score', '').replace('_', ' ').title())
+#                     categories.append(col.replace('Ψ_', '').replace('_score', '').replace('_', ' ').title())
 #                     values.append(score)
             
 #             if values:  # Only add trace if there are values
