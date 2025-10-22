@@ -4,15 +4,13 @@
 ## check s3 
 # python /home/ec2-user/qwen-hebrew-finetuning/evaluation/s3_utils.py
 
-DATASET_NAME="gsm8k_heb,arc_ai2_heb,copa_heb,hellaswag_heb,mmlu_heb,psychometric_heb_math,psychometric_heb_analogies_hebrew,psychometric_heb_restatement_english,psychometric_heb_sentence_complete_english,psychometric_heb_sentence_complete_hebrew,psychometric_heb_sentence_text_english,psychometric_heb_sentence_text_hebrew,psychometric_heb_understanding_hebrew"
-
 DEVICE="cuda:0"
 
 DTYPE="bfloat16"
 TOP_K=1
 TEMPERATURE=1.0
 FEW_SHOTS=5
-MODEL_PATH="/home/ec2-user/models/qwen8-20-billion/step-22064/"
+MODEL_PATH="/home/ec2-user/models/qwen8-20-billion/mid-step-15617"
 OUTPUT_DIR="./hebrew_benchmark_results"
 RESULTS_PATH_TEMPLATE="$OUTPUT_DIR/scores_sum"
 PYTHONPATH_DIR="/home/ec2-user/qwen-hebrew-finetuning/evaluation/heb_bnch"

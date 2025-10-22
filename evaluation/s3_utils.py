@@ -151,4 +151,6 @@ def test_s3_connection():
 
 if __name__ == "__main__":
     # Test the S3 connection
-    test_s3_connection()
+    # test_s3_connection()
+    # download_s3_directory("s3://gepeta-checkpoints/qwen8-20-billion/step-22064/","/home/ec2-user/models/qwen8-20-billion/step-22064/")
+    download_s3_directory("s3://gepeta-checkpoints/qwen8-20-billion/mid-step-15617/","/home/ec2-user/models/qwen8-20-billion/mid-step-15617/")
