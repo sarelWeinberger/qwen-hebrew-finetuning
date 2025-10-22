@@ -76,7 +76,8 @@ def remove_empty_columns(df: pd.DataFrame) -> pd.DataFrame:
     except Exception as e:
         print(f"Error removing empty columns: {e}")
         return df
-    def extract_simple_view(df: pd.DataFrame) -> pd.DataFrame:
+
+def extract_simple_view(df: pd.DataFrame) -> pd.DataFrame:
     """
     Extract simple view: doc.query, metric.acc, model_response.logprobs, model_response.text_post_processed
     Each row is a sample, columns are the fields

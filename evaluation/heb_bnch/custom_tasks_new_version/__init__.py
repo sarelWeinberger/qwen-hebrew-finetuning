@@ -1548,7 +1548,7 @@ LightevalTaskConfig(
         evaluation_splits=["validation"],
     ),
        LightevalTaskConfig(
-        name="psychometric_heb_analogies",
+        name="psychometric_heb_analogies_hebrew",
         suite=["community"],
         prompt_function=psychometric_test_analogies_prompt,
         hf_subset="default",
@@ -1558,7 +1558,7 @@ LightevalTaskConfig(
         few_shots_split="train",
     ),
        LightevalTaskConfig(
-        name="psychometric_heb_restatement",
+        name="psychometric_heb_restatement_english",
         suite=["community"],
         prompt_function=psychometric_test_restatement_prompt,
         hf_subset="default",

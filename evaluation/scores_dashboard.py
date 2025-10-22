@@ -163,19 +163,35 @@ def create_benchmark_comparison(selected_runs, plot_mode="Lines + Markers"):
             model_name = row['model_name']
             run_time = row['timestamp'].strftime('%Y-%m-%d %H:%M')
             
-            # Collect scores for this run
-            scores = []
-            valid_benchmarks = []
+            heb_benchmarks = ["psychometric_heb_understanding_hebrew_score",
+                              "psychometric_heb_sentence_text_hebrew_score",
+                              "psychometric_heb_sentence_complete_hebrew_score",
+                              "psychometric_heb_analogies_hebrew_score"]
+            eng_benchmarks = ["psychometric_heb_restatement_english_score",
+                              "psychometric_heb_sentence_text_english_score",
+                              "psychometric_heb_sentence_complete_english_score"]
+            GATHER_PSYCHOMETRIC_TOPICS = True
+            #change score_columns to gather psychometric topics
+            if GATHER_PSYCHOMETRIC_TOPICS:
+                score_columns_dict = {col: [row[col]] for col in score_columns if not col.startswith('psychometric_heb_') and pd.notna(row[col])}
+                if 'psychometric_heb_math_score' in row and pd.notna(row['psychometric_heb_math_score']):
+                    score_columns_dict['psychometric_heb_math_score'] = [row['psychometric_heb_math_score']]
             
-            for j, score_col in enumerate(score_columns):
-                score = row[score_col]
-                if pd.notna(score):
-                    scores.append(score)
-                    valid_benchmarks.append(benchmark_names[j])
-            
-            if scores:  # Only add if there are valid scores
+                if all(col in row and pd.notna(row[col]) for col in heb_benchmarks):
+                    score_columns_dict['psychometric_heb_hebrew_score'] = [row[col] for col in heb_benchmarks]
+                if all(col in row and pd.notna(row[col]) for col in eng_benchmarks):
+                    score_columns_dict['psychometric_heb_english_score'] = [row[col] for col in eng_benchmarks]
+            else:
+                score_columns_dict = {}
+                for j, score_col in enumerate(score_columns):
+                    score = row[score_col]
+                    if pd.notna(score):
+                        score_columns_dict[benchmark_names[j]] = [score]
+                
+            if score_columns_dict:  # Only add if there are valid scores
+                scores = [np.mean(x) for x in list(score_columns_dict.values())]
                 trace_config = {
-                    'x': valid_benchmarks,
+                    'x': list(score_columns_dict.keys()),
                     'y': scores,
                     'mode': mode,
                     'name': f'{model_name} ({run_time})',
