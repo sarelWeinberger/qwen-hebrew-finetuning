@@ -6,6 +6,56 @@ import tempfile
 import shutil
 from s3_utils import download_s3_directory, create_temp_directory, cleanup_temp_directory, is_s3_path
 
+def open_json_file(filepath, run_info, all_benchmarks):
+    with open(filepath, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        for results_key in list(data['results'].keys()):
+            if results_key =="all":
+                continue
+            benchmark_name = data['config_tasks'][results_key].get('name', results_key)
+            acc = data['results'][results_key].get('acc')
+            acc_stderr = data['results'][results_key].get('acc_stderr')
+            model_name = data['config_general'].get('model_name')
+            if not acc:
+                acc = data['results'][results_key].get('em_with_normalize_gold&normalize_pred')
+                acc_stderr = data['results'][results_key].get('em_with_normalize_gold&normalize_pred_stderr')
+            samples_number = data['config_general'].get('max_samples')
+            run_info[f'{benchmark_name}_score'] = acc
+            run_info[f'{benchmark_name}_std'] = acc_stderr
+            all_benchmarks.add(benchmark_name)
+        return run_info, samples_number, all_benchmarks, model_name
+    
+def rename_benchmark_columns(df):
+    # RENAME COLUMNS TO FIX MISTAKES
+    # Step 1: Merge data from mistaken columns into correct columns
+    # For psychometric_heb_restatement -> psychometric_heb_restatement_english
+    for suffix in ['_score', '_std', '_details']:
+        old_col = f'psychometric_heb_restatement{suffix}'
+        new_col = f'psychometric_heb_restatement_english{suffix}'
+        
+        if old_col in df.columns and new_col in df.columns:
+            # Fill NaN values in new_col with values from old_col
+            df[new_col] = df[new_col].fillna(df[old_col])
+            # Drop the old column
+            df = df.drop(columns=[old_col])
+        elif old_col in df.columns:
+            # If new_col doesn't exist, just rename old_col
+            df = df.rename(columns={old_col: new_col})
+
+    # For psychometric_heb_analogies -> psychometric_heb_analogies_hebrew
+    for suffix in ['_score', '_std', '_details']:
+        old_col = f'psychometric_heb_analogies{suffix}'
+        new_col = f'psychometric_heb_analogies_hebrew{suffix}'
+        
+        if old_col in df.columns and new_col in df.columns:
+            # Fill NaN values in new_col with values from old_col
+            df[new_col] = df[new_col].fillna(df[old_col])
+            # Drop the old column
+            df = df.drop(columns=[old_col])
+        elif old_col in df.columns:
+            # If new_col doesn't exist, just rename old_col
+            df = df.rename(columns={old_col: new_col})
+    return df
 def summarize_benchmark_runs(scores_sum_dir, local_save_dir=None,csv_filename='benchmark_results_summary.csv'):
     """
     Summarize benchmark runs from either local directory or S3 path.
@@ -65,21 +115,13 @@ def summarize_benchmark_runs(scores_sum_dir, local_save_dir=None,csv_filename='b
             # Search for JSON files in all subdirectories of run_dir
             for subdir in os.listdir(run_dir):
                 subdir_path = os.path.join(run_dir, subdir)
-                if os.path.isdir(subdir_path):
+                if subdir_path.endswith('.json'):
+                    run_info, samples_number, all_benchmarks,model_name = open_json_file(subdir_path, run_info, all_benchmarks)
+                elif os.path.isdir(subdir_path):
                     for file in os.listdir(subdir_path):
                         if file.endswith('.json'):
-                            with open(os.path.join(subdir_path, file), 'r', encoding='utf-8') as f:
-                                data = json.load(f)
-                                results_key = next(iter(data['results']))
-                                benchmark_name = data['config_tasks'][results_key].get('name', results_key)
-                                acc = data['results'][results_key].get('acc')
-                                acc_stderr = data['results'][results_key].get('acc_stderr')
-                                model_name = data['config_general'].get('model_name')
-                                samples_number = data['config_general'].get('max_samples')
-                                run_info[f'{benchmark_name}_score'] = acc
-                                run_info[f'{benchmark_name}_std'] = acc_stderr
-                                all_benchmarks.add(benchmark_name)
-            
+                            run_info, samples_number, all_benchmarks,model_name = open_json_file(os.path.join(subdir_path, file), run_info, all_benchmarks)
+                            
             run_info['samples_number'] = samples_number
             run_info['model_name'] = model_name
             rows.append(run_info)
@@ -95,7 +137,9 @@ def summarize_benchmark_runs(scores_sum_dir, local_save_dir=None,csv_filename='b
         # keep only the ordered columns that actually exist in the dataframe
         existing_columns = [c for c in columns if c in df.columns]
         df = df[existing_columns]
-        
+        df = rename_benchmark_columns(df)
+        # remove rows with NA model name
+        df = df.dropna(subset=['model_name']).drop_duplicates().reset_index(drop=True)
         # Determine where to save the CSV
         if local_save_dir is None:
             local_save_dir = os.getcwd()  # Current directory
@@ -129,7 +173,8 @@ if __name__ == "__main__":
     # scores_sum_directory = 's3://your-bucket/hebrew_benchmark_results/scores_sum'
     
     # Use the original local path as default
-    scores_sum_directory = 's3://gepeta-datasets/benchmark_results/heb_benc_results/'
+    # scores_sum_directory = 's3://gepeta-datasets/benchmark_results/heb_benc_results/'
+    scores_sum_directory = '/home/ec2-user/qwen-hebrew-finetuning/evaluation/hebrew_benchmark_results/scores_sum'
     
     # You can specify a custom local directory to save the CSV
     local_save_directory = 'benchmark_results_test'  # Will save to current directory

@@ -9,7 +9,7 @@ import re
 import traceback
 import os
 from s3_utils import download_s3_file
-from extract_benchmark_results import summarize_benchmark_runs
+from extract_benchmark_results import summarize_benchmark_runs, rename_benchmark_columns
 from check_port_avaliablity import check_port_or_raise
 from detailed_results_viewer import create_detailed_viewer   
 import webbrowser
@@ -87,35 +87,7 @@ def load_data():
     df['run_id'] = df['model_name'] + ' - ' + df['timestamp'].dt.strftime('%Y-%m-%d %H:%M')
     
     # RENAME COLUMNS TO FIX MISTAKES
-    # Step 1: Merge data from mistaken columns into correct columns
-    # For Ψ_restatement -> Ψ_restatement_english
-    for suffix in ['_score', '_std', '_details']:
-        old_col = f'Ψ_restatement{suffix}'
-        new_col = f'Ψ_restatement_english{suffix}'
-        
-        if old_col in df.columns and new_col in df.columns:
-            # Fill NaN values in new_col with values from old_col
-            df[new_col] = df[new_col].fillna(df[old_col])
-            # Drop the old column
-            df = df.drop(columns=[old_col])
-        elif old_col in df.columns:
-            # If new_col doesn't exist, just rename old_col
-            df = df.rename(columns={old_col: new_col})
-
-    # For Ψ_analogies -> Ψ_analogies_hebrew
-    for suffix in ['_score', '_std', '_details']:
-        old_col = f'Ψ_analogies{suffix}'
-        new_col = f'Ψ_analogies_hebrew{suffix}'
-        
-        if old_col in df.columns and new_col in df.columns:
-            # Fill NaN values in new_col with values from old_col
-            df[new_col] = df[new_col].fillna(df[old_col])
-            # Drop the old column
-            df = df.drop(columns=[old_col])
-        elif old_col in df.columns:
-            # If new_col doesn't exist, just rename old_col
-            df = df.rename(columns={old_col: new_col})
-
+    df = rename_benchmark_columns(df)
     # Step 2: Replace psychometric_heb with Ψ (Greek Psi character)
     rename_mapping = {}
     for col in df.columns:
@@ -126,13 +98,25 @@ def load_data():
 
     # Get score columns (excluding std columns and metadata)
     score_columns = [col for col in df.columns if col.endswith('_score')]
-    df = df.reset_index(drop=True)
+    df = df.reset_index(drop=True).round(3)
     return df, score_columns
 
-def get_available_runs():
+def filter_partial_training(df, include_partial):
+    """Filter dataframe based on partial training toggle"""
+    if include_partial:
+        return df
+    
+    # Filter out rows where samples_number < 1000
+    if 'samples_number' in df.columns:
+        # Keep rows where samples_number is None or > 1000
+        df = df[(df['samples_number'].isna()) | (df['samples_number'] > 1000)]
+    
+    return df
+
+def get_available_runs(df):
     """Get list of available runs for the dropdown"""
     try:
-        df, _ = load_data()
+        # df, _ = load_data()
         if df.empty:
             return ["No runs available"]
         
@@ -147,13 +131,14 @@ def get_available_runs():
     except:
         return ["Error loading runs"]
 
-def create_data_table():
+def create_data_table(include_partial = False):
     try:
         
         df, _ = load_data()
         # Format timestamp for display
         df_display = df.copy()
         df_display['timestamp'] = df_display['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        df_display = filter_partial_training(df_display, include_partial)
         return df_display
     except Exception as e:
         print(f"Error creating data table: {e}")
@@ -162,10 +147,14 @@ def create_data_table():
 
         # Return empty dataframe with error message
         return pd.DataFrame({'Error': [f'Failed to load data: {str(e)}']})
-def create_benchmark_comparison(selected_runs, plot_mode="Lines + Markers"):
+def create_benchmark_comparison(selected_runs, df=None, plot_mode="Lines + Markers"):
     try:
-        df, score_columns = load_data()
-        
+        if df is None:
+            df, score_columns = load_data()
+        else:
+            score_columns = [col for col in df.columns if col.endswith('_score')]
+        # sort score columns alphabetically
+        score_columns = sorted(score_columns)
         if df.empty:
             fig = go.Figure()
             fig.add_annotation(text="No data available", 
@@ -191,7 +180,7 @@ def create_benchmark_comparison(selected_runs, plot_mode="Lines + Markers"):
         
         # Prepare benchmark names for x-axis
         benchmark_names = [col.replace('_score', '').replace('_', ' ').title() for col in score_columns]
-        
+
         colors = px.colors.qualitative.Set1
         
         # Determine plot mode
@@ -199,8 +188,7 @@ def create_benchmark_comparison(selected_runs, plot_mode="Lines + Markers"):
         
         for i, (_, row) in enumerate(comparison_df.iterrows()):
             model_name = row['model_name']
-            run_time = row['timestamp'].strftime('%Y-%m-%d %H:%M')
-            
+            run_time = row['timestamp'].strftime('%Y-%m-%d %H:%M') if not isinstance(row['timestamp'], str) else row['timestamp']
             heb_benchmarks = ["Ψ_understanding_hebrew_score",
                               "Ψ_sentence_text_hebrew_score",
                               "Ψ_sentence_complete_hebrew_score",
@@ -225,7 +213,7 @@ def create_benchmark_comparison(selected_runs, plot_mode="Lines + Markers"):
                     score = row[score_col]
                     if pd.notna(score):
                         score_columns_dict[benchmark_names[j]] = [score]
-                
+            # make a lists of scores and score in the order of benchmark_names
             if score_columns_dict:  # Only add if there are valid scores
                 scores = [np.mean(x) for x in list(score_columns_dict.values())]
                 trace_config = {
@@ -393,9 +381,12 @@ def create_score_over_time():
                          xref="paper", yref="paper", x=0.5, y=0.5)
         return fig
 
-def create_psychometric_detailed():
+def create_psychometric_detailed(df = None):
     try:
-        df, score_columns = load_data()
+        if df is None:
+            df, score_columns = load_data()
+        else:
+            score_columns = [col for col in df.columns if col.endswith('_score')]
         
         # Get psychometric columns
         psychometric_cols = [col for col in score_columns if col.startswith('Ψ')]
@@ -573,7 +564,16 @@ def make_clickable_table():
         return pd.DataFrame({'Error': [str(e)]}), []
 
 # Create Gradio interface
-with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) as demo:
+
+with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft(), css="""
+    .small-toggle label {
+        font-size: 0.75rem !important;
+        opacity: 0.6;
+    }
+    .small-toggle input {
+        transform: scale(0.8);
+    }
+""") as demo:
     gr.Markdown("# 🏆 Benchmark Results Visualization Dashboard")
     gr.Markdown("Interactive visualization of Hebrew language model benchmark results")
     
@@ -584,9 +584,11 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
             
             # Create state to store dataframe
             df_state = gr.State(value=create_data_table())
+            # State for partial training toggle
+            partial_training_state = gr.State(value=False)
 
             data_table = gr.Dataframe(
-                value=lambda: df_state.value[[col for col in df_state.value.columns if not col.endswith('_details')]],
+                value=lambda: df_state.value[[col for col in df_state.value.columns if not col.endswith('_details')]].round(3),
                 wrap=True,
                 max_height=600,
                 show_fullscreen_button=True,
@@ -597,19 +599,45 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
                 df, score_cols = make_clickable_table()
                 return gr.Dropdown(choices=score_cols)
             
-            def refresh_table():
+            def refresh_table(include_partial):
                 generate_runs_table()  # Refresh data
-                df = create_data_table()
+                df = create_data_table(include_partial)
                 _, score_cols = make_clickable_table()
-                df = df[[col for col in df_state.value.columns if not col.endswith('_details')]]
+                df = df[[col for col in df.columns if not col.endswith('_details')]]
                 return df
             
-            refresh_data_btn = gr.Button("🔄 Refresh Data", variant="secondary")
+            def toggle_partial_training(include_partial, df):
+                """Filter table based on partial training toggle"""
+                df_full = create_data_table()
+                df_filtered = filter_partial_training(df_full, include_partial)
+                df_filtered = df_filtered[[col for col in df_filtered.columns if not col.endswith('_details')]]
+                return df_filtered
             
+            with gr.Row():
+                refresh_data_btn = gr.Button("🔄 Refresh Data", variant="secondary")
+                gr.Markdown("")  # Spacer
+            
+            # Small toggle at the bottom for partial training
+            with gr.Row():
+                gr.Markdown("")  # Spacer to push toggle to the right
+                partial_training_toggle = gr.Checkbox(
+                    label="Include partial runs (DEBUG)",
+                    value=False,
+                    scale=0,
+                    container=False,
+                    elem_classes=["small-toggle"]
+                )
         #  Tab for detailed table view with selection
 
             refresh_data_btn.click(
                 fn=refresh_table,
+                inputs=[partial_training_toggle],
+                outputs=[data_table]
+            )
+            
+            partial_training_toggle.change(
+                fn=toggle_partial_training,
+                inputs=[partial_training_toggle, df_state],
                 outputs=[data_table]
             )
             
@@ -620,7 +648,7 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
             
             # Run selection dropdown
             run_selector = gr.Dropdown(
-                choices=get_available_runs(),
+                choices=get_available_runs(df_state.value),
                 value=["Latest per model"],
                 multiselect=True,
                 label="Select Runs to Compare",
@@ -637,19 +665,19 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
                 )
                 gr.Markdown("")  # Spacer
             
-            comparison_plot = gr.Plot(value=create_benchmark_comparison(["Latest per model"], "Lines + Markers"))
+            comparison_plot = gr.Plot(value=create_benchmark_comparison(["Latest per model"],df_state.value, "Lines + Markers"))
             
             # Update chart when selection changes
             run_selector.change(
                 fn=create_benchmark_comparison,
-                inputs=[run_selector, plot_mode],
+                inputs=[run_selector,df_state , plot_mode],
                 outputs=comparison_plot
             )
             
             # Update chart when plot mode changes
             plot_mode.change(
                 fn=create_benchmark_comparison,
-                inputs=[run_selector, plot_mode],
+                inputs=[run_selector,df_state , plot_mode],
                 outputs=comparison_plot
             )
             
@@ -659,11 +687,12 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
             
             refresh_comparison_btn.click(
                 fn=create_benchmark_comparison,
-                inputs=[run_selector, plot_mode],
+                inputs=[run_selector, df_state, plot_mode],
                 outputs=comparison_plot
             )
             refresh_runs_btn.click(
                 fn=get_available_runs,
+                inputs=[df_state],
                 outputs=run_selector
             )
                 
@@ -676,10 +705,10 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
         
         with gr.Tab("🎯 Psychometric Details"):
             gr.Markdown("### Detailed Psychometric Benchmark Analysis")
-            psychometric_plot = gr.Plot(value=create_psychometric_detailed())
+            psychometric_plot = gr.Plot(value=create_psychometric_detailed(df_state.value))
             
             refresh_psychometric_btn = gr.Button("🔄 Refresh Chart", variant="secondary")
-            refresh_psychometric_btn.click(fn=create_psychometric_detailed, outputs=psychometric_plot)
+            refresh_psychometric_btn.click(fn=create_psychometric_detailed,inputs=[df_state], outputs=psychometric_plot)
         
         with gr.Tab("🔥 Performance Heatmap"):
             gr.Markdown("### Model Performance Heatmap")
@@ -692,7 +721,7 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
             gr.Markdown("### View Detailed Results for Specific Dataset")
             
             with gr.Row():
-                run_selector = gr.Dropdown(
+                run_selector_det = gr.Dropdown(
                     label="run_id",
                     choices=[(name, idx) for idx, name in enumerate(df_state.value.model_name.values.tolist())], 
                     value=None
@@ -840,7 +869,7 @@ with gr.Blocks(title="Benchmark Results Visualization", theme=gr.themes.Soft()) 
             
             view_btn.click(
                 fn=on_view_click,
-                inputs=[run_selector, col_selector, df_state],
+                inputs=[run_selector_det, col_selector, df_state],
                 outputs=[detailed_results, stats_display, view_mode_selector, 
                         download_btn, refresh_detail_btn, download_output, 
                         current_parquet_path, info_box]
@@ -963,7 +992,7 @@ PORT = 7680
 # Launch the app
 if __name__ == "__main__":
     print("Starting Gradio app...")
-    # generate_runs_table()  # Initial data generation
+    generate_runs_table()  # Initial data generation
     check_port_or_raise(PORT, timeout=3,auto_kill=True, retry=True)
     demo.launch(
         share=False,
@@ -973,13 +1002,15 @@ if __name__ == "__main__":
         debug=False,
         prevent_thread_lock=False
     )
-
+## gradio logs 
+# sudo tail -n 100 /var/log/gradio.log
 # kill previous process on port 7680
 # lsof -ti:7680 | xargs kill -9 2>/dev/null || echo "No process found on port 7680"
 
 # check if the protocol is avaliable
 # netstat -tlnp | grep 7680
 # start server in background
+# sudo systemctl stop gradio
 # sudo systemctl daemon-reload
 # sudo systemctl enable gradio
 # sudo systemctl start gradio
@@ -987,7 +1018,8 @@ if __name__ == "__main__":
 # sudo systemctl status gradio
 ## monitor logs
 # sudo journalctl -u gradio -f
-
+## stop server
+# sudo systemctl stop gradio
 # nohup python scores_dashboard.py > gradio.log 2>&1 &
 # import gradio as gr
 # import pandas as pd
