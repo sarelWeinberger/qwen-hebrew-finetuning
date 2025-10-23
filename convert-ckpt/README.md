@@ -14,7 +14,7 @@ This tool converts an NVIDIA NeMo checkpoint into the Hugging Face (`.safetensor
 Pull the specific NeMo container that includes all necessary dependencies.
 
 ```bash
-sudo docker pull nvcr.io/nvidia/nemo:25.09
+sudo docker pull nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2
 ```
 
 ### 2. Place Your Checkpoint
@@ -41,7 +41,7 @@ Start an interactive shell inside the Docker container. This command mounts your
 sudo docker run --gpus all --rm -it \
   --shm-size=16g \
   -v /home/ubuntu/qwen-hebrew-finetuning/convert-ckpt:/workspace \
-  nvcr.io/nvidia/nemo:25.09 \
+  sudo docker pull nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2 \
   bash
 ```
 

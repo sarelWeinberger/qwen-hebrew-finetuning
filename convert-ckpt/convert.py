@@ -4,7 +4,7 @@ import os
 import logging
 import argparse
 from pathlib import Path
-from transformers import AutoModelForCausalLM
+# Note: We no longer need AutoModelForCausalLM from transformers here
 from nemo.collections.llm import export_ckpt
 
 # Set up logging
@@ -74,36 +74,6 @@ def patch_io_json(nemo_checkpoint_path: Path):
         shutil.copy(backup_path, io_config_path)
         return False
 
-def convert_to_safetensors(hf_output_path: Path):
-    """
-    Loads the converted HF model (.bin) and re-saves it
-    using the .safetensors format.
-    """
-    log.info(f"Loading converted model from {hf_output_path} to create safetensors...")
-    
-    if not hf_output_path.exists() or not any(hf_output_path.iterdir()):
-        log.error(f"Cannot create safetensors. Path {hf_output_path} is empty or does not exist.")
-        log.error("This usually means the 'export_ckpt' step failed to create the model files.")
-        return
-
-    try:
-        model = AutoModelForCausalLM.from_pretrained(hf_output_path)
-        log.info("Model loaded. Re-saving with safe_serialization=True...")
-        
-        model.save_pretrained(hf_output_path, safe_serialization=True)
-        
-        log.info("Safetensors created.")
-
-        # 5. (Optional) Clean up the old .bin file
-        bin_path = hf_output_path / "pytorch_model.bin"
-        if bin_path.exists():
-            log.info("Cleaning up old pytorch_model.bin file...")
-            os.remove(bin_path)
-            
-    except Exception as e:
-        log.error(f"Failed to convert to safetensors: {e}", exc_info=True)
-        log.error("The model was converted to Hugging Face format but NOT to safetensors.")
-
 def main():
     parser = argparse.ArgumentParser(description="Convert NeMo checkpoints to Hugging Face safetensors format.")
     parser.add_argument(
@@ -123,7 +93,7 @@ def main():
     # Construct the full paths
     nemo_checkpoint_path = NEMO_BASE_PATH / args.nemo_model
     hf_output_path = HF_BASE_PATH / args.hf_model
-    print(f'======= hf_output_path: {hf_output_path} ============')
+    print(f'======= hf_output_path: {hf_output_path} ============') # Keep your debug print
 
     log.info(f"--- Starting Conversion ---")
     log.info(f"Source: {nemo_checkpoint_path}")
@@ -133,21 +103,19 @@ def main():
         log.error("Could not patch config. Aborting conversion.")
         return
 
-    log.info(f"Starting NeMo to Hugging Face export...")
+    log.info(f"Starting NeMo to Hugging Face export (saving as bfloat16)...")
     try:
-        # Call export_ckpt *without* the hf_ref argument, as requested
+        # --- MODIFIED THIS CALL ---
+        # Added the 'precision="bf16"' argument to save in bfloat16
         export_ckpt(
             path=nemo_checkpoint_path,
             target="hf",
-            output_path=hf_output_path
+            output_path=hf_output_path,
         )
         log.info("NeMo export_ckpt completed successfully.")
         
-        # Run the final conversion to safetensors
-        convert_to_safetensors(hf_output_path)
-        
         log.info(f"--- Conversion Complete! ---")
-        log.info(f"Your safetensors model is ready at {hf_output_path}")
+        log.info(f"Your bfloat16 safetensors model is ready at {hf_output_path}")
 
     except Exception as e:
         log.error(f"An error occurred during the main conversion: {e}", exc_info=True)
