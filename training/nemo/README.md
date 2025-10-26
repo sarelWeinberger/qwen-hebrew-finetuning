@@ -2,19 +2,6 @@
 
 Minimal steps to preprocess data and launch training in the NVIDIA NeMo 25.07 container.
 
-## Setting up VS-Code Tunneling:
-
-Run this command:
-
-```bash
-sudo apt update && sudo apt install screen curl -y && screen -dmS vscode_tunnel sh -c 'curl -Lk "https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64" --output vscode_cli.tar.gz; tar -xf vscode_cli.tar.gz && ./code tunnel --random-name'
-screen -r
-```
-
-Then, navigate to `GitHub Account` and follow the instructions. Once done, press `Ctrl+a`, *and then* `d` (*WITHOUT `Ctrl`) to disconnect from the screen and leave it running in the background.
-
-Once set up, go to your local VS-Code, `Connect to Tunnel` -> `GitHub Account` -> Look for one that is online. 
-
 ## Links
 
 * Guide: [https://docs.nvidia.com/nemo-framework/user-guide/latest/nemo-2.0/quickstart.html](https://docs.nvidia.com/nemo-framework/user-guide/latest/nemo-2.0/quickstart.html)
@@ -90,7 +77,7 @@ python import.py
 python train.py --run_name RUN_NAME [--use_fp8]
 ```
 
-> Training config lives in `train.py` lines **22ΓÇô29**. Adjust as needed. 
+> Training config lives in `train.py` lines **22–29**. Adjust as needed. 
 
 > Note, when cancelling a run the rest of the processes will still be hogging the GPU, make sure to kill them:
 
@@ -98,12 +85,7 @@ python train.py --run_name RUN_NAME [--use_fp8]
 > ps ux | grep 'nemo_run.core.runners.fdl_runner' | awk '{print $2}' | xargs kill -9
 > ```
 
-# Cluster Instructions
-connect to cluster:
-```bash
-./easy-ssh.sh -r us-east-2 ml-cluster
-```
-
+## Cluster Instructions
 
 ### Home Directory
 
@@ -138,11 +120,6 @@ sudo chmod -R 777 $DATA_DIR
 cp ... $DATA_DIR/
 ```
 
-create enroot folder N2 - means 2 nodes -change it if needed
-```bash
-srun -N2 sudo mkdir -p /opt/sagemaker/tmp/enroot
-srun -N2 sudo chmod 777 /opt/sagemaker/tmp/enroot
-```
 Important: Once you copy all the data in, make sure to run this command:
 
 ```bash
@@ -220,9 +197,3 @@ python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
-
-
-
-
-
-
