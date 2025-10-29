@@ -81,6 +81,8 @@ RESULTS_PATH_TEMPLATE="$OUTPUT_RUN_DIR/$DS_NAME"
 export VLLM_CACHE_DIR="$OUTPUT_RUN_DIR/vllm_cache"
 mkdir -p "$VLLM_CACHE_DIR"
 MODEL_CONFIG="model_name=$MODEL_PATH,override_chat_template=false,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=$DTYPE,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=4096"
+# MODEL_CONFIG="model_name=$MODEL_PATH,override_chat_template=false,tensor_parallel_size=1,gpu_memory_utilization=0.9,dtype=$DTYPE,max_num_seqs=128,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=4096,max_num_batched_tokens=8192"
+# MODEL_CONFIG="model_name=$MODEL_PATH,override_chat_template=false,tensor_parallel_size=4,gpu_memory_utilization=0.85,dtype=$DTYPE,max_num_seqs=64,enforce_eager=false,enable_chunked_prefill=true,enable_prefix_caching=true,generation_parameters={top_k:$TOP_K,temperature:$TEMPERATURE},max_model_length=4096"
 
 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
 VLLM_WORKER_MULTIPROC_METHOD=spawn \

@@ -28,15 +28,15 @@ def create_training_progress_plot(df,
         # Handle special benchmark selections
         all_benchmarks = [col for col in df.columns if col.endswith('_score') and not col.endswith('_std')]
         
+        benchmarks_to_plot = selected_benchmarks
         if not selected_benchmarks or 'All' in selected_benchmarks:
             benchmarks_to_plot = all_benchmarks
         elif 'Avg Score' in selected_benchmarks:
             # Calculate average score across all benchmarks
             if 'avg_score' not in df.columns:
                 df['avg_score'] = df[all_benchmarks].mean(axis=1, skipna=True)
-            benchmarks_to_plot = ['avg_score']
-        else:
-            benchmarks_to_plot = selected_benchmarks
+            benchmarks_to_plot += ['avg_score']
+            del selected_benchmarks[selected_benchmarks.index('Avg Score')]
         
         # Filter out avg_score from benchmarks if it's already there
         benchmarks_to_plot = [b for b in benchmarks_to_plot if b in df.columns]

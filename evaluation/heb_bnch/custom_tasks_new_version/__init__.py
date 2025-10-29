@@ -331,25 +331,29 @@ def arc_ai2_heb_prompt(line, task_name: str = "arc_ai2_heb"):
 
     target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
-    target_choices_text = ", ".join(target_choices)
-    instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-    full_prompt = f"""{instruction}
-Question: {target_q}
-Choices: {target_choices_text}
-Answer:"""
 
-    if not printed_arc_prompt:
-        print("="*50)
-        print("FULL ARC PROMPT WITH FEW-SHOTS (INTUITIVE FORMAT):")
-        print(full_prompt)
-        print("="*50)
-        printed_arc_prompt = True
+#     instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+#     full_prompt = f"""{instruction}
+# Question: {target_q}
+# Choices: {target_choices_text}
+# Answer:"""
+    target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
 
+    # # instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+    instruction = f"להלן שאלות רב-ברירה (עם תשובות)\n\n"
+    full_prompt = (
+        instruction +
+        # f"{few_shot_text}"
+        f"שאלה: {target_q}\n"
+        f"{target_choices_formatted}\n"
+        f"תשובה:"
+    ).strip()
+    is_few_shots = line.get("__few_shots", False)  # We are adding few shots
     return Doc(
         task_name=task_name,
         query=full_prompt,
         instruction=instruction,
-        choices=target_choices,
+        choices=[" A", " B", " C", " D"] if is_few_shots else ["A", "B", "C", "D"],
         gold_index=line.get("answer_index", 0),
     )
 
@@ -1416,7 +1420,7 @@ def hellaswag_heb_prompt(line, task_name: str = "hellaswag_heb"):
 # Generic Psychometric Test Function
 # ============================================================
 
-def generic_psychometric_prompt(line, task_name: str):
+def generic_psychometric_prompt(line, task_name: str, topic=""):
     """
     Generic function to create psychometric test prompts.
     
@@ -1431,9 +1435,20 @@ def generic_psychometric_prompt(line, task_name: str):
     target_choices = line.get("choices", [])
     
     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-    
-    instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-    full_prompt = f"""{instruction}שאלה: {target_q}
+    if topic=="english":
+        instruction = f"Answer the following questions by choosing the appropriate letter (A, B, C, or D).\n"
+        full_prompt = f"""{instruction}Question: {target_q}
+{target_choices_formatted}
+Answer:"""
+    elif topic=="analogies_hebrew":
+        instruction = f"""מצאו את היחס בין המשמעויות של שתי המילים האלה, ובחרו מתוך התשובות המוצעות את זוג המילים שהיחס ביניהן הוא הדומה ביותר ליחס שמצאתם. שימו לב: יש חשיבות לסדר המילים בזוג.\nענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n"""
+        full_prompt = f"""{instruction}שאלה: {target_q}
+{target_choices_formatted}
+תשובה:"""
+
+    else:
+        instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n"
+        full_prompt = f"""{instruction}שאלה: {target_q}
 {target_choices_formatted}
 תשובה:"""
     
@@ -1474,19 +1489,19 @@ def psychometric_test_math_prompt(line, task_name: str = "psychometric_test_math
     return generic_psychometric_prompt(line, task_name)
 
 def psychometric_test_analogies_prompt(line, task_name: str = "psychometric_test_analogies"):
-    return generic_psychometric_prompt(line, task_name)
+    return generic_psychometric_prompt(line, task_name, topic="analogies_hebrew")
 
 def psychometric_test_restatement_prompt(line, task_name: str = "psychometric_test_restatement"):
-    return generic_psychometric_prompt(line, task_name)
+    return generic_psychometric_prompt(line, task_name, topic="english")
 
 def psychometric_test_sentence_complete_english_prompt(line, task_name: str = "psychometric_test_sentence_complete_english"):
-    return generic_psychometric_prompt(line, task_name)
+    return generic_psychometric_prompt(line, task_name, topic="english")
 
 def psychometric_test_sentence_complete_hebrew_prompt(line, task_name: str = "psychometric_test_sentence_complete_hebrew"):
     return generic_psychometric_prompt(line, task_name)
 
 def psychometric_test_text_english_prompt(line, task_name: str = "psychometric_test_text_english"):
-    return generic_psychometric_prompt(line, task_name)
+    return generic_psychometric_prompt(line, task_name, topic="english")
 
 def psychometric_test_text_hebrew_prompt(line, task_name: str = "psychometric_test_text_hebrew"):
     return generic_psychometric_prompt(line, task_name)
