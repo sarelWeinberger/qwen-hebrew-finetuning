@@ -5,6 +5,8 @@ import pandas as pd
 import tempfile
 import shutil
 from s3_utils import download_s3_directory, create_temp_directory, cleanup_temp_directory, is_s3_path
+from dashboard.utils import rename_benchmark_columns, clean_model_name
+
 
 def open_json_file(filepath, run_info, all_benchmarks):
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -25,37 +27,7 @@ def open_json_file(filepath, run_info, all_benchmarks):
             all_benchmarks.add(benchmark_name)
         return run_info, samples_number, all_benchmarks, model_name
     
-def rename_benchmark_columns(df):
-    # RENAME COLUMNS TO FIX MISTAKES
-    # Step 1: Merge data from mistaken columns into correct columns
-    # For psychometric_heb_restatement -> psychometric_heb_restatement_english
-    for suffix in ['_score', '_std', '_details']:
-        old_col = f'psychometric_heb_restatement{suffix}'
-        new_col = f'psychometric_heb_restatement_english{suffix}'
-        
-        if old_col in df.columns and new_col in df.columns:
-            # Fill NaN values in new_col with values from old_col
-            df[new_col] = df[new_col].fillna(df[old_col])
-            # Drop the old column
-            df = df.drop(columns=[old_col])
-        elif old_col in df.columns:
-            # If new_col doesn't exist, just rename old_col
-            df = df.rename(columns={old_col: new_col})
 
-    # For psychometric_heb_analogies -> psychometric_heb_analogies_hebrew
-    for suffix in ['_score', '_std', '_details']:
-        old_col = f'psychometric_heb_analogies{suffix}'
-        new_col = f'psychometric_heb_analogies_hebrew{suffix}'
-        
-        if old_col in df.columns and new_col in df.columns:
-            # Fill NaN values in new_col with values from old_col
-            df[new_col] = df[new_col].fillna(df[old_col])
-            # Drop the old column
-            df = df.drop(columns=[old_col])
-        elif old_col in df.columns:
-            # If new_col doesn't exist, just rename old_col
-            df = df.rename(columns={old_col: new_col})
-    return df
 def summarize_benchmark_runs(scores_sum_dir, local_save_dir=None,csv_filename='benchmark_results_summary.csv'):
     """
     Summarize benchmark runs from either local directory or S3 path.
@@ -123,11 +95,25 @@ def summarize_benchmark_runs(scores_sum_dir, local_save_dir=None,csv_filename='b
                             run_info, samples_number, all_benchmarks,model_name = open_json_file(os.path.join(subdir_path, file), run_info, all_benchmarks)
                             
             run_info['samples_number'] = samples_number
-            run_info['model_name'] = model_name
+            run_info['model_name'] = clean_model_name(model_name)
+            # if there is / in model name, extract the part before the first / as model group
+            if run_info['model_name'] and '/' in run_info['model_name']:
+                run_info['model_group'] = run_info['model_name'].split('/')[0]
+            else:
+                run_info['model_group'] = ""
+            
+            if run_info['model_name'] and 'step' in run_info['model_name']:
+                # try to extract steps from model name using regex
+                m = re.search(r'step-(\d+)', run_info['model_name'])
+                if m:
+                    run_info['steps'] = int(m.group(1))
+                else:
+                    run_info['steps'] = int(0)
+
             rows.append(run_info)
         
         # Build columns
-        columns = ['timestamp', 'samples_number', 'model_name']
+        columns = ['timestamp', 'samples_number', 'model_name','model_group','steps']
         for bench in sorted(all_benchmarks):
             columns.append(f'{bench}_score')
             columns.append(f'{bench}_std')
@@ -177,7 +163,8 @@ if __name__ == "__main__":
     scores_sum_directory = '/home/ec2-user/qwen-hebrew-finetuning/evaluation/hebrew_benchmark_results/scores_sum'
     
     # You can specify a custom local directory to save the CSV
-    local_save_directory = 'benchmark_results_test'  # Will save to current directory
+    # local_save_directory = 'benchmark_results_test'  # Will save to current directory
+    local_save_directory = '/home/ec2-user/qwen-hebrew-finetuning/evaluation'  # Will save to current directory
     
     summarize_benchmark_runs(scores_sum_directory, local_save_directory)
 
