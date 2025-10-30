@@ -2,6 +2,35 @@
 
 This repository contains scripts and tools for fine-tuning the Qwen3-30B-A3B-Base model on Hebrew language data.
 
+## Quick Start
+
+```bash
+# 1. Clone repository
+git clone https://github.com/sarelWeinberger/qwen-hebrew-finetuning.git
+cd qwen-hebrew-finetuning
+
+# 2. Get your tokens
+# - Hugging Face: https://huggingface.co/settings/tokens
+# - GitHub: https://github.com/settings/tokens
+
+# 3. Set up environment (automated)
+chmod +x setup_uv_env.sh
+./setup_uv_env.sh
+
+# 4. Configure tokens
+cat > .env << EOF
+GITHUB_TOKEN=your_github_token_here
+HF_TOKEN=your_huggingface_token_here
+EOF
+
+# 5. Activate environment and verify
+source activate_env.sh
+python -c "import torch; import transformers; print('Setup complete!')"
+
+# 6. Run pipeline test
+python qwen_model/test_pipeline.py --max_samples 10
+```
+
 ## Overview
 
 The project provides a complete workflow for fine-tuning large language models on Hebrew data, with a focus on the Qwen3-30B-A3B-Base model. It includes:
@@ -378,20 +407,14 @@ Model evaluation and benchmarking infrastructure:
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd <repository-directory>
+git clone https://github.com/sarelWeinberger/qwen-hebrew-finetuning.git
+cd qwen-hebrew-finetuning
 ```
 
-### 2. Install Dependencies
+### 2. Environment Setup and Authentication
 
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Installation Process and Environment Setup
-
-#### Environment Requirements
-- Python 3.8+ is required
+#### Prerequisites
+- Python 3.10+ is required
 - CUDA 11.8+ is recommended for GPU acceleration
 - At least 500GB of disk space for model and data storage
 
@@ -407,14 +430,44 @@ The requirements.txt file includes:
 For logging and monitoring, you need to set up Weights & Biases:
 
 ```bash
-# Install wandb
-pip install wandb
+# Configure git (the script uses environment variables)
+./git_setup.sh your_github_username
 
+# This will:
+# - Configure git with your credentials
+# - Add files to git
+# - Create initial commit
+# - Set up remote repository
+# - Provide instructions for pushing
+```
+
+### 5. Data and Model Preparation
+
+#### Weights & Biases Setup (Optional but Recommended)
+
+For logging and monitoring, you can set up Weights & Biases:
+
+```bash
+# Install wandb (already included in dependencies)
 # Login with your API key
 wandb login YOUR_API_KEY
 ```
 
-### 4. Data and Model Preparation
+#### AWS Credentials (Required for S3 Data)
+
+If you plan to use the S3 data pipeline, configure AWS credentials:
+
+```bash
+# Option 1: Environment variables
+export AWS_ACCESS_KEY_ID="your_aws_access_key"
+export AWS_SECRET_ACCESS_KEY="your_aws_secret_key"
+export AWS_DEFAULT_REGION="us-east-1"
+
+# Option 2: AWS CLI configuration
+aws configure
+```
+
+#### Model and Data Download
 
 The repository includes comprehensive data preprocessing tools for preparing Hebrew data:
 
@@ -493,6 +546,9 @@ python main.py --source hebrew_text --cleaner regex --sample-mode
 Before running a full training job, test the pipeline with a small subset of data:
 
 ```bash
+# Ensure environment is activated
+source activate_env.sh
+
 # For single GPU testing
 python training/deepspeed/test_debug.py --dataset_path data/dataset/dataset --max_samples 100
 

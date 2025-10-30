@@ -42,6 +42,9 @@ training/deepspeed/logs/qwen_model_shaltiel/*.log
 .venv
 venv/
 ENV/
+.uv/
+uv.lock
+.python-version
 
 # IDE
 .idea/

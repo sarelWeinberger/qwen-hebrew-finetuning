@@ -1,0 +1,179 @@
+import os
+import json
+import re
+import pandas as pd
+import tempfile
+import shutil
+from s3_utils import download_s3_directory, create_temp_directory, cleanup_temp_directory, is_s3_path
+from dashboard.utils import rename_benchmark_columns, clean_model_name
+
+
+def open_json_file(filepath, run_info, all_benchmarks):
+    with open(filepath, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        for results_key in list(data['results'].keys()):
+            if results_key =="all":
+                continue
+            benchmark_name = data['config_tasks'][results_key].get('name', results_key)
+            acc = data['results'][results_key].get('acc')
+            acc_stderr = data['results'][results_key].get('acc_stderr')
+            model_name = data['config_general'].get('model_name')
+            if not acc:
+                acc = data['results'][results_key].get('em_with_normalize_gold&normalize_pred')
+                acc_stderr = data['results'][results_key].get('em_with_normalize_gold&normalize_pred_stderr')
+            samples_number = data['config_general'].get('max_samples')
+            run_info[f'{benchmark_name}_score'] = acc
+            run_info[f'{benchmark_name}_std'] = acc_stderr
+            all_benchmarks.add(benchmark_name)
+        return run_info, samples_number, all_benchmarks, model_name
+    
+
+def summarize_benchmark_runs(scores_sum_dir, local_save_dir=None,csv_filename='benchmark_results_summary.csv'):
+    """
+    Summarize benchmark runs from either local directory or S3 path.
+    
+    Args:
+        scores_sum_dir (str): Path to scores directory (local path or S3 path starting with 's3://')
+        local_save_dir (str, optional): Local directory to save the CSV. If None, saves to current directory.
+    
+    Returns:
+        pd.DataFrame: DataFrame containing the benchmark results summary
+    """
+    temp_dir = None
+    original_path = scores_sum_dir
+    
+    try:
+        # Handle S3 path
+        if is_s3_path(scores_sum_dir):
+            print(f"Detected S3 path: {scores_sum_dir}")
+            temp_dir = create_temp_directory()
+            print(f"Created temporary directory: {temp_dir}")
+            scores_sum_dir = download_s3_directory(scores_sum_dir, temp_dir)
+            print(f"Downloaded S3 data to: {scores_sum_dir}")
+        
+        # Process the directory (same logic as before)
+        run_dirs = [os.path.join(scores_sum_dir, d) for d in os.listdir(scores_sum_dir) if os.path.isdir(os.path.join(scores_sum_dir, d))]
+        all_benchmarks = set()
+        rows = []
+        
+        for run_dir in run_dirs:
+            run_info = {}
+            run_info['timestamp'] = os.path.basename(run_dir)
+            samples_number = None
+            model_name = None
+            #  flatten details parquet files and map benchmark -> parquet path ---
+            details_dir = os.path.join(run_dir, 'details')
+            if os.path.isdir(details_dir):
+                for root, dirs, files in os.walk(details_dir):
+                    for file in files:
+                        if file.endswith('.parquet'):
+                            # Try to parse benchmark name from filename like:
+                            # details_community|arc_ai2_heb|5_2025-09-16T19-47-51.839494.parquet
+                            m = re.search(r'\|([^|]+)\|', file)
+                            if m:
+                                bench_name = m.group(1)
+                            else:
+                                # fallback to basename without extension
+                                bench_name = os.path.splitext(file)[0]
+                            parquet_path = os.path.join(root, file)
+                            # store relative path (relative to the scores_sum_dir root) so it can be used to fetch from S3 later
+                            try:
+                                benchmark_details_rel = os.path.relpath(parquet_path, start=scores_sum_dir)
+                            except Exception:
+                                benchmark_details_rel = parquet_path
+                            run_info[f'{bench_name}_details'] = benchmark_details_rel
+                            all_benchmarks.add(bench_name)
+
+            # Search for JSON files in all subdirectories of run_dir
+            for subdir in os.listdir(run_dir):
+                subdir_path = os.path.join(run_dir, subdir)
+                if subdir_path.endswith('.json'):
+                    run_info, samples_number, all_benchmarks,model_name = open_json_file(subdir_path, run_info, all_benchmarks)
+                elif os.path.isdir(subdir_path):
+                    for file in os.listdir(subdir_path):
+                        if file.endswith('.json'):
+                            run_info, samples_number, all_benchmarks,model_name = open_json_file(os.path.join(subdir_path, file), run_info, all_benchmarks)
+                            
+            run_info['samples_number'] = samples_number
+            run_info['model_name'] = clean_model_name(model_name)
+            # if there is / in model name, extract the part before the first / as model group
+            if run_info['model_name'] and '/' in run_info['model_name']:
+                run_info['model_group'] = run_info['model_name'].split('/')[0]
+            else:
+                run_info['model_group'] = ""
+            
+            if run_info['model_name'] and 'step' in run_info['model_name']:
+                # try to extract steps from model name using regex
+                m = re.search(r'step-(\d+)', run_info['model_name'])
+                if m:
+                    run_info['steps'] = int(m.group(1))
+                else:
+                    run_info['steps'] = int(0)
+
+            rows.append(run_info)
+        
+        # Build columns
+        columns = ['timestamp', 'samples_number', 'model_name','model_group','steps']
+        for bench in sorted(all_benchmarks):
+            columns.append(f'{bench}_score')
+            columns.append(f'{bench}_std')
+            columns.append(f'{bench}_details')
+        
+        df = pd.DataFrame(rows)
+        # keep only the ordered columns that actually exist in the dataframe
+        existing_columns = [c for c in columns if c in df.columns]
+        df = df[existing_columns]
+        df = rename_benchmark_columns(df)
+        # remove rows with NA model name
+        df = df.dropna(subset=['model_name']).drop_duplicates().reset_index(drop=True)
+        # Determine where to save the CSV
+        if local_save_dir is None:
+            local_save_dir = os.getcwd()  # Current directory
+
+        # Ensure local save directory exists
+        os.makedirs(local_save_dir, exist_ok=True)
+
+        csv_path = os.path.join(local_save_dir, csv_filename)
+
+        # Remove existing file if it exists to ensure complete override
+        if os.path.exists(csv_path):
+            os.remove(csv_path)
+            print(f"Removed existing file: {csv_path}")
+
+        # Save the new CSV file
+        df.to_csv(csv_path, index=False)
+        print(f"Saved summary to {csv_path}")
+
+        return df
+        
+    finally:
+        # Clean up temporary directory if it was created
+        if temp_dir:
+            cleanup_temp_directory(temp_dir)
+
+if __name__ == "__main__":
+    # Example usage with local path
+    # scores_sum_directory = '/home/ec2-user/qwen-hebrew-finetuning/hebrew_benchmark_results/scores_sum'
+    
+    # Example usage with S3 path
+    # scores_sum_directory = 's3://your-bucket/hebrew_benchmark_results/scores_sum'
+    
+    # Use the original local path as default
+    # scores_sum_directory = 's3://gepeta-datasets/benchmark_results/heb_benc_results/'
+    scores_sum_directory = '/home/ec2-user/qwen-hebrew-finetuning/evaluation/hebrew_benchmark_results/scores_sum'
+    
+    # You can specify a custom local directory to save the CSV
+    # local_save_directory = 'benchmark_results_test'  # Will save to current directory
+    local_save_directory = '/home/ec2-user/qwen-hebrew-finetuning/evaluation'  # Will save to current directory
+    
+    summarize_benchmark_runs(scores_sum_directory, local_save_directory)
+
+# Example bash commands to run this function:
+# For local path:
+# python -c "from extract_benchmark_results import summarize_benchmark_runs; summarize_benchmark_runs('/home/ec2-user/qwen-hebrew-finetuning/hebrew_benchmark_results/scores_sum')"
+
+# For S3 path:
+# python -c "from extract_benchmark_results import summarize_benchmark_runs; summarize_benchmark_runs('s3://your-bucket/hebrew_benchmark_results/scores_sum')"
+
+# For S3 path with custom local save directory:
+# python -c "from extract_benchmark_results import summarize_benchmark_runs; summarize_benchmark_runs('s3://your-bucket/hebrew_benchmark_results/scores_sum', '/path/to/save/csv')"
