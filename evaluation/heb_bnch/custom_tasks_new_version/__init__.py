@@ -181,15 +181,15 @@ def gsm8k_final_acc_eval_fn(**kwargs):
 
     return float(exact_match)
 
-FEW_SHOT_PATH_gsm8k = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/gsm8k_heb/train.jsonl"
+# FEW_SHOT_PATH_gsm8k = f"{HEB_BENCHMARKS_DIR_PATH}/hebrew_benchmarks_data_final/gsm8k_heb/train.jsonl"
 
-few_shots_list = []
-with open(FEW_SHOT_PATH_gsm8k, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f):
-        if i >= 5:  # take only 5 few-shots
-            break
-        data = json.loads(line)
-        few_shots_list.append({"query": data["query"], "gold": data["gold"]})
+# few_shots_list = []
+# with open(FEW_SHOT_PATH_gsm8k, "r", encoding="utf-8") as f:
+#     for i, line in enumerate(f):
+#         if i >= 5:  # take only 5 few-shots
+#             break
+#         data = json.loads(line)
+#         few_shots_list.append({"query": data["query"], "gold": data["gold"]})
 
 
 # ============================================================
@@ -210,33 +210,84 @@ with open(FEW_SHOT_PATH_gsm8k, "r", encoding="utf-8") as f:
 
 printed_prompt = False  # global flag
 
-def gsm8k_heb_fewshot_prompt(line, task_name="gsm8k_heb"):
-    global printed_prompt
-    
-    few_shot_text = ""
-    for i, shot in enumerate(few_shots_list):
-        qs = shot["query"].replace('\n', ' ').strip()
-        ans = shot["gold"].replace('\n', ' ').strip()
-        few_shot_text += f"שאלה {i+1}: {qs}\nפתור שלב אחר שלב ותן את התשובה הסופית: {ans}[ANSWER_END]\n\n"
+def gsm8k_heb_prompt(line, task_name="gsm8k_heb"):
 
     target_q = line["query"].replace('\n', ' ').strip()
-    full_prompt = few_shot_text + f"על סמך השאלות שניתנו פתור את בעיית המתמטיקה הבאה שלב אחר שלב וספק את התשובה הסופית: {target_q}"
-
-    if not printed_prompt:
-        print("="*50)
-        print("FULL PROMPT WITH FEW-SHOTS:")
-        print(full_prompt)
-        print("="*50)
-        printed_prompt = True
+    # full_prompt =  f"על סמך השאלות שניתנו פתור את בעיית המתמטיקה הבאה שלב אחר שלב וספק את התשובה הסופית: {target_q}"
 
     return Doc(
         task_name=task_name,
-        query=target_q,
-        instruction=full_prompt,
+        query=f"שאלה: {target_q}\nתשובה:",
         gold_index=0,
-        choices=['תשובה: ' + line["gold"].replace('\n', ' ').strip() + '[ANSWER_END]']
+        choices=[" "+line["gold"].replace('\n', ' ').strip()]
+    )
+def gsm8k(line, task_name: str = None):
+    # Has special analysis in metric for number decomposition
+    return Doc(
+        task_name=task_name,
+        query=f"Question: {line['question']}\nAnswer:",
+        choices=[f" {line['answer']}"],
+        gold_index=0,
     )
 
+gsm8k_heb_stop_sequences = ["\n\nשאלה:", "\nשאלה:", "שאלה:"]
+def gsm8k_heb_normalizer(text: str) -> str:
+    """From https://github.com/openai/grade-school-math/blob/3101c7d5072418e28b9008a6636bde82a006892c/grade_school_math/dataset.py#L28
+
+    Args:
+        text (str): input text
+
+    Returns:
+        str: Output text, either the number found in the text or "[invalid]" if
+        no number was found
+    """
+    if gsm8k_heb_stop_sequences[-1] in text:
+        text = text.split(gsm8k_heb_stop_sequences[-1])[0].strip()
+
+    ANS_RE = re.compile(r"#### (\-?[0-9\.\,]+)")
+    INVALID_ANS = "[invalid]"
+
+    match = ANS_RE.search(text)
+    if match:
+        match_str = match.group(1).strip()
+        match_str = match_str.replace(",", "")
+        return match_str
+    else:
+        return INVALID_ANS
+# gsm8k_leaderboard = LightevalTaskConfig(
+#     name="gsm8k",
+#     suite=["leaderboard"],
+#     prompt_function=prompt.gsm8k,
+#     hf_repo="gsm8k",
+#     hf_subset="main",
+#     hf_avail_splits=["train", "test"],
+#     evaluation_splits=["test"],
+#     few_shots_split=None,
+#     few_shots_select="random_sampling_from_train",
+#     generation_size=256,
+    # metrics=[
+    #   Metrics.exact_match(sample_params={"normalize_gold": gsm8k_normalizer, "normalize_pred": gsm8k_normalizer})
+    # ],
+#     stop_sequence=[],
+#     version=0,
+# )
+# gsm8k_lighteval = LightevalTaskConfig(
+#     name="gsm8k",
+#     suite=["lighteval"],
+#     prompt_function=prompt.gsm8k,
+#     hf_repo="openai/gsm8k",
+#     hf_subset="main",
+#     hf_avail_splits=["train", "test"],
+#     evaluation_splits=["test"],
+#     few_shots_split=None,
+#     few_shots_select="random_sampling_from_train",
+#     generation_size=256,
+#     metrics=[
+#         Metrics.expr_gold_metric,
+#     ],
+#     stop_sequence=["Question:"],
+#     version=0,
+# )
 
 # ============================================================
 # ARC 
@@ -280,25 +331,29 @@ def arc_ai2_heb_prompt(line, task_name: str = "arc_ai2_heb"):
 
     target_q = line["query"].replace('\n', ' ').strip()
     target_choices = line.get("choices", [])
-    target_choices_text = ", ".join(target_choices)
-    instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-    full_prompt = f"""{instruction}
-Question: {target_q}
-Choices: {target_choices_text}
-Answer:"""
 
-    if not printed_arc_prompt:
-        print("="*50)
-        print("FULL ARC PROMPT WITH FEW-SHOTS (INTUITIVE FORMAT):")
-        print(full_prompt)
-        print("="*50)
-        printed_arc_prompt = True
+#     instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+#     full_prompt = f"""{instruction}
+# Question: {target_q}
+# Choices: {target_choices_text}
+# Answer:"""
+    target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
 
+    # # instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
+    instruction = f"להלן שאלות רב-ברירה (עם תשובות)\n\n"
+    full_prompt = (
+        instruction +
+        # f"{few_shot_text}"
+        f"שאלה: {target_q}\n"
+        f"{target_choices_formatted}\n"
+        f"תשובה:"
+    ).strip()
+    is_few_shots = line.get("__few_shots", False)  # We are adding few shots
     return Doc(
         task_name=task_name,
         query=full_prompt,
         instruction=instruction,
-        choices=target_choices,
+        choices=[" A", " B", " C", " D"] if is_few_shots else ["A", "B", "C", "D"],
         gold_index=line.get("answer_index", 0),
     )
 
@@ -1365,7 +1420,7 @@ def hellaswag_heb_prompt(line, task_name: str = "hellaswag_heb"):
 # Generic Psychometric Test Function
 # ============================================================
 
-def generic_psychometric_prompt(line, task_name: str):
+def generic_psychometric_prompt(line, task_name: str, topic=""):
     """
     Generic function to create psychometric test prompts.
     
@@ -1380,9 +1435,20 @@ def generic_psychometric_prompt(line, task_name: str):
     target_choices = line.get("choices", [])
     
     target_choices_formatted = "\n".join([f"{chr(65+j)}. {choice}" for j, choice in enumerate(target_choices)])
-    
-    instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n\n"
-    full_prompt = f"""{instruction}שאלה: {target_q}
+    if topic=="english":
+        instruction = f"Answer the following questions by choosing the appropriate letter (A, B, C, or D).\n"
+        full_prompt = f"""{instruction}Question: {target_q}
+{target_choices_formatted}
+Answer:"""
+    elif topic=="analogies_hebrew":
+        instruction = f"""מצאו את היחס בין המשמעויות של שתי המילים האלה, ובחרו מתוך התשובות המוצעות את זוג המילים שהיחס ביניהן הוא הדומה ביותר ליחס שמצאתם. שימו לב: יש חשיבות לסדר המילים בזוג.\nענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n"""
+        full_prompt = f"""{instruction}שאלה: {target_q}
+{target_choices_formatted}
+תשובה:"""
+
+    else:
+        instruction = f"ענה על השאלות הבאות על ידי בחירת האות המתאימה (A, B, C, או D).\n"
+        full_prompt = f"""{instruction}שאלה: {target_q}
 {target_choices_formatted}
 תשובה:"""
     
@@ -1423,19 +1489,19 @@ def psychometric_test_math_prompt(line, task_name: str = "psychometric_test_math
     return generic_psychometric_prompt(line, task_name)
 
 def psychometric_test_analogies_prompt(line, task_name: str = "psychometric_test_analogies"):
-    return generic_psychometric_prompt(line, task_name)
+    return generic_psychometric_prompt(line, task_name, topic="analogies_hebrew")
 
 def psychometric_test_restatement_prompt(line, task_name: str = "psychometric_test_restatement"):
-    return generic_psychometric_prompt(line, task_name)
+    return generic_psychometric_prompt(line, task_name, topic="english")
 
 def psychometric_test_sentence_complete_english_prompt(line, task_name: str = "psychometric_test_sentence_complete_english"):
-    return generic_psychometric_prompt(line, task_name)
+    return generic_psychometric_prompt(line, task_name, topic="english")
 
 def psychometric_test_sentence_complete_hebrew_prompt(line, task_name: str = "psychometric_test_sentence_complete_hebrew"):
     return generic_psychometric_prompt(line, task_name)
 
 def psychometric_test_text_english_prompt(line, task_name: str = "psychometric_test_text_english"):
-    return generic_psychometric_prompt(line, task_name)
+    return generic_psychometric_prompt(line, task_name, topic="english")
 
 def psychometric_test_text_hebrew_prompt(line, task_name: str = "psychometric_test_text_hebrew"):
     return generic_psychometric_prompt(line, task_name)
@@ -1449,17 +1515,21 @@ def psychometric_test_understanding_hebrew_prompt(line, task_name: str = "psycho
 _CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 
 _TASKS = [
-    # LightevalTaskConfig(
-    #     name="gsm8k_heb",
-    #     suite=["community"],
-    #     prompt_function=gsm8k_heb_fewshot_prompt,  # <-- updated to few-shot version
-    #     hf_subset="default",
-    #     metric=[GSM8KFinalAccMetric],
-    #     hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "gsm8k_heb/"),
-    #     evaluation_splits=["validation"],
-    #     stop_sequence=['[ANSWER_END]'],
-    #     generation_size=512
-    # ),
+    LightevalTaskConfig(
+    name="gsm8k_heb",
+    suite=["community"],
+    prompt_function=gsm8k_heb_prompt,
+    hf_repo=os.path.join(_CURR_DIR, "..", "hebrew_benchmarks_data_final", "gsm8k_heb/"),
+    hf_subset="default",
+    evaluation_splits=["validation"],
+    few_shots_split="train",
+    generation_size=256,
+    metrics=[
+      Metrics.exact_match(sample_params={"normalize_gold": gsm8k_heb_normalizer, "normalize_pred": gsm8k_heb_normalizer})
+    ],
+    stop_sequence=gsm8k_heb_stop_sequences,
+    version=0,
+),
     LightevalTaskConfig(
         name="arc_ai2_heb",
         suite=["community"],
@@ -1493,7 +1563,7 @@ LightevalTaskConfig(
         evaluation_splits=["validation"],
     ),
        LightevalTaskConfig(
-        name="psychometric_heb_analogies",
+        name="psychometric_heb_analogies_hebrew",
         suite=["community"],
         prompt_function=psychometric_test_analogies_prompt,
         hf_subset="default",
@@ -1503,7 +1573,7 @@ LightevalTaskConfig(
         few_shots_split="train",
     ),
        LightevalTaskConfig(
-        name="psychometric_heb_restatement",
+        name="psychometric_heb_restatement_english",
         suite=["community"],
         prompt_function=psychometric_test_restatement_prompt,
         hf_subset="default",

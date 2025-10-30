@@ -202,4 +202,7 @@ if __name__ == "__main__":
     if test_s3_connection():
         print("Ready to download from S3")
     else:
-        print("Please check your AWS credentials")
+        print("Please check your AWS credentials")    # download_s3_directory("s3://gepeta-checkpoints/qwen8-20-billion/step-22064/","/home/ec2-user/models/qwen8-20-billion/step-22064/")
+    # download_s3_directory("s3://gepeta-checkpoints/qwen8-20-billion/mid-step-15617/","/home/ec2-user/models/qwen8-20-billion/mid-step-15617/")
+    # download_s3_directory("s3://gepeta-checkpoints/qwen8-20-billion/low-step-6499/","/home/ec2-user/models/qwen8-20-billion/low-step-6499/")
+    download_s3_directory("s3://gepeta-checkpoints/qwen8-20-billion/long-step-517/","/home/ec2-user/models/qwen8-20-billion/long-step-517/")

@@ -76,10 +76,12 @@ def remove_empty_columns(df: pd.DataFrame) -> pd.DataFrame:
     except Exception as e:
         print(f"Error removing empty columns: {e}")
         return df
+
 def extract_simple_view(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Extract simple view: doc.query, metric.acc, model_response.logprobs
+    Extract simple view: doc.query, metric.acc, model_response.logprobs, model_response.text_post_processed
     Each row is a sample, columns are the fields
+    Columns with all empty values are automatically hidden.
     """
     try:
         simple_records = []
@@ -104,10 +106,18 @@ def extract_simple_view(df: pd.DataFrame) -> pd.DataFrame:
             else:
                 record['Query (Input)'] = ''
             
-            # Extract model_response.logprobs
+            # Extract model_response.text_post_processed and model_response.logprobs
             if 'model_response' in df.columns:
                 model_response = row['model_response']
                 if isinstance(model_response, dict):
+                    # Extract text_post_processed
+                    text_post_processed = safe_get_value(model_response, 'text_post_processed')
+                    if not is_empty(text_post_processed):
+                        record['Text Post-Processed'] = str(text_post_processed)[:1000]
+                    else:
+                        record['Text Post-Processed'] = ''
+                    
+                    # Extract logprobs
                     logprobs = safe_get_value(model_response, 'logprobs')
                     
                     if not is_empty(logprobs):
@@ -138,8 +148,10 @@ def extract_simple_view(df: pd.DataFrame) -> pd.DataFrame:
                     else:
                         record['Log Probabilities'] = ''
                 else:
+                    record['Text Post-Processed'] = ''
                     record['Log Probabilities'] = ''
             else:
+                record['Text Post-Processed'] = ''
                 record['Log Probabilities'] = ''
             
             # Extract metric.acc
@@ -195,7 +207,33 @@ def extract_simple_view(df: pd.DataFrame) -> pd.DataFrame:
         import traceback
         traceback.print_exc()
         return pd.DataFrame({'Error': [f'Failed to create simple view: {str(e)}']})
+
+
+def remove_empty_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove columns where all values are empty (None, NaN, empty string, or '?')
+    """
+    columns_to_keep = []
     
+    for col in df.columns:
+        # Always keep the Sample # column
+        if col == 'Sample #':
+            columns_to_keep.append(col)
+            continue
+        
+        # Check if column has any non-empty values
+        has_content = False
+        for val in df[col]:
+            # Check if value is not empty
+            if pd.notna(val) and val != '' and val != '?':
+                has_content = True
+                break
+        
+        if has_content:
+            columns_to_keep.append(col)
+    
+    return df[columns_to_keep]
+
 def safe_convert_to_string(obj: Any, max_length: int = 1000) -> str:
     """Safely convert any object to string representation"""
     try:
