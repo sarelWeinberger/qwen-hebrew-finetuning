@@ -1,0 +1,22 @@
+{
+    "model_name_or_path": "CohereLabs/aya-expanse-32b",
+    "output_dir": "/opt/dlami/nvme/checkpoints/local",
+    "per_device_train_batch_size": 2,
+    "per_device_eval_batch_size": 4,
+    "gradient_accumulation_steps": 16,
+    "learning_rate": 1e-05,
+    "num_train_epochs": 1,
+    "save_strategy": "steps",
+    "save_steps": 1000,
+    "save_total_limit": 3,
+    "logging_steps": 1,
+    "max_steps": 200,
+    "eval_steps": 1000,
+    "warmup_ratio": 0.1,
+    "max_seq_length": 4096,
+    "weight_decay": 0.01,
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.999,
+    "adam_epsilon": 1e-8,
+    "resume_from_checkpoint": "auto"
+}

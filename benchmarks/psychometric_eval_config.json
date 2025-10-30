@@ -1,0 +1,11 @@
+{
+  "dataset_name": "psychometric_hebrew",
+  "dataset_path": "benchmarks/psychometric_dataset.jsonl",
+  "language": "hebrew",
+  "task_type": "multiple_choice",
+  "metrics": [
+    "accuracy",
+    "f1"
+  ],
+  "description": "Hebrew psychometric reasoning benchmark"
+}

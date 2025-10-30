@@ -1,0 +1,16 @@
+community|arc_ai2_heb|25
+community|copa_heb|5
+community|hellaswag_heb|10
+community|mmlu_heb|25
+community|gsm8k_heb|5
+community|psychometric_heb_math|5
+community|psychometric_heb_analogies_hebrew|5
+community|psychometric_heb_sentence_complete_hebrew|5
+community|psychometric_heb_sentence_text_hebrew|2
+community|psychometric_heb_understanding_hebrew|5
+community|psychometric_heb_restatement_english|5
+community|psychometric_heb_sentence_complete_english|5
+community|psychometric_heb_sentence_text_english|2
+leaderboard|arc:challenge|25
+leaderboard|hellaswag|10
+leaderboard|gsm8k|5

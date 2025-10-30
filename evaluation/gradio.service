@@ -1,0 +1,15 @@
+[Unit]
+Description=Gradio Service
+After=network.target
+
+[Service]
+ExecStart=/home/ubuntu/codes/noam-env/bin/python /home/ubuntu/qwen-hebrew-finetuning/evaluation/scores_dashboard.py
+WorkingDirectory=/home/ubuntu/qwen-hebrew-finetuning/evaluation
+Restart=always
+User=ubuntu
+
+StandardOutput=append:/var/log/gradio.log
+StandardError=append:/var/log/gradio.log
+
+[Install]
+WantedBy=multi-user.target
