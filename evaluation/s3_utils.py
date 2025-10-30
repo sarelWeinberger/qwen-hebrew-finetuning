@@ -2,7 +2,33 @@ import boto3
 import os
 import tempfile
 import json
+import re
 from botocore.exceptions import ClientError
+
+def sanitize_filename(filename):
+    """
+    Sanitize filename to be compatible with Windows and other OS.
+    Replaces invalid characters with underscores.
+    
+    Args:
+        filename (str): Original filename
+        
+    Returns:
+        str: Sanitized filename safe for Windows and Unix systems
+    """
+    # Characters that are invalid in Windows filenames
+    invalid_chars = r'[<>:"|?*]'
+    
+    # Replace invalid characters with underscore
+    sanitized = re.sub(invalid_chars, '_', filename)
+    
+    # Also handle pipe character which can cause issues
+    sanitized = sanitized.replace('|', '_')
+    
+    # Remove any trailing dots or spaces (invalid in Windows)
+    sanitized = sanitized.rstrip('. ')
+    
+    return sanitized
 
 def parse_s3_path(s3_path):
     """Parse S3 path into bucket and key components."""
@@ -18,6 +44,7 @@ def parse_s3_path(s3_path):
 def download_s3_directory(s3_path, local_dir):
     """
     Download an entire S3 directory to a local directory.
+    Compatible with Windows and Unix systems.
     
     Args:
         s3_path (str): S3 path in format 's3://bucket/key/'
@@ -55,7 +82,13 @@ def download_s3_directory(s3_path, local_dir):
                     
                     # Calculate relative path from the prefix
                     relative_path = s3_key[len(key_prefix):]
-                    local_file_path = os.path.join(local_dir, relative_path)
+                    
+                    # Split the path into components and sanitize each part
+                    path_parts = relative_path.split('/')
+                    sanitized_parts = [sanitize_filename(part) for part in path_parts]
+                    
+                    # Reconstruct the path using os.path.join for OS compatibility
+                    local_file_path = os.path.join(local_dir, *sanitized_parts)
                     
                     # Create subdirectories if needed
                     local_file_dir = os.path.dirname(local_file_path)
@@ -63,10 +96,15 @@ def download_s3_directory(s3_path, local_dir):
                         os.makedirs(local_file_dir, exist_ok=True)
                     
                     # Download the file
-                    s3_client.download_file(bucket, s3_key, local_file_path)
-                    downloaded_files.append(local_file_path)
+                    try:
+                        s3_client.download_file(bucket, s3_key, local_file_path)
+                        downloaded_files.append(local_file_path)
+                        print(f"Downloaded: {s3_key} -> {local_file_path}")
+                    except Exception as e:
+                        print(f"Error downloading {s3_key}: {e}")
+                        continue
         
-        print(f"Downloaded {len(downloaded_files)} files from {s3_path} to {local_dir}")
+        print(f"Successfully downloaded {len(downloaded_files)} files from {s3_path} to {local_dir}")
         return local_dir
         
     except ClientError as e:
@@ -92,6 +130,7 @@ def cleanup_temp_directory(temp_dir):
 def download_s3_file(s3_path, local_path=None, s3_client=None):
     """
     Download a single S3 object to a local file.
+    Compatible with Windows and Unix systems.
 
     Args:
         s3_path (str): S3 path in format 's3://bucket/key'
@@ -111,12 +150,21 @@ def download_s3_file(s3_path, local_path=None, s3_client=None):
 
     # Determine local path
     if local_path is None:
-        local_path = os.path.basename(key) or "downloaded_s3_object"
+        # Sanitize the basename for Windows compatibility
+        basename = os.path.basename(key) or "downloaded_s3_object"
+        local_path = sanitize_filename(basename)
 
     # If local_path is a directory path (ends with separator) or an existing dir, place file inside it
     if local_path.endswith(os.sep) or local_path.endswith('/') or os.path.isdir(local_path):
         os.makedirs(local_path, exist_ok=True)
-        local_path = os.path.join(local_path, os.path.basename(key))
+        basename = sanitize_filename(os.path.basename(key))
+        local_path = os.path.join(local_path, basename)
+    else:
+        # Sanitize the full path
+        dir_path = os.path.dirname(local_path)
+        file_name = os.path.basename(local_path)
+        sanitized_file_name = sanitize_filename(file_name)
+        local_path = os.path.join(dir_path, sanitized_file_name) if dir_path else sanitized_file_name
 
     # Ensure parent directories exist
     parent_dir = os.path.dirname(local_path)
@@ -151,4 +199,7 @@ def test_s3_connection():
 
 if __name__ == "__main__":
     # Test the S3 connection
-    test_s3_connection()
+    if test_s3_connection():
+        print("Ready to download from S3")
+    else:
+        print("Please check your AWS credentials")
