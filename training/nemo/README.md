@@ -78,13 +78,18 @@ Currently the script contains imports for Qwen3-8B, Qwen3-30B-A3B-Base, Aya-8B, 
 
 ```bash
 pip install -U huggingface_hub
-hf download Qwen/Qwen3-30B-A3B-Base
 python import.py
 ```
 
 > If you want to import a different model, then you need to update the following:
-> 1. The `hf download` command should be updated
-> 2. In `import.py`, make sure to update the import line. NOTE: You need to update the source name to point to the correct HF model, and **ALSO** update the model config. E.g., for Qwen3-8B, you need to add an import to Qwen3Config8B in line 2, and update it in line 5 as well. You can view the full list of configurations in the source code [here](https://github.com/NVIDIA/NeMo).
+> 1. In `import.py`, make sure to update the import line. NOTE: You need to update the source name to point to the correct HF model, and **ALSO** update the model config. E.g., for Qwen3-8B, you need to add an import to Qwen3Config8B in line 2, and update it in line 5 as well. You can view the full list of configurations in the source code [here](https://github.com/NVIDIA/NeMo).
+
+
+**IMPORTANT:** The *aya* models are all based on custom code that appears in [./aya/aya.py]. We include two extra scripts there, for convenience:
+
+1. [validate_import.py](./aya/validate_import.py) - This script was used to ensure the outputs from the HF checkpoints & the import checkpoint for Aya were indeed the same. No need to use it - I already confirmed it works, but keeping it here *just in case*.
+
+2. [export_aya.py](./aya/export_aya.py) - An example script fro exporting an Aya-based checkpoint from NeMo back to HF. 
 
 ### Training *on a single node*
 
