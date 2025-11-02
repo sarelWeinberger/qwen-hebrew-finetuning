@@ -204,7 +204,7 @@ bash launch_docker.sh
 Set up: 
 
 ```bash
-pip install -U huggingface_hub git+https://github.com/NVIDIA-NeMo/Run
+pip install -U "huggingface_hub<1" git+https://github.com/NVIDIA-NeMo/Run
 apt update && apt install -y libmunge2 && adduser --disabled-password --gecos "" slurm
 export PATH="$PATH:/opt/slurm/bin"
 ```
@@ -234,6 +234,7 @@ python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
+
 
 
 
