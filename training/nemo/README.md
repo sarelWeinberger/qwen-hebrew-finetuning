@@ -83,7 +83,6 @@ Outputs: `hebdata_hewiki_text_document.bin` and `.idx` (under the created prepro
 Currently the script contains imports for Qwen3-8B, Qwen3-30B-A3B-Base, Aya-8B, and Aya-32B. Make sure to uncomment the relevant line.
 
 ```bash
-pip install -U "huggingface_hub<1"
 # > Edit the import.py file, and uncomment the relevant line!!
 python import.py
 ```
@@ -204,7 +203,7 @@ bash launch_docker.sh
 Set up: 
 
 ```bash
-pip install -U "huggingface_hub<1" git+https://github.com/NVIDIA-NeMo/Run
+pip install -U git+https://github.com/NVIDIA-NeMo/Run
 apt update && apt install -y libmunge2 && adduser --disabled-password --gecos "" slurm
 export PATH="$PATH:/opt/slurm/bin"
 ```
@@ -234,6 +233,7 @@ python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
+
 
 
 
