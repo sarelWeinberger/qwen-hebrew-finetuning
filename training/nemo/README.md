@@ -77,7 +77,8 @@ Outputs: `hebdata_hewiki_text_document.bin` and `.idx` (under the created prepro
 Currently the script contains imports for Qwen3-8B, Qwen3-30B-A3B-Base, Aya-8B, and Aya-32B. Make sure to uncomment the relevant line.
 
 ```bash
-pip install -U huggingface_hub
+pip install -U "huggingface_hub<1"
+# > Edit the import.py file, and uncomment the relevant line!!
 python import.py
 ```
 
@@ -85,7 +86,7 @@ python import.py
 > 1. In `import.py`, make sure to update the import line. NOTE: You need to update the source name to point to the correct HF model, and **ALSO** update the model config. E.g., for Qwen3-8B, you need to add an import to Qwen3Config8B in line 2, and update it in line 5 as well. You can view the full list of configurations in the source code [here](https://github.com/NVIDIA/NeMo).
 
 
-**IMPORTANT:** The *aya* models are all based on custom code that appears in [./aya/aya.py]. We include two extra scripts there, for convenience:
+**IMPORTANT:** The *aya* models are all based on custom code that appears in [aya.py](./aya/aya.py). We include two extra scripts there, for convenience:
 
 1. [validate_import.py](./aya/validate_import.py) - This script was used to ensure the outputs from the HF checkpoints & the import checkpoint for Aya were indeed the same. No need to use it - I already confirmed it works, but keeping it here *just in case*.
 
