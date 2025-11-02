@@ -4,6 +4,12 @@ Minimal steps to preprocess data and launch training in the NVIDIA NeMo 25.09 co
 
 ## Setting up VS-Code Tunneling:
 
+connect to hyperpod controller:
+
+```bash
+./easy-ssh.sh -c controller-machine ml-cluster --region us-east-2
+```
+
 Run this command:
 
 ```bash
@@ -228,6 +234,7 @@ python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
+
 
 
 
