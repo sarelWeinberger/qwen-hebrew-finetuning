@@ -26,6 +26,7 @@ var/
 # Data files
 training/deepspeed/datasets/
 training/deepspeed/datasets_bkp/
+training/nemo/data/*.jsonl
 
 # Output files
 training/deepspeed/output/
@@ -42,9 +43,6 @@ training/deepspeed/logs/qwen_model_shaltiel/*.log
 .venv
 venv/
 ENV/
-.uv/
-uv.lock
-.python-version
 
 # IDE
 .idea/

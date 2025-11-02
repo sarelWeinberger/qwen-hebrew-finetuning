@@ -1,4 +1,4 @@
-# NeMo PWC Israel-LLM Project Training
+﻿# NeMo PWC Israel-LLM Project Training
 
 Minimal steps to preprocess data and launch training in the NVIDIA NeMo 25.07 container.
 
