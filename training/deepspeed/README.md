@@ -5,41 +5,28 @@ A working reproduction of single-node distributed continuous-pretraining of a Mo
 
 ## Quick Start
 
+### AWS Details
+
+This code was proven to work with the following settings - it may work in other settings as well. 
+
+Machine Type: `p4de.24xlarge` or `p5en.48xlarge`
+
+AMI: `Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.8 (Ubuntu 22.04)`
+
+Storage: If the checkpoints are going to persist when turning the machine on & off, then add a large sum. Otherwise, 100GB is enough and in the setup HF_HOME & checkpoints will be set to the NVME drive. If the data needs to be persisted, make sure to update the `cpt_config.json` so that the checkpoints will be saved to EBS and not NVME. 
+
 ### 1. One-Command Setup
 
 ```bash
 # Clone the repository
 git clone https://github.com/sarelWeinberger/qwen-hebrew-finetuning.git
-cd qwen-hebrew-finetuning/qwen_ec2_advanced_training/
+cd qwen-hebrew-finetuning/training/deepspeed/
 
-# Run the setup script
-./setup.sh
+# Run the setup script (you may be prompted to log in to HF / WandB / S3)
+source ./setup.sh
 ```
 
-### 2. Login to Services
-
-```bash
-# Activate the virtual environment
-source .venv/bin/activate
-
-# Login to Weights & Biases
-wandb login
-
-# Login to HuggingFace (for model downloads and uploads)
-huggingface-cli login
-```
-
-### 3. AWS Credentials Setup
-
-Create or update `~/.aws/credentials`:
-
-```ini
-[default]
-aws_access_key_id = YOUR_ACCESS_KEY
-aws_secret_access_key = YOUR_SECRET_KEY
-```
-
-### 4. Add Your Datasets
+### 2. Add Your Datasets
 
 Place your JSONL dataset files in the `datasets/` directory:
 
@@ -49,11 +36,11 @@ Place your JSONL dataset files in the `datasets/` directory:
 ...
 ```
 
-### 5. Start Training
+### 3. Start Training
 
 ```bash
 # Launch training (runs in background)
-nohup ./train_all.sh > logs/train.log 2>&1 &
+nohup ./train_all.sh
 
 # Monitor progress
 tail -f logs/train.log
@@ -62,90 +49,13 @@ tail -f logs/train.log
 ./kill_train_all.sh
 ```
 
-## Manual Setup (Alternative)
-
-If you prefer to set up manually or the automatic setup fails:
-
-### AWS Details
-
-This code was proven to work with the following settings - it may work in other settings as well. 
-
-Machine Type: `p4de.24xlarge`
-
-AMI: `Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.7 (Ubuntu 22.04)`
-
-Storage: (recommended on the safe side) 4 Tbytes
-
-### Environment Setup
-
-```bash
-# Clone & Navigate
-git clone https://github.com/sarelWeinberger/qwen-hebrew-finetuning.git
-cd qwen-hebrew-finetuning/qwen_ec2_advanced_training/
-
-# Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source $HOME/.local/bin/env
-
-# Create a new virtual environment
-uv venv
-source .venv/bin/activate
-
-# Install libraries
-uv pip install -r requirements.txt
-
-# Create necessary directories
-mkdir -p logs datasets output
-
-# Set up HuggingFace transfer for faster downloads
-export HF_HUB_ENABLE_HF_TRANSFER=1
-
-# Download models (optional - will be downloaded automatically if needed)
-huggingface-cli download Qwen/Qwen3-30B-A3B-Base
-huggingface-cli download Qwen/Qwen3-32B
-
-# Login to services
-wandb login
-huggingface-cli login
-```
-
 ### Resuming on Existing Machine
 
-When logging back into a machine after a stop, just activate the venv again:
+When logging back into a machine after a stop, just run setup again:
 
 ```bash
-cd qwen-hebrew-finetuning/qwen_ec2_advanced_training/
-source .venv/bin/activate
-```
-
-### Data
-
-Put all the datasets you want to run in the `datasets/` sub-directory.
-Don't put there other files.
-Dataset should be in .jsonl format, as below:
-
-```json
-{"text": "text of document one"}
-{"text": "text of document two"}
-...
-```
-
-## Training
-
-### Quick Launch
-
-For the most common use case, simply run:
-
-```bash
-```bash
-# Start training (runs in background, creates logs automatically)
-nohup ./train_all.sh > logs/train.log 2>&1 &
-
-# Monitor training progress
-tail -f logs/train.log
-
-# Check if training is running
-ps aux | grep train
+cd qwen-hebrew-finetuning/training/deepspeed/
+source setup.sh
 ```
 
 ### Advanced Training Options
@@ -166,7 +76,7 @@ These are the parameters (currently) supported:
 
     > **IMPORTANT**: The value here *must* match the value in the deepspeed config passed into the script. The instructions here use the file [deepspeed_zero3.yaml](./deepspeed_zero3.yaml). 
 
-- `output_dir`: (*Optional*, defaults to `./output`) - The directory to save all the intermediate checkpoints
+- `output_dir`: (*Required*) - The directory to save all the intermediate checkpoints. Currently set to the NVME, but should be updated to EBS if the data should persist after shutdown. 
 
 - `learning_rate`: (*Optional*, defaults to `1e-5`) - The (max) learning rate to use for training. 
 
@@ -190,15 +100,6 @@ The script uses `DeepSpeed` to accelerate training, the default configuration us
 
 The only important to note here is that the `gradient_accumulation_steps` **must** be set to the same value specified in the JSON configuration. 
 
-### Running! 
-
-First, make sure you are in the virtual environment:
-
-```bash
-cd qwen-hebrew-finetuning/qwen_ec2_advanced_training/
-source .venv/bin/activate
-```
-
 #### Single Training Run
 
 For a single training run with custom parameters:
@@ -207,24 +108,14 @@ For a single training run with custom parameters:
 accelerate launch --config_file=deepspeed_zero3.yaml train.py --wandb_name run-name-for-wandb
 ```
 
-#### Multiple Datasets (Automated)
-
-To train on all datasets in the `datasets/` directory automatically:
-
-```bash
-# Run in background with logging
-nohup ./train_all.sh > logs/train.log 2>&1 &
-
-# Monitor progress
-tail -f logs/train.log
-```
-
 Other parameters to set:
 
 - `--config /path/to/alternative/config.json` (Path to an alternative [Configuration](#configuration))
 - `--dataset_path /path/to/data/jsonl` (Path to alternative [Data](#data))
 - `--seed 111` (Specifying a different random seed)
 - `--wandb_project a_different_wandb_project` (For separating runs into a different WandB project)
+- `--verbose` (Produces more verbose output, and prints things like model architecture)
+- `--dynamic_packing` (Dynamically packs the dataset before training - this should only be done on small datasets, as it is very costly and takes time. Can be used for test runs on sample data, but for larger data there should be a different solution)
 
 ## Monitoring Training
 
@@ -249,71 +140,13 @@ df -h
 ```bash
 # Stop training using the provided script
 ./kill_train_all.sh
-
-# Or find and kill training processes manually
-ps aux | grep train
-kill <PID>
 ```
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **"No such file or directory: logs/"**
-   - Run `mkdir -p logs` or use the setup script
-   - The `train_all.sh` script now creates this automatically
-
-2. **Virtual environment not found**
-   - Run `./setup.sh` to create and configure everything
-   - Or manually: `uv venv && source .venv/bin/activate`
-
-3. **Permission denied on scripts**
-   - Run `chmod +x *.sh` to make scripts executable
-
-4. **CUDA out of memory**
+- **CUDA out of memory**
    - Reduce `per_device_train_batch_size` in `cpt_config.json`
    - Increase `gradient_accumulation_steps` to maintain effective batch size
-
-5. **Slow downloads**
-   - Ensure `export HF_HUB_ENABLE_HF_TRANSFER=1` is set
-   - Check internet connection and HuggingFace status
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"No such file or directory: logs/"**
-   - The `train_all.sh` script now creates this automatically
-   - Or manually run: `mkdir -p logs`
-
-2. **Virtual environment not found**
-   - Create it: `uv venv && source .venv/bin/activate`
-
-3. **Permission denied on scripts**
-   - Run `chmod +x *.sh` to make scripts executable
-
-4. **CUDA out of memory**
-   - Reduce `per_device_train_batch_size` in `cpt_config.json`
-   - Increase `gradient_accumulation_steps` to maintain effective batch size
-
-5. **Slow downloads**
-   - Ensure `export HF_HUB_ENABLE_HF_TRANSFER=1` is set
-   - Check internet connection and HuggingFace status
-## File Structure
-
-```
-qwen_ec2_advanced_training/
-├── train_all.sh          # Main training script (fixed paths)
-├── logs/                 # Training logs (auto-created)
-├── datasets/             # Place your JSONL files here
-├── output/               # Model checkpoints saved here
-├── .venv/                # Python virtual environment
-├── cpt_config.json       # Training configuration
-├── deepspeed_zero3.yaml  # DeepSpeed configuration
-├── train.py              # Core training script
-├── requirements.txt      # Python dependencies
-└── kill_train_all.sh     # Script to stop training
-```
 
 ## Next Steps
 
@@ -321,12 +154,13 @@ We have a working script here that trains, utilizes all GPUs with DeepSpeed+Zero
 
 That being said, there are still many improvements that must be done to the script for large-scale training:
 
-- **Packing**: In order to maximize utilization we want to avoid padding, and instead we pack sequences together. See [here](https://lweitkamp.github.io/posts/packing/index.html) for more details. This is crucial for successfully training the LLM. 
+- **Packing**: Update: We added the `pack_dataset` from `TRL` which packs a given a dataset during the run. This works for smaller datasets, but should be avoided on larger datasets since it takes a long time. 
+> In order to maximize utilization we want to avoid padding, and instead we pack sequences together. See [here](https://lweitkamp.github.io/posts/packing/index.html) for more details. This is crucial for successfully training the LLM. 
 
 - **Large Dataset**: The current script assumes a small sample, and loads the full dataset into memory tokenizing ahead of time. When working with very large datasets, we can't have them all in memory at once - instead we want to pre-tokenize and stream them to avoid any bottlenecks. 
 
-- **GPU Utilization**: Right now we have a reasonable GPU utilization, average at ~60%. That's decent, but we want to be nearing 99%. This can definitely improve with hardware, but there are software changes that should be done. 
-![alt text](./readme_image.png)
+- **GPU Utilization**: Update: Works 100% for non MoE models.
+> Right now we have a reasonable GPU utilization, average at ~60%. That's decent, but we want to be nearing 99%. This can definitely improve with hardware, but there are software changes that should be done. 
 
 - **Hyperparameter Tuning**: We want to optimize the hyperparameters we're using - currently there is no support for `optuna`, that needs to be added. 
 
@@ -337,13 +171,3 @@ That being said, there are still many improvements that must be done to the scri
     1. Perplexity - this can be done within the `train.py` script, we just need to update the script accordingly and set `eval_dataset` to the relevant dataset. 
 
     2. Quality - this will involve pulling the checkpoints from the hub as they're uploaded, and then evaluting them using a library like `lighteval`. 
-
-## Troubleshooting
-
-**Issue: "No such file or directory: logs/"**
-
-The training script now automatically creates the logs directory. If you still encounter this error, manually create it:
-
-```bash
-mkdir -p logs
-``` 
