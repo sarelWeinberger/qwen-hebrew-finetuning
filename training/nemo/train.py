@@ -2,7 +2,7 @@ import argparse
 import tempfile
 import os
 
-def slurm_executor(nodes: int = 1, container_image: str = 'dockerd://nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2'):
+def slurm_executor(nodes: int = 1, container_image: str = 'dockerd://nvcr.io/nvidia/nemo:25.09'):
     import nemo_run as run
     local_tunnel = run.LocalTunnel(job_dir=os.path.join(os.environ['NEMORUN_HOME'], "experiments"))
 
@@ -136,7 +136,7 @@ if __name__ == '__main__':
     )
     pretrain.data = run.Config(PreTrainingDataModule, 
         # paths=['100', '/workspace/tok-data/hebdata_hewiki_text_document'], # can include lots of segments with different ratios
-        paths=['100', './tok-data/hebdata_hewiki_text_document'], # can include lots of segments with different ratios
+        paths=['100', '/workspace/tok-data/low_text_document'], # can include lots of segments with different ratios
         tokenizer=tokenizer, 
         seq_length=seq_length, 
         micro_batch_size=micro_bs,

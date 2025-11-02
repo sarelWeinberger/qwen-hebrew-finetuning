@@ -1,4 +1,4 @@
-﻿if command -v nvidia-smi &>/dev/null && nvidia-smi -L &>/dev/null; then
+if command -v nvidia-smi &>/dev/null && nvidia-smi -L &>/dev/null; then
   GPUS="--gpus all"
 else
   GPUS=""
