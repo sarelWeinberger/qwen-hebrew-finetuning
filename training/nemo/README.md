@@ -1,6 +1,6 @@
 ﻿# NeMo PWC Israel-LLM Project Training
 
-Minimal steps to preprocess data and launch training in the NVIDIA NeMo 25.07 container.
+Minimal steps to preprocess data and launch training in the NVIDIA NeMo 25.09 container.
 
 ## Setting up VS-Code Tunneling:
 
@@ -25,14 +25,14 @@ Once set up, go to your local VS-Code, `Connect to Tunnel` -> `GitHub Account` -
 * Tested on AWS 8xH200 Machine - p5en.48xlarge
 * Tested on AWS SageMaker Hyperpod - 2 x g6e.48xLarge
 * NVIDIA GPU + drivers, Docker with GPU support.
-* This image: `nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2`.
+* This image: `nvcr.io/nvidia/nemo:25.09`.
 
 ## Single Node Instructions
 
 ### Pull & Run
 
 ```bash
-docker pull nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2
+docker pull nvcr.io/nvidia/nemo:25.09
 
 docker run --gpus all \
   -e HF_HOME=/home/ubuntu/nvme/.cache/huggingface/ \
@@ -42,7 +42,7 @@ docker run --gpus all \
   -v $(pwd):/home/ubuntu/nemo_training/ \
   -v /opt/dlami/nvme:/home/ubuntu/nvme/ \
   -w /home/ubuntu/nemo_training/ \
-  nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2
+  nvcr.io/nvidia/nemo:25.09
 ```
 
 ### Data
@@ -73,6 +73,8 @@ python /opt/NeMo/scripts/nlp_language_modeling/preprocess_data_for_megatron.py \
 Outputs: `hebdata_hewiki_text_document.bin` and `.idx` (under the created preprocess folder). You can change the output prefix as you wish, to help distinguish the different corpora. 
 
 ### Import the model (inside the container)
+
+Currently the script contains imports for Qwen3-8B, Qwen3-30B-A3B-Base, Aya-8B, and Aya-32B. Make sure to uncomment the relevant line.
 
 ```bash
 pip install -U huggingface_hub
@@ -119,9 +121,9 @@ cd $HOME_DIR
 On the controller node, run (replace the *2* without the actual number of nodes in the cluster):
 
 ```bash
-srun -N 2 docker pull nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2
+srun -N 2 docker pull nvcr.io/nvidia/nemo:25.09
 srun -N 2 sudo chmod -R 1777 /opt/sagemaker/tmp/
-docker pull nvcr.io/nvidia/nemo:25.07.nemotron-nano-v2
+docker pull nvcr.io/nvidia/nemo:25.09
 chmod o+rx /fsx/ubuntu
 ```
 
@@ -220,6 +222,7 @@ python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
+
 
 
 
