@@ -223,7 +223,11 @@ Just run the python script, and let the magic work! (Perhaps run this inside a s
 ```bash
 python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen3-8b-nemo-mn-test --use_fp8 --num_nodes 2 --model Qwen3_8B
 ```
-
+or
+change     max_steps = 15000 
+```bash
+python train.py --checkpoints_path /fsx/test_runs/aya-8b-mid --run_name aya-8b-mid --use_fp8 --num_nodes 4 --model Aya_8B
+```
 ## Incomplete TODO list / Next steps
 
 * Tokenize everything (cover all corpora beyond `hewiki-data.jsonl`).
@@ -233,6 +237,7 @@ python train.py --checkpoints_path /fsx/test_runs/checkpoints-8b --run_name qwen
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
+
 
 
 
