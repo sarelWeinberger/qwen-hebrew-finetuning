@@ -45,7 +45,7 @@ def slurm_executor(nodes: int = 1, container_image: str = 'dockerd://nvcr.io/nvi
             "/dev/infiniband:/dev/infiniband",
             f'{os.environ['WORKSPACE_DIR']}:/workspace',
         ],
-        packager=run.Packager(),
+        packager=run.PatternPackager(include_pattern="./aya/aya.py", relative_path=os.getcwd()),
     )
 
 
