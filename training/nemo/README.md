@@ -131,6 +131,7 @@ On the controller node, run (replace the *2* without the actual number of nodes 
 ```bash
 srun -N 2 docker pull nvcr.io/nvidia/nemo:25.09
 srun -N 2 bash -c "sudo mkdir -p /opt/sagemaker/tmp/enroot && sudo chmod -R 1777 /opt/sagemaker/tmp/"
+srun -N 2 bash -c "sudo mkdir -p /opt/dlami/nvme/tmp/enroot && sudo chmod -R 1777 /opt/dlami/nvme/sagemaker/tmp/"
 docker pull nvcr.io/nvidia/nemo:25.09
 chmod o+rx /fsx/ubuntu
 ```
@@ -240,6 +241,7 @@ python train.py --checkpoints_path /fsx/test_runs/aya-8b-mid --run_name aya-8b-m
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
+
 
 
 
