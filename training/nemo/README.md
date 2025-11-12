@@ -63,20 +63,17 @@ For my test run, I placed the source JSONL in `./data`. Example used:
 
 ```bash
 mkdir tok-data
-python /opt/NeMo/scripts/nlp_language_modeling/preprocess_data_for_megatron.py \
-  --input ./data \
+python /opt/Automodel/tools/preprocess_megatron_dataset.py \
+  --input "./data/*" \
   --keep-newlines \
-  --tokenizer-library huggingface \
-  --tokenizer-type Qwen/Qwen3-8B \
-  --append-eod \
+  --pretrained-model-name-or-path Qwen/Qwen3-8B \
   --output-prefix ./tok-data/hebdata_hewiki \
+  --append-eod \
   --workers 128 \
-  --preproc-folder \
-  --files-filter '*' \
   --log-interval 50000
 ```
 
-Outputs: `hebdata_hewiki_text_document.bin` and `.idx` (under the created preprocess folder). You can change the output prefix as you wish, to help distinguish the different corpora. 
+Outputs: `hebdata_hewiki_0_text_document.bin` and `.idx` (under the created preprocess folder). You can change the output prefix as you wish, to help distinguish the different corpora. 
 
 ### Import the model (inside the container)
 
@@ -133,10 +130,16 @@ On the controller node, run (replace the *2* without the actual number of nodes 
 
 ```bash
 srun -N 2 docker pull nvcr.io/nvidia/nemo:25.09
-srun -N 2 sudo chmod -R 1777 /opt/sagemaker/tmp/
+srun -N 2 bash -c "sudo mkdir -p /opt/sagemaker/tmp && sudo chmod -R 1777 /opt/sagemaker/tmp/"
 docker pull nvcr.io/nvidia/nemo:25.09
 chmod o+rx /fsx/ubuntu
 ```
+
+> If you encounter an error with `no space is left on device` during the docker pull, run this:
+> ```bash
+> srun -N 2 bash -c 'sudo systemctl stop containerd && sudo mkdir -p /opt/sagemaker/containerd && echo "root = \"/opt/sagemaker/containerd\"" | sudo tee /etc/containerd/config.toml && sudo systemctl start containerd && sudo systemctl restart docker'
+> sudo systemctl stop containerd && sudo mkdir -p /opt/sagemaker/containerd && echo "root = \"/opt/sagemaker/containerd\"" | sudo tee /etc/containerd/config.toml && sudo systemctl start containerd && sudo systemctl restart docker
+> ```
 
 ### Data
 
@@ -237,6 +240,7 @@ python train.py --checkpoints_path /fsx/test_runs/aya-8b-mid --run_name aya-8b-m
 ## Diamonds in the Ruff
 
 - Answers to all your EFA-related prayers: [https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md](https://github.com/aws/aws-ofi-nccl/blob/master/doc/efa-env-var.md)
+
 
 
 
